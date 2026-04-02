@@ -65,39 +65,53 @@ let lastStrumTime = 0;
 let expectedStrumIndex = 0;
 let strumHistory = [];
 
-// DOM 元素
-const btnStart = document.getElementById('btnStart');
-const btnStop = document.getElementById('btnStop');
-const statusIndicator = document.getElementById('statusIndicator');
-const statusText = document.getElementById('statusText');
-const rhythmSelector = document.getElementById('rhythmSelector');
-const rhythmScoreEl = document.getElementById('rhythmScore');
-const toneScoreEl = document.getElementById('toneScore');
-const dynamicsScoreEl = document.getElementById('dynamicsScore');
-const totalScoreEl = document.getElementById('totalScore');
-const feedbackMessage = document.getElementById('feedbackMessage');
-const historyList = document.getElementById('historyList');
-const canvas = document.getElementById('waveform');
-const canvasCtx = canvas.getContext('2d');
-
-// 新增 DOM 元素
-const metronomeToggle = document.getElementById('metronomeToggle');
-const bpmSlider = document.getElementById('bpmSlider');
-const bpmValue = document.getElementById('bpmValue');
-const demoButtons = document.querySelectorAll('.btn-demo');
-const sensitivitySlider = document.getElementById('sensitivitySlider');
-const sensitivityValue = document.getElementById('sensitivityValue');
-const thresholdDisplay = document.getElementById('thresholdDisplay');
-
-// 统计图表 DOM 元素
-const statsChartCanvas = document.getElementById('statsChart');
-const statsChartCtx = statsChartCanvas ? statsChartCanvas.getContext('2d') : null;
-const avgScoreEl = document.getElementById('avgScore');
-const maxScoreEl = document.getElementById('maxScore');
-const practiceCountEl = document.getElementById('practiceCount');
+// DOM 元素（在 init 中初始化）
+let btnStart, btnStop, statusIndicator, statusText, rhythmSelector;
+let rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl;
+let feedbackMessage, historyList, canvas, canvasCtx;
+let metronomeToggle, bpmSlider, bpmValue, demoButtons;
+let sensitivitySlider, sensitivityValue, thresholdDisplay;
+let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
 
 // 初始化
 function init() {
+  console.log('[GuitarStrumTrainer] 开始初始化...');
+  
+  // 获取所有 DOM 元素
+  btnStart = document.getElementById('btnStart');
+  btnStop = document.getElementById('btnStop');
+  statusIndicator = document.getElementById('statusIndicator');
+  statusText = document.getElementById('statusText');
+  rhythmSelector = document.getElementById('rhythmSelector');
+  rhythmScoreEl = document.getElementById('rhythmScore');
+  toneScoreEl = document.getElementById('toneScore');
+  dynamicsScoreEl = document.getElementById('dynamicsScore');
+  totalScoreEl = document.getElementById('totalScore');
+  feedbackMessage = document.getElementById('feedbackMessage');
+  historyList = document.getElementById('historyList');
+  canvas = document.getElementById('waveform');
+  canvasCtx = canvas ? canvas.getContext('2d') : null;
+  
+  metronomeToggle = document.getElementById('metronomeToggle');
+  bpmSlider = document.getElementById('bpmSlider');
+  bpmValue = document.getElementById('bpmValue');
+  demoButtons = document.querySelectorAll('.btn-demo');
+  sensitivitySlider = document.getElementById('sensitivitySlider');
+  sensitivityValue = document.getElementById('sensitivityValue');
+  thresholdDisplay = document.getElementById('thresholdDisplay');
+  
+  statsChartCanvas = document.getElementById('statsChart');
+  statsChartCtx = statsChartCanvas ? statsChartCanvas.getContext('2d') : null;
+  avgScoreEl = document.getElementById('avgScore');
+  maxScoreEl = document.getElementById('maxScore');
+  practiceCountEl = document.getElementById('practiceCount');
+  
+  console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
+    btnStart: !!btnStart,
+    btnStop: !!btnStop,
+    demoButtons: demoButtons?.length || 0
+  });
+  
   setupRhythmSelector();
   setupButtons();
   setupCanvas();
@@ -108,6 +122,8 @@ function init() {
   renderHistory();
   renderStatsChart();
   updateStatus('ready');
+  
+  console.log('[GuitarStrumTrainer] 初始化完成');
 }
 
 // 设置节奏型选择
@@ -325,8 +341,26 @@ function setupSensitivity() {
 
 // 设置按钮
 function setupButtons() {
-  btnStart.addEventListener('click', startListening);
-  btnStop.addEventListener('click', stopListening);
+  if (!btnStart) {
+    console.error('[GuitarStrumTrainer] btnStart 元素未找到');
+    return;
+  }
+  if (!btnStop) {
+    console.error('[GuitarStrumTrainer] btnStop 元素未找到');
+    return;
+  }
+  
+  btnStart.addEventListener('click', () => {
+    console.log('[GuitarStrumTrainer] 开始练习按钮被点击');
+    startListening();
+  });
+  
+  btnStop.addEventListener('click', () => {
+    console.log('[GuitarStrumTrainer] 停止按钮被点击');
+    stopListening();
+  });
+  
+  console.log('[GuitarStrumTrainer] 按钮事件绑定成功');
 }
 
 // 设置画布
