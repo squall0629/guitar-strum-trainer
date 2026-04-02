@@ -74,10 +74,9 @@ let feedbackMessage, historyList, canvas, canvasCtx;
 let metronomeToggle, bpmSlider, bpmValue, demoButtons;
 let sensitivitySlider, sensitivityValue, thresholdDisplay;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
-let btnTestMic;
 
 // 版本号
-const APP_VERSION = 'v1.3';
+const APP_VERSION = 'v1.7';
 
 // 初始化
 function init() {
@@ -111,7 +110,6 @@ function init() {
   avgScoreEl = document.getElementById('avgScore');
   maxScoreEl = document.getElementById('maxScore');
   practiceCountEl = document.getElementById('practiceCount');
-  btnTestMic = document.getElementById('btnTestMic');
   
   console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
@@ -389,7 +387,6 @@ function stopDemo() {
   currentDemoRhythmIndex = -1;
   
   demoButtons.forEach(btn => {
-    if (btn.id === 'btnTestMic') return;
     btn.classList.remove('playing');
     btn.textContent = '🔊 试听演示';
   });
@@ -448,38 +445,6 @@ function setupButtons() {
     console.log('[GuitarStrumTrainer] 停止按钮被点击');
     stopListening();
   });
-  
-  // 测试麦克风按钮
-  let isTestingMic = false;
-  let micTestStream = null;
-  if (btnTestMic) {
-    btnTestMic.addEventListener('click', async () => {
-      console.log('[GuitarStrumTrainer] 测试麦克风按钮被点击');
-      if (isTestingMic) {
-        // 停止测试
-        isTestingMic = false;
-        if (micTestStream) {
-          micTestStream.getTracks().forEach(track => track.stop());
-          micTestStream = null;
-        }
-        btnTestMic.textContent = '🧪 测试麦克风';
-        feedbackMessage.textContent = '麦克风测试已停止';
-        return;
-      }
-      try {
-        isTestingMic = true;
-        btnTestMic.textContent = '⏹ 停止测试';
-        micTestStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        feedbackMessage.textContent = '✅ 麦克风测试成功！点击按钮停止测试';
-        console.log('[GuitarStrumTrainer] 麦克风测试成功');
-      } catch (err) {
-        isTestingMic = false;
-        btnTestMic.textContent = '🧪 测试麦克风';
-        feedbackMessage.textContent = '❌ 麦克风测试失败：' + err.message;
-        console.error('[GuitarStrumTrainer] 麦克风测试失败:', err);
-      }
-    });
-  }
   
   console.log('[GuitarStrumTrainer] 按钮事件绑定成功');
 }
