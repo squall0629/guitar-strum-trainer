@@ -389,6 +389,7 @@ function stopDemo() {
   currentDemoRhythmIndex = -1;
   
   demoButtons.forEach(btn => {
+    if (btn.id === 'btnTestMic') return;
     btn.classList.remove('playing');
     btn.textContent = '🔊 试听演示';
   });
@@ -449,15 +450,31 @@ function setupButtons() {
   });
   
   // 测试麦克风按钮
+  let isTestingMic = false;
+  let micTestStream = null;
   if (btnTestMic) {
     btnTestMic.addEventListener('click', async () => {
       console.log('[GuitarStrumTrainer] 测试麦克风按钮被点击');
+      if (isTestingMic) {
+        // 停止测试
+        isTestingMic = false;
+        if (micTestStream) {
+          micTestStream.getTracks().forEach(track => track.stop());
+          micTestStream = null;
+        }
+        btnTestMic.textContent = '🧪 测试麦克风';
+        feedbackMessage.textContent = '麦克风测试已停止';
+        return;
+      }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop());
-        feedbackMessage.textContent = '✅ 麦克风测试成功！现在可以开始练习了';
+        isTestingMic = true;
+        btnTestMic.textContent = '⏹ 停止测试';
+        micTestStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        feedbackMessage.textContent = '✅ 麦克风测试成功！点击按钮停止测试';
         console.log('[GuitarStrumTrainer] 麦克风测试成功');
       } catch (err) {
+        isTestingMic = false;
+        btnTestMic.textContent = '🧪 测试麦克风';
         feedbackMessage.textContent = '❌ 麦克风测试失败：' + err.message;
         console.error('[GuitarStrumTrainer] 麦克风测试失败:', err);
       }
