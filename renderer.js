@@ -191,7 +191,8 @@ function setupDemoButtons() {
   });
 }
 
-// 播放节拍器声音
+// 播放节拍器声音 - 保留原有简洁的电子滴答声
+// 与扫弦音色区分开，使用纯 sine 波确保节拍器声音清晰可辨
 function playMetronomeSound(frequency = 1000, duration = 0.05) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
@@ -237,42 +238,116 @@ function stopMetronome() {
   }
 }
 
-// 播放扫弦演示声音
-function playStrumSound(direction, duration = 0.1) {
+// 播放扫弦演示声音 - 改进版：更真实的吉他音色
+// 改进点：
+// 1. 使用基频 + 泛音叠加模拟吉他和弦
+// 2. 添加 ADSR 包络 (Attack, Decay, Sustain, Release) 让声音更自然
+// 3. 使用 triangle 和 sawtooth 波形混合代替单一 sine
+// 4. 添加轻微频率抖动 (±0.5%) 模拟真实吉他弦的不完美
+// 5. 下扫 (D) 和上扫 (U) 使用不同的音色处理
+function playStrumSound(direction, duration = 0.15) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
   
-  // 创建多个振荡器模拟扫弦的和弦效果
-  const frequencies = direction === 'D' ? [329.63, 440, 554.37, 659.25] : [659.25, 554.37, 440, 329.63];
+  const ctx = audioContextForMetronome;
+  const now = ctx.currentTime;
   
-  frequencies.forEach((freq, index) => {
-    const oscillator = audioContextForMetronome.createOscillator();
-    const gainNode = audioContextForMetronome.createGain();
+  // 基础和弦频率 (E 大调和弦: E3, B3, E4, G#4, B4, E5)
+  const baseChord = [164.81, 246.94, 329.63, 415.30, 493.88, 659.25];
+  
+  // 根据扫弦方向调整延迟和音色
+  const isDownStrum = direction === 'D';
+  const strumDelay = isDownStrum ? 0.008 : 0.012; // 下扫更快，上扫稍慢
+  const brightness = isDownStrum ? 1.0 : 0.7; // 下扫更明亮，上扫柔和
+  
+  // ADSR 包络参数
+  const attackTime = 0.005;    // 5ms 快速起音
+  const decayTime = 0.08;      // 80ms 衰减
+  const sustainLevel = 0.3;    // 延 sustain 电平 30%
+  const releaseTime = duration * 0.6; // 释放时间
+  
+  // 为每根弦创建声音
+  baseChord.forEach((baseFreq, stringIndex) => {
+    // 频率抖动: ±0.5% 模拟真实吉他
+    const jitter = 1 + (Math.random() - 0.5) * 0.01;
+    const freq = baseFreq * jitter;
     
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContextForMetronome.destination);
+    // 每根弦的起始时间错开，模拟扫弦效果
+    const startTime = now + (stringIndex * strumDelay);
     
-    oscillator.frequency.value = freq;
-    oscillator.type = 'triangle';
+    // --- 基频振荡器 (triangle 波形) ---
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.value = freq;
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
     
-    const startTime = audioContextForMetronome.currentTime + (index * 0.02);
-    gainNode.gain.setValueAtTime(0.15, startTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+    // --- 二次泛音 (sawtooth 波形，音量较低) ---
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.value = freq * 2.0; // 二次谐波
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
     
-    oscillator.start(startTime);
-    oscillator.stop(startTime + duration);
+    // --- 三次泛音 (triangle 波形，更弱) ---
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.type = 'triangle';
+    osc3.frequency.value = freq * 3.0; // 三次谐波
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    
+    // 音量分配: 基频最强，泛音递减
+    const baseVolume = 0.12 * brightness;
+    const harmonic2Volume = 0.04 * brightness;
+    const harmonic3Volume = 0.02 * brightness;
+    
+    // 应用 ADSR 包络到基频
+    const peakTime = startTime + attackTime;
+    const sustainTime = startTime + attackTime + decayTime;
+    const endTime = startTime + duration;
+    
+    gain1.gain.setValueAtTime(0.001, startTime);
+    gain1.gain.linearRampToValueAtTime(baseVolume, peakTime);
+    gain1.gain.exponentialRampToValueAtTime(baseVolume * sustainLevel, sustainTime);
+    gain1.gain.setValueAtTime(baseVolume * sustainLevel, endTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, endTime + releaseTime);
+    
+    // 泛音衰减更快
+    gain2.gain.setValueAtTime(0.001, startTime);
+    gain2.gain.linearRampToValueAtTime(harmonic2Volume, peakTime);
+    gain2.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.5);
+    
+    gain3.gain.setValueAtTime(0.001, startTime);
+    gain3.gain.linearRampToValueAtTime(harmonic3Volume, peakTime);
+    gain3.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.3);
+    
+    // 启动和停止所有振荡器
+    osc1.start(startTime);
+    osc1.stop(endTime + releaseTime + 0.01);
+    
+    osc2.start(startTime);
+    osc2.stop(sustainTime + releaseTime * 0.5 + 0.01);
+    
+    osc3.start(startTime);
+    osc3.stop(sustainTime + releaseTime * 0.3 + 0.01);
   });
 }
 
-// 播放节奏型演示
+// 播放节奏型演示 - 改进版：根据 currentBPM 动态计算节拍间隔
+// 改进点：
+// 1. 使用 currentBPM 替代硬编码的 120 BPM
+// 2. 节拍间隔公式: beatInterval = (60 / currentBPM) * 1000 毫秒
+// 3. 根据节奏型 pattern 数组计算每个音符的实际时长
 function playDemo(rhythmIndex, btnElement) {
   isPlayingDemo = true;
   btnElement.classList.add('playing');
   btnElement.textContent = '⏹ 停止演示';
   
   const pattern = RHYTHM_PATTERNS[rhythmIndex];
-  const baseBPM = 120;
   let noteIndex = 0;
   
   function playNextNote() {
@@ -286,7 +361,13 @@ function playDemo(rhythmIndex, btnElement) {
     options.forEach(o => o.classList.remove('active'));
     options[rhythmIndex].classList.add('active');
     
-    const intervalMs = (60 / baseBPM) * pattern.pattern[noteIndex % pattern.pattern.length];
+    // 根据当前 BPM 动态计算节拍间隔
+    // 公式: beatInterval = (60 / BPM) * 1000 毫秒
+    // pattern 中的值是相对于 120BPM 的基准时长，需要按比例缩放
+    const baseBPM = 120;
+    const patternDuration = pattern.pattern[noteIndex % pattern.pattern.length];
+    const intervalMs = patternDuration * (baseBPM / currentBPM);
+    
     noteIndex++;
     
     demoTimeout = setTimeout(playNextNote, intervalMs);
