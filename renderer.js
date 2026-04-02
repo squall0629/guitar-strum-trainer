@@ -49,6 +49,8 @@ let audioContextForMetronome = null;
 // 演示播放相关
 let isPlayingDemo = false;
 let demoTimeout = null;
+let demoLoopCount = 0;
+let currentDemoRhythmIndex = -1;
 
 // 灵敏度相关
 let sensitivityLevel = 50; // 1-100
@@ -337,13 +339,11 @@ function playStrumSound(direction, duration = 0.15) {
   });
 }
 
-// 播放节奏型演示 - 改进版：根据 currentBPM 动态计算节拍间隔
-// 改进点：
-// 1. 使用 currentBPM 替代硬编码的 120 BPM
-// 2. 节拍间隔公式: beatInterval = (60 / currentBPM) * 1000 毫秒
-// 3. 根据节奏型 pattern 数组计算每个音符的实际时长
+// 播放节奏型演示 - 循环播放版本
 function playDemo(rhythmIndex, btnElement) {
   isPlayingDemo = true;
+  demoLoopCount = 0;
+  currentDemoRhythmIndex = rhythmIndex;
   btnElement.classList.add('playing');
   btnElement.textContent = '⏹ 停止演示';
   
@@ -352,6 +352,12 @@ function playDemo(rhythmIndex, btnElement) {
   
   function playNextNote() {
     if (!isPlayingDemo) return;
+    
+    // 检测一轮结束，开始新一轮
+    if (noteIndex > 0 && noteIndex % pattern.pattern.length === 0) {
+      demoLoopCount++;
+      feedbackMessage.textContent = `演示播放中 - 第 ${demoLoopCount + 1} 轮`;
+    }
     
     const direction = pattern.demo[noteIndex % pattern.demo.length];
     playStrumSound(direction);
@@ -362,8 +368,6 @@ function playDemo(rhythmIndex, btnElement) {
     options[rhythmIndex].classList.add('active');
     
     // 根据当前 BPM 动态计算节拍间隔
-    // 公式: beatInterval = (60 / BPM) * 1000 毫秒
-    // pattern 中的值是相对于 120BPM 的基准时长，需要按比例缩放
     const baseBPM = 120;
     const patternDuration = pattern.pattern[noteIndex % pattern.pattern.length];
     const intervalMs = patternDuration * (baseBPM / currentBPM);
@@ -373,18 +377,16 @@ function playDemo(rhythmIndex, btnElement) {
     demoTimeout = setTimeout(playNextNote, intervalMs);
   }
   
+  feedbackMessage.textContent = `演示播放中 - 第 1 轮`;
   playNextNote();
-  
-  // 3 秒后自动停止
-  setTimeout(() => {
-    if (isPlayingDemo) stopDemo();
-  }, 3000);
 }
 
 // 停止演示
 function stopDemo() {
   isPlayingDemo = false;
   if (demoTimeout) clearTimeout(demoTimeout);
+  demoLoopCount = 0;
+  currentDemoRhythmIndex = -1;
   
   demoButtons.forEach(btn => {
     btn.classList.remove('playing');
