@@ -73,9 +73,12 @@ let metronomeToggle, bpmSlider, bpmValue, demoButtons;
 let sensitivitySlider, sensitivityValue, thresholdDisplay;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
 
+// 版本号
+const APP_VERSION = 'v1.3';
+
 // 初始化
 function init() {
-  console.log('[GuitarStrumTrainer] 开始初始化...');
+  console.log(`[GuitarStrumTrainer] ${APP_VERSION} 开始初始化...`);
   
   // 获取所有 DOM 元素
   btnStart = document.getElementById('btnStart');
