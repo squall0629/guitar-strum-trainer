@@ -72,6 +72,7 @@ let feedbackMessage, historyList, canvas, canvasCtx;
 let metronomeToggle, bpmSlider, bpmValue, demoButtons;
 let sensitivitySlider, sensitivityValue, thresholdDisplay;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
+let btnTestMic;
 
 // 版本号
 const APP_VERSION = 'v1.3';
@@ -108,6 +109,7 @@ function init() {
   avgScoreEl = document.getElementById('avgScore');
   maxScoreEl = document.getElementById('maxScore');
   practiceCountEl = document.getElementById('practiceCount');
+  btnTestMic = document.getElementById('btnTestMic');
   
   console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
@@ -363,6 +365,22 @@ function setupButtons() {
     stopListening();
   });
   
+  // 测试麦克风按钮
+  if (btnTestMic) {
+    btnTestMic.addEventListener('click', async () => {
+      console.log('[GuitarStrumTrainer] 测试麦克风按钮被点击');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        feedbackMessage.textContent = '✅ 麦克风测试成功！现在可以开始练习了';
+        console.log('[GuitarStrumTrainer] 麦克风测试成功');
+      } catch (err) {
+        feedbackMessage.textContent = '❌ 麦克风测试失败：' + err.message;
+        console.error('[GuitarStrumTrainer] 麦克风测试失败:', err);
+      }
+    });
+  }
+  
   console.log('[GuitarStrumTrainer] 按钮事件绑定成功');
 }
 
@@ -391,14 +409,28 @@ function updateStatus(status) {
 // 开始监听
 async function startListening() {
   try {
+    // 检查浏览器支持
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('浏览器不支持麦克风访问');
+    }
+    
+    // 检查是否是 HTTPS 或 localhost
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      throw new Error('麦克风访问需要 HTTPS 连接');
+    }
+    
     // 请求麦克风权限
+    console.log('[GuitarStrumTrainer] 请求麦克风权限...');
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: false,
         noiseSuppression: false,
-        autoGainControl: false
+        autoGainControl: false,
+        latency: 0
       } 
     });
+    
+    console.log('[GuitarStrumTrainer] 麦克风权限已获取');
     
     // 创建音频上下文
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -430,8 +462,21 @@ async function startListening() {
     analyzeAudio();
     
   } catch (err) {
-    console.error('音频初始化失败:', err);
-    feedbackMessage.textContent = '❌ 无法访问麦克风，请检查权限设置';
+    console.error('[GuitarStrumTrainer] 音频初始化失败:', err.name, err.message);
+    
+    let errorMsg = '❌ 无法访问麦克风';
+    
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errorMsg = '❌ 麦克风权限被拒绝\n\n请在浏览器设置中允许麦克风访问，然后刷新页面';
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      errorMsg = '❌ 未找到麦克风设备\n\n请检查麦克风是否已连接';
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorMsg = '❌ 麦克风被其他程序占用\n\n请关闭其他使用麦克风的程序后重试';
+    } else if (err.message.includes('HTTPS')) {
+      errorMsg = '❌ 需要 HTTPS 连接\n\n请使用 https:// 开头的网址访问';
+    }
+    
+    feedbackMessage.textContent = errorMsg;
     updateStatus('error');
   }
 }
