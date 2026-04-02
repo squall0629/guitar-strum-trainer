@@ -982,5 +982,13 @@ function renderStatsChart() {
   }
 }
 
-// 启动
-init();
+// 启动 - 确保 DOM 加载完成后再初始化
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[GuitarStrumTrainer] DOMContentLoaded 触发');
+  try {
+    init();
+    console.log('[GuitarStrumTrainer] 初始化成功');
+  } catch (error) {
+    console.error('[GuitarStrumTrainer] 初始化失败:', error);
+  }
+});
