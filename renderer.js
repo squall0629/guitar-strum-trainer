@@ -14,21 +14,21 @@ const RHYTHM_PATTERNS = [
     pattern: [500, 250, 250], // 八分 + 十六分 + 十六分
     beats: 4,
     description: '♪ ♫♫',
-    demo: ['D', 'D', 'U', 'D', 'U', 'D'] // 下 下上 下上 下 (6 次扫弦，更完整)
+    demo: ['D', 'D', 'U'] // 下 下上
   },
   {
     name: '前十六后八',
     pattern: [250, 250, 500], // 十六分 + 十六分 + 八分
     beats: 4,
     description: '♫♫ ♪',
-    demo: ['D', 'U', 'D'] // 下上 下 (两个 16 分用上下扫)
+    demo: ['D', 'U', 'D'] // 下上 下
   },
   {
     name: '民谣常用',
-    pattern: [500, 250, 250, 250, 250, 500], // 下 下上 上下上
+    pattern: [500, 250, 250, 250, 250, 500], // 下 下上 下上 下
     beats: 4,
-    description: 'D DU UDU',
-    demo: ['D', 'D', 'U', 'U', 'D', 'U']
+    description: 'D DUDU D',
+    demo: ['D', 'D', 'U', 'D', 'U', 'D']
   },
   {
     name: '摇滚八分',
