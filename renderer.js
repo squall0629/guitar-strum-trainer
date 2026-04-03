@@ -248,10 +248,6 @@ function setupDemoButtons() {
       console.log('[GuitarStrumTrainer] Demo button clicked:', { rhythmIndex, isPlayingDemo: getIsPlayingDemo() });
       
       if (getIsPlayingDemo()) {
-        if (currentPlayingDemoBtn === btn) {
-          console.log('[GuitarStrumTrainer] Same button clicked during playback, ignoring');
-          return;
-        }
         console.log('[GuitarStrumTrainer] Stopping demo...');
         stopDemo();
       } else {
@@ -394,11 +390,6 @@ async function playDemo(rhythmIndex, btnElement) {
   currentDemoRhythmIndex = rhythmIndex;
   currentPlayingDemoBtn = btnElement;
   
-  // 禁用当前按钮防止重复点击
-  if (btnElement && btnElement.tagName === 'BUTTON') {
-    btnElement.disabled = true;
-  }
-  
   // 安全地更新按钮状态（兼容虚拟按钮对象）
   if (btnElement && btnElement.classList) {
     btnElement.classList.add('playing');
@@ -479,10 +470,6 @@ function stopDemo() {
   demoLoopCount = 0;
   currentDemoRhythmIndex = -1;
   
-  // 重置当前播放的按钮
-  if (currentPlayingDemoBtn && currentPlayingDemoBtn.tagName === 'BUTTON') {
-    currentPlayingDemoBtn.disabled = false;
-  }
   currentPlayingDemoBtn = null;
   
   // 重置所有演示按钮（包括自定义节奏型按钮）
