@@ -8,5 +8,8 @@
   },
   "keywords": ["guitar", "strumming", "practice", "audio-analysis"],
   "author": "老马",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "soundfont-player": "^0.12.0"
+  }
 }

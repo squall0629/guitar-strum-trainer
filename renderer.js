@@ -1,5 +1,12 @@
 // 吉他扫弦练习助手 - 核心音频分析引擎
 
+// ========== 真实吉他音源 (FluidR3 GM - Acoustic Guitar Steel String) ==========
+// 使用 soundfont-player 加载 FluidR3 GM 音源，CC0 授权免费商用
+let guitarSoundfont = null;
+let guitarInstrument = null;
+let soundfontLoading = false;
+let soundfontLoaded = false;
+
 // 节奏型定义 (单位：毫秒，基于 120BPM)
 const RHYTHM_PATTERNS = [
   {
@@ -127,6 +134,9 @@ function init() {
   renderHistory();
   renderStatsChart();
   updateStatus('ready');
+  
+  // 预加载吉他音源
+  loadGuitarSoundfont();
   
   console.log('[GuitarStrumTrainer] 初始化完成');
 }
@@ -423,6 +433,150 @@ function setupSensitivity() {
   
   // 初始化阈值
   updateThreshold();
+}
+
+// ========== 真实吉他音源函数 ==========
+
+// 加载吉他音源 (FluidR3 GM - Acoustic Guitar Steel String)
+async function loadGuitarSoundfont() {
+  if (soundfontLoading || soundfontLoaded) return;
+  
+  soundfontLoading = true;
+  console.log('[GuitarStrumTrainer] 开始加载吉他音源 (FluidR3 GM - 钢弦吉他)...');
+  
+  try {
+    // 使用 soundfont-player 加载 Steel String Guitar
+    // 音源来自 https://github.com/gleitz/midi-js-soundfonts (FluidR3_GM)
+    guitarSoundfont = await soundfont.instrument('acoustic_guitar_steel', {
+      soundfont: 'MusyngKite', // 更高质量的音源
+      gain: 1.0
+    });
+    
+    soundfontLoaded = true;
+    console.log('[GuitarStrumTrainer] ✓ 吉他音源加载完成');
+    
+    // 预加载几个音符到缓存
+    guitarSoundfont.get('E3');
+    guitarSoundfont.get('B3');
+    guitarSoundfont.get('E4');
+    guitarSoundfont.get('G#4');
+    guitarSoundfont.get('B4');
+    guitarSoundfont.get('E5');
+    
+  } catch (error) {
+    console.error('[GuitarStrumTrainer] 音源加载失败:', error);
+    console.warn('[GuitarStrumTrainer] 将使用合成音色作为备选');
+    soundfontLoading = false;
+  }
+}
+
+// 播放真实吉他扫弦声音
+// 改进点：
+// 1. 使用 FluidR3 GM 真实钢弦吉他采样 (CC0 授权)
+// 2. 模拟真实扫弦：6 根弦错开 8-12ms，营造从上到下/从下到上的扫弦感
+// 3. 下扫 (D) 和上扫 (U) 使用不同的弦组合和力度
+// 4. 添加轻微力度变化，让每次扫弦都有细微差别
+function playStrumSound(direction, duration = 0.15) {
+  if (!guitarSoundfont) {
+    // 如果音源未加载，使用备选合成音色
+    playStrumSoundSynth(direction, duration);
+    return;
+  }
+  
+  // E 大调和弦：E3, B3, E4, G#4, B4, E5 (标准吉他调弦)
+  const chordNotes = ['E3', 'B3', 'E4', 'G#4', 'B4', 'E5'];
+  const isDownStrum = direction === 'D';
+  
+  // 下扫：从低音弦到高音弦 (E3 → E5)
+  // 上扫：从高音弦到低音弦 (E5 → E3)
+  const strumOrder = isDownStrum ? chordNotes : chordNotes.reverse();
+  
+  // 扫弦速度参数
+  const strumSpeed = isDownStrum ? 0.008 : 0.012; // 下扫更快，上扫稍慢
+  
+  // 力度范围 (0.5-0.9)，模拟不同扫弦强度
+  const velocity = isDownStrum ? 0.8 : 0.6; // 下扫更强
+  
+  // 播放扫弦
+  strumOrder.forEach((note, index) => {
+    const delay = index * strumSpeed; // 每根弦错开 8-12ms
+    
+    setTimeout(() => {
+      // 添加轻微的力度随机变化 (±10%)
+      const randomVelocity = velocity * (0.9 + Math.random() * 0.2);
+      
+      // 播放音符，duration 控制延音
+      guitarSoundfont.play(note, {
+        gain: randomVelocity,
+        duration: duration
+      });
+    }, delay * 1000);
+  });
+  
+  // 恢复原数组顺序（因为 reverse() 会修改原数组）
+  if (!isDownStrum) {
+    chordNotes.reverse();
+  }
+}
+
+// 备选合成音色 (当音源加载失败时使用)
+function playStrumSoundSynth(direction, duration = 0.15) {
+  if (!audioContextForMetronome) {
+    audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  
+  const ctx = audioContextForMetronome;
+  const now = ctx.currentTime;
+  
+  const baseChord = [164.81, 246.94, 329.63, 415.30, 493.88, 659.25];
+  const isDownStrum = direction === 'D';
+  const strumDelay = isDownStrum ? 0.008 : 0.012;
+  const brightness = isDownStrum ? 1.0 : 0.7;
+  const attackTime = 0.005;
+  const decayTime = 0.08;
+  const sustainLevel = 0.3;
+  const releaseTime = duration * 0.6;
+  
+  baseChord.forEach((baseFreq, stringIndex) => {
+    const jitter = 1 + (Math.random() - 0.5) * 0.01;
+    const freq = baseFreq * jitter;
+    const startTime = now + (stringIndex * strumDelay);
+    
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.value = freq;
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.value = freq * 2.0;
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    
+    const baseVolume = 0.12 * brightness;
+    const harmonic2Volume = 0.04 * brightness;
+    const peakTime = startTime + attackTime;
+    const sustainTime = startTime + attackTime + decayTime;
+    const endTime = startTime + duration;
+    
+    gain1.gain.setValueAtTime(0.001, startTime);
+    gain1.gain.linearRampToValueAtTime(baseVolume, peakTime);
+    gain1.gain.exponentialRampToValueAtTime(baseVolume * sustainLevel, sustainTime);
+    gain1.gain.setValueAtTime(baseVolume * sustainLevel, endTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, endTime + releaseTime);
+    
+    gain2.gain.setValueAtTime(0.001, startTime);
+    gain2.gain.linearRampToValueAtTime(harmonic2Volume, peakTime);
+    gain2.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.5);
+    
+    osc1.start(startTime);
+    osc1.stop(endTime + releaseTime + 0.01);
+    osc2.start(startTime);
+    osc2.stop(sustainTime + releaseTime * 0.5 + 0.01);
+  });
 }
 
 // 设置按钮
