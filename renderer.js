@@ -445,9 +445,16 @@ async function loadGuitarSoundfont() {
   console.log('[GuitarStrumTrainer] 开始加载吉他音源 (FluidR3 GM - 钢弦吉他)...');
   
   try {
+    // 检查 Soundfont 全局对象是否存在
+    if (typeof window.Soundfont === 'undefined') {
+      console.warn('[GuitarStrumTrainer] Soundfont 未加载，使用合成音色');
+      soundfontLoading = false;
+      return;
+    }
+    
     // 使用 soundfont-player 加载 Steel String Guitar
     // 音源来自 https://github.com/gleitz/midi-js-soundfonts (FluidR3_GM)
-    guitarSoundfont = await soundfont.instrument('acoustic_guitar_steel', {
+    guitarSoundfont = await window.Soundfont.instrument('acoustic_guitar_steel', {
       soundfont: 'MusyngKite', // 更高质量的音源
       gain: 1.0
     });
