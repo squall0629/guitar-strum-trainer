@@ -59,9 +59,22 @@ let demoTimeout = null;
 let demoLoopCount = 0;
 let currentDemoRhythmIndex = -1;
 
-// 灵敏度相关
+// 设置灵敏度
 let sensitivityLevel = 50; // 1-100
 let strumThreshold = 0.15; // 根据灵敏度动态计算
+
+// 全局函数：更新阈值计算
+function updateThreshold() {
+  // 灵敏度 1-100 映射到阈值 0.30-0.05
+  // 灵敏度越高，阈值越低（更容易触发）
+  strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.25 / 99);
+  strumThreshold = Math.max(0.05, Math.min(0.30, strumThreshold));
+  
+  const thresholdDisplay = document.getElementById('thresholdDisplay');
+  if (thresholdDisplay) {
+    thresholdDisplay.textContent = strumThreshold.toFixed(2);
+  }
+}
 
 // 全局状态
 let audioContext = null;
@@ -422,18 +435,6 @@ function stopDemo() {
 // 设置灵敏度
 function setupSensitivity() {
   if (!sensitivitySlider) return;
-  
-  // 更新阈值计算
-  function updateThreshold() {
-    // 灵敏度 1-100 映射到阈值 0.30-0.05
-    // 灵敏度越高，阈值越低（更容易触发）
-    strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.25 / 99);
-    strumThreshold = Math.max(0.05, Math.min(0.30, strumThreshold));
-    
-    if (thresholdDisplay) {
-      thresholdDisplay.textContent = strumThreshold.toFixed(2);
-    }
-  }
   
   sensitivitySlider.addEventListener('input', (e) => {
     sensitivityLevel = parseInt(e.target.value);
@@ -1568,14 +1569,17 @@ function playCustomRhythm(index) {
   const tempIndex = RHYTHM_PATTERNS.length;
   RHYTHM_PATTERNS.push(tempRhythm);
   
-  // 播放演示 - 创建虚拟按钮对象
+  // 创建完整的虚拟按钮对象
+  let isPlaying = false;
   const virtualBtn = {
     dataset: { rhythm: tempIndex },
     classList: {
-      add: function() {},
-      remove: function() {}
+      add: function(cls) { if (cls === 'playing') isPlaying = true; },
+      remove: function(cls) { if (cls === 'playing') isPlaying = false; },
+      toggle: function(cls) { isPlaying = !isPlaying; return isPlaying; }
     },
-    textContent: ''
+    textContent: '🔊 试听演示',
+    getAttribute: function() { return null; }
   };
   
   playDemo(tempIndex, virtualBtn);
