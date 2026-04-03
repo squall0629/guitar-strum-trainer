@@ -376,22 +376,32 @@ async function playDemo(rhythmIndex, btnElement) {
   let noteIndex = 0;
   
   async function playNextNote() {
-    if (!isPlayingDemo) return;
+    if (!isPlayingDemo) {
+      console.log('[GuitarStrumTrainer] playNextNote: isPlayingDemo=false, stopping');
+      return;
+    }
+    
+    console.log('[GuitarStrumTrainer] playNextNote:', { noteIndex, patternLength: pattern.pattern.length });
     
     // 检测一轮结束，开始新一轮
     if (noteIndex > 0 && noteIndex % pattern.pattern.length === 0) {
       demoLoopCount++;
       feedbackMessage.textContent = `演示播放中 - 第 ${demoLoopCount + 1} 轮`;
+      console.log('[GuitarStrumTrainer] Starting loop', demoLoopCount + 1);
     }
     
     const direction = pattern.demo[noteIndex % pattern.demo.length];
     
-    // 如果是自定义节奏型，传递力度参数
-    if (pattern.isCustom && pattern.notes && pattern.notes[noteIndex % pattern.notes.length]) {
-      const noteData = pattern.notes[noteIndex % pattern.notes.length];
-      await playStrumSound(direction, 0.15, [noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity]);
-    } else {
-      await playStrumSound(direction);
+    try {
+      // 如果是自定义节奏型，传递力度参数
+      if (pattern.isCustom && pattern.notes && pattern.notes[noteIndex % pattern.notes.length]) {
+        const noteData = pattern.notes[noteIndex % pattern.notes.length];
+        await playStrumSound(direction, 0.15, [noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity]);
+      } else {
+        await playStrumSound(direction);
+      }
+    } catch (err) {
+      console.error('[GuitarStrumTrainer] playStrumSound error:', err);
     }
     
     // 视觉反馈 - 添加空值检查（自定义节奏型没有对应的 DOM 元素）
@@ -405,6 +415,8 @@ async function playDemo(rhythmIndex, btnElement) {
     const baseBPM = 120;
     const patternDuration = pattern.pattern[noteIndex % pattern.pattern.length];
     const intervalMs = patternDuration * (baseBPM / currentBPM);
+    
+    console.log('[GuitarStrumTrainer] Scheduling next note in', intervalMs, 'ms');
     
     noteIndex++;
     
@@ -619,8 +631,10 @@ async function loadGuitarSoundfont() {
 // 5. 16 分音符也区分上下扫（下扫更轻，上扫稍强）
 // 6. 添加轻微力度变化，让每次扫弦都有细微差别
 async function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
+  console.log('[GuitarStrumTrainer] playStrumSound:', { direction, hasSoundfont: !!guitarSoundfont });
+  
   if (!guitarSoundfont) {
-    // 如果音源未加载，使用备选合成音色
+    console.log('[GuitarStrumTrainer] playStrumSound: using synth fallback');
     await playStrumSoundSynth(direction, duration);
     return;
   }
@@ -690,13 +704,18 @@ async function playStrumSound(direction, duration = 0.15, noteVelocities = null)
 
 // 备选合成音色 (当音源加载失败时使用) - 增强音量版
 async function playStrumSoundSynth(direction, duration = 0.15) {
+  console.log('[GuitarStrumTrainer] playStrumSoundSynth:', { direction, duration });
+  
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
+    console.log('[GuitarStrumTrainer] Created new AudioContext');
   }
   
   // 移动端修复：确保 AudioContext 已恢复
   if (audioContextForMetronome.state === 'suspended') {
+    console.log('[GuitarStrumTrainer] Resuming AudioContext...');
     await audioContextForMetronome.resume();
+    console.log('[GuitarStrumTrainer] AudioContext resumed, state:', audioContextForMetronome.state);
   }
   
   const ctx = audioContextForMetronome;
