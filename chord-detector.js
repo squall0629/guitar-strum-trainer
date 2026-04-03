@@ -334,7 +334,7 @@ class ChordDetector {
 /**
  * 和弦转换检测器
  */
-export class TransitionDetector {
+class TransitionDetector {
   constructor() {
     this.lastChord = null;
     this.lastStrumTime = 0;
