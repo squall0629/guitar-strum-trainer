@@ -189,15 +189,20 @@ export function getChordInfoFromTab(tab) {
 }
 
 /**
- * 使用 chordictionary 生成和弦 SVG 指法图
+ * 使用 chordictionary 生成和弦 HTML 指法图
  * @param {string} tab - 指法图字符串 (如 "x32010")
- * @returns {string} SVG 字符串
+ * @param {string} chordName - 和弦名称（用于显示）
+ * @returns {string} HTML 字符串
  */
-export function getChordSVGFromTab(tab) {
+export function getChordLayoutFromTab(tab, chordName = '') {
   try {
-    return guitar.getChordSVG(tab);
+    const info = guitar.getChordInfo(tab);
+    if (info) {
+      return guitar.getChordLayout(tab, info.chords[0]);
+    }
+    return null;
   } catch (e) {
-    console.warn('[ChordLibrary] getChordSVG error:', e);
+    console.warn('[ChordLibrary] getChordLayout error:', e);
     return null;
   }
 }
@@ -218,21 +223,28 @@ export function getChordData(chordName) {
     name: chordName,
     tab: tab,
     info: info,
-    fingering: chord.fingering
+    fingering: chord.fingering,
+    layout: info ? getChordLayoutFromTab(tab, chordName) : null
   };
 }
 
 /**
- * 获取和弦 SVG 指法图（使用 chordictionary 生成）
+ * 获取和弦指法图数据（用于 canvas 绘制）
  * @param {string} chordName - 和弦名称
- * @returns {string|null} SVG 字符串
+ * @returns {object|null} 指法图数据（strings, frets）
  */
 export function getChordSVG(chordName) {
+  // 注意：chordictionary 不直接支持 SVG，返回指法数据供 canvas 绘制
   const chord = findChord(chordName);
   if (!chord) return null;
   
-  const tab = getChordTabString(chord);
-  return getChordSVGFromTab(tab);
+  return {
+    name: chordName,
+    tab: getChordTabString(chord),
+    fingering: chord.fingering,
+    // 返回 HTML 布局（可选）
+    layout: getChordLayoutFromTab(getChordTabString(chord), chordName)
+  };
 }
 
 /**

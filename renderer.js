@@ -2477,23 +2477,18 @@ function updateChordDisplay(chordResult, expectedChord, nextChord) {
 /**
  * 在 canvas 上绘制和弦指法图
  * @param {HTMLCanvasElement} canvas - canvas 元素
- * @param {string} svgString - SVG 字符串
+ * @param {object} chordData - 和弦数据（包含 fingering.strings 和 fingering.frets）
  */
-function drawChordDiagramOnCanvas(canvas, svgString) {
-  const ctx = canvas.getContext('2d');
-  const img = new Image();
-  
-  // 将 SVG 转换为 Data URL
-  const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(svgBlob);
-  
-  img.onload = function() {
+function drawChordDiagramOnCanvas(canvas, chordData) {
+  if (!chordData || !chordData.fingering) {
+    // 清空 canvas
+    const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
-  };
+    return;
+  }
   
-  img.src = url;
+  // 使用已有的 drawChordDiagram 函数
+  drawChordDiagram(canvas, chordData);
 }
 
 /**
@@ -2522,10 +2517,7 @@ function updateNextChordDisplay(chordName, countdown) {
   if (nextChordDiagramEl && chordName) {
     const chord = findChord(chordName);
     if (chord) {
-      const svg = chordDict.getChordSVG(getChordTabString(chord));
-      if (svg) {
-        drawChordDiagramOnCanvas(nextChordDiagramEl, svg);
-      }
+      drawChordDiagramOnCanvas(nextChordDiagramEl, chord);
     }
   }
 }
