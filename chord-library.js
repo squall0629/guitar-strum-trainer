@@ -10,7 +10,7 @@
 /**
  * 基础和弦列表（首期 10 个）
  */
-const BASIC_CHORDS = [
+var BASIC_CHORDS = [
   { name: 'C', difficulty: 1, label: 'C 大调' },
   { name: 'G', difficulty: 1, label: 'G 大调' },
   { name: 'D', difficulty: 1, label: 'D 大调' },
@@ -25,10 +25,8 @@ const BASIC_CHORDS = [
 
 /**
  * 和弦指法数据（简化版，用于 UI 显示）
- * 格式：[6 弦，5 弦，4 弦，3 弦，2 弦，1 弦]
- * null = 不弹，0 = 空弦，数字 = 按第几品
  */
-const CHORD_FINGERINGS = {
+var CHORD_FINGERINGS = {
   'C':  [null, 3, 2, 0, 1, null],
   'G':  [3, 2, null, null, 3, 3],
   'D':  [null, null, 0, 2, 3, 2],
@@ -36,7 +34,7 @@ const CHORD_FINGERINGS = {
   'Em': [0, 2, 2, 0, 0, 0],
   'E':  [0, 2, 2, 1, 0, 0],
   'A':  [null, 0, 2, 2, 2, null],
-  'F':  [1, 3, 3, 2, 1, 1],  // 简化版 F（横按）
+  'F':  [1, 3, 3, 2, 1, 1],
   'Dm': [null, null, 0, 2, 3, 1],
   'Cmaj7': [null, 3, 2, 0, 0, null]
 };
@@ -44,7 +42,7 @@ const CHORD_FINGERINGS = {
 /**
  * 和弦音符组成
  */
-const CHORD_NOTES = {
+var CHORD_NOTES = {
   'C': ['C3', 'E3', 'G3', 'C4', 'E4'],
   'G': ['G2', 'B2', 'D3', 'G3', 'B3', 'D4'],
   'D': ['D3', 'A3', 'D4', 'F#4', 'A4'],
@@ -60,7 +58,7 @@ const CHORD_NOTES = {
 /**
  * 常用和弦进行预设
  */
-const COMMON_PROGRESSIONS = [
+var COMMON_PROGRESSIONS = [
   { name: '1645 进行', chords: ['C', 'Am', 'F', 'G'] },
   { name: '4536 进行', chords: ['F', 'G', 'Em', 'Am'] },
   { name: '卡农进行', chords: ['C', 'G', 'Am', 'Em', 'F', 'C', 'F', 'G'] },
@@ -71,10 +69,10 @@ const COMMON_PROGRESSIONS = [
 /**
  * 获取和弦指法数据
  */
-function getChordData(chordName) {
-  const fingering = CHORD_FINGERINGS[chordName];
-  const notes = CHORD_NOTES[chordName];
-  const basic = BASIC_CHORDS.find(c => c.name === chordName);
+var getChordData = function(chordName) {
+  var fingering = CHORD_FINGERINGS[chordName];
+  var notes = CHORD_NOTES[chordName];
+  var basic = BASIC_CHORDS.find(function(c) { return c.name === chordName; });
   
   if (!fingering || !notes) return null;
   
@@ -85,129 +83,130 @@ function getChordData(chordName) {
     difficulty: basic ? basic.difficulty : 3,
     label: basic ? basic.label : chordName
   };
-}
+};
 
 /**
  * 生成简易 SVG 指法图
  */
-function getChordSVG(chordName, width = 120, height = 140) {
-  const fingering = CHORD_FINGERINGS[chordName];
+var getChordSVG = function(chordName, width, height) {
+  if (width === undefined) width = 120;
+  if (height === undefined) height = 140;
+  
+  var fingering = CHORD_FINGERINGS[chordName];
   if (!fingering) return '';
   
-  const strings = 6;
-  const frets = 4;
-  const padding = 20;
-  const stringSpacing = (width - 2 * padding) / (strings - 1);
-  const fretSpacing = (height - 2 * padding) / frets;
+  var strings = 6;
+  var frets = 4;
+  var padding = 20;
+  var stringSpacing = (width - 2 * padding) / (strings - 1);
+  var fretSpacing = (height - 2 * padding) / frets;
   
-  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
+  var svg = '<svg width="' + width + '" height="' + height + '" xmlns="http://www.w3.org/2000/svg">';
   
   // 画品格
-  for (let i = 0; i <= frets; i++) {
-    const y = padding + i * fretSpacing;
-    svg += `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#888" stroke-width="1"/>`;
+  for (var i = 0; i <= frets; i++) {
+    var y = padding + i * fretSpacing;
+    svg += '<line x1="' + padding + '" y1="' + y + '" x2="' + (width - padding) + '" y2="' + y + '" stroke="#888" stroke-width="1"/>';
   }
   
   // 画弦
-  for (let i = 0; i < strings; i++) {
-    const x = padding + i * stringSpacing;
-    svg += `<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}" stroke="#888" stroke-width="${i >= 3 ? 1 : 2}"/>`;
+  for (var i = 0; i < strings; i++) {
+    var x = padding + i * stringSpacing;
+    svg += '<line x1="' + x + '" y1="' + padding + '" x2="' + x + '" y2="' + (height - padding) + '" stroke="#888" stroke-width="' + (i >= 3 ? 1 : 2) + '"/>';
   }
   
   // 画按弦点
-  for (let i = 0; i < strings; i++) {
-    const fret = fingering[i];
+  for (var i = 0; i < strings; i++) {
+    var fret = fingering[i];
     if (fret === null) continue;
     
-    const x = padding + i * stringSpacing;
-    const y = fret === 0 ? padding - 10 : padding + (fret - 0.5) * fretSpacing;
+    var x = padding + i * stringSpacing;
+    var y = fret === 0 ? padding - 10 : padding + (fret - 0.5) * fretSpacing;
     
     if (fret === 0) {
-      // 空弦圈
-      svg += `<circle cx="${x}" cy="${y}" r="6" fill="none" stroke="#b866ff" stroke-width="2"/>`;
+      svg += '<circle cx="' + x + '" cy="' + y + '" r="6" fill="none" stroke="#b866ff" stroke-width="2"/>';
     } else {
-      // 按弦点
-      svg += `<circle cx="${x}" cy="${y}" r="8" fill="#b866ff"/>`;
+      svg += '<circle cx="' + x + '" cy="' + y + '" r="8" fill="#b866ff"/>';
     }
   }
   
   svg += '</svg>';
   return svg;
-}
+};
 
 /**
  * 获取和弦音符
  */
-function getChordNotes(chordName) {
+var getChordNotes = function(chordName) {
   return CHORD_NOTES[chordName] || [];
-}
+};
 
 /**
  * 验证和弦是否有效
  */
-function isValidChord(chordName) {
+var isValidChord = function(chordName) {
   return CHORD_FINGERINGS[chordName] !== undefined;
-}
+};
 
 /**
  * 获取基础和弦名称列表
  */
-function getBasicChordNames() {
-  return BASIC_CHORDS.map(c => c.name);
-}
+var getBasicChordNames = function() {
+  return BASIC_CHORDS.map(function(c) { return c.name; });
+};
 
 /**
  * 获取和弦难度
  */
-function getChordDifficulty(chordName) {
-  const basic = BASIC_CHORDS.find(c => c.name === chordName);
+var getChordDifficulty = function(chordName) {
+  var basic = BASIC_CHORDS.find(function(c) { return c.name === chordName; });
   return basic ? basic.difficulty : 3;
-}
+};
 
 /**
  * 计算和弦转换难度
  */
-function calculateTransitionDifficulty(chord1, chord2) {
-  const f1 = CHORD_FINGERINGS[chord1];
-  const f2 = CHORD_FINGERINGS[chord2];
+var calculateTransitionDifficulty = function(chord1, chord2) {
+  var f1 = CHORD_FINGERINGS[chord1];
+  var f2 = CHORD_FINGERINGS[chord2];
   
   if (!f1 || !f2) return 5;
   
-  let diff = 0;
-  for (let i = 0; i < 6; i++) {
+  var diff = 0;
+  for (var i = 0; i < 6; i++) {
     if (f1[i] !== f2[i]) diff++;
   }
   
   return Math.min(5, Math.round(diff / 2));
-}
+};
 
 /**
  * 获取常用和弦进行
  */
-const COMMON_PROGRESSIONS_MAP = {};
-COMMON_PROGRESSIONS.forEach(p => {
+var COMMON_PROGRESSIONS_MAP = {};
+COMMON_PROGRESSIONS.forEach(function(p) {
   COMMON_PROGRESSIONS_MAP[p.name] = p.chords;
 });
 
-function getProgression(name) {
+var getProgression = function(name) {
   return COMMON_PROGRESSIONS_MAP[name] || [];
-}
+};
 
-function getProgressionNames() {
-  return COMMON_PROGRESSIONS.map(p => p.name);
-}
+var getProgressionNames = function() {
+  return COMMON_PROGRESSIONS.map(function(p) { return p.name; });
+};
 
 // 导出到全局
 window.ChordLibrary = {
-  BASIC_CHORDS,
-  COMMON_PROGRESSIONS,
-  getChordData,
-  getChordSVG,
-  getChordNotes,
-  isValidChord,
-  getBasicChordNames,
-  getChordDifficulty,
-  calculateTransitionDifficulty,
-  getProgression,
-  getProgressionNames
+  BASIC_CHORDS: BASIC_CHORDS,
+  COMMON_PROGRESSIONS: COMMON_PROGRESSIONS,
+  getChordData: getChordData,
+  getChordSVG: getChordSVG,
+  getChordNotes: getChordNotes,
+  isValidChord: isValidChord,
+  getBasicChordNames: getBasicChordNames,
+  getChordDifficulty: getChordDifficulty,
+  calculateTransitionDifficulty: calculateTransitionDifficulty,
+  getProgression: getProgression,
+  getProgressionNames: getProgressionNames
 };
