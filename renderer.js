@@ -65,10 +65,10 @@ let strumThreshold = 0.15; // 根据灵敏度动态计算
 
 // 全局函数：更新阈值计算
 function updateThreshold() {
-  // 灵敏度 1-100 映射到阈值 0.30-0.05
+  // 灵敏度 1-100 映射到阈值 0.50-0.08 (更宽松的范围，更容易触发)
   // 灵敏度越高，阈值越低（更容易触发）
-  strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.25 / 99);
-  strumThreshold = Math.max(0.05, Math.min(0.30, strumThreshold));
+  strumThreshold = 0.50 - (sensitivityLevel - 1) * (0.42 / 99);
+  strumThreshold = Math.max(0.08, Math.min(0.50, strumThreshold));
   
   const thresholdDisplay = document.getElementById('thresholdDisplay');
   if (thresholdDisplay) {
@@ -386,9 +386,9 @@ function playStrumSound(direction, duration = 0.15) {
     gain3.connect(ctx.destination);
     
     // 音量分配: 基频最强，泛音递减
-    const baseVolume = 0.12 * brightness;
-    const harmonic2Volume = 0.04 * brightness;
-    const harmonic3Volume = 0.02 * brightness;
+    const baseVolume = 0.25 * brightness;  // 增强音量：0.12→0.25 (约 2 倍)
+    const harmonic2Volume = 0.08 * brightness;  // 增强泛音：0.04→0.08
+    const harmonic3Volume = 0.04 * brightness;  // 增强泛音：0.02→0.04
     
     // 应用 ADSR 包络到基频
     const peakTime = startTime + attackTime;
@@ -750,7 +750,7 @@ function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
   });
 }
 
-// 备选合成音色 (当音源加载失败时使用)
+// 备选合成音色 (当音源加载失败时使用) - 增强音量版
 function playStrumSoundSynth(direction, duration = 0.15) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
@@ -775,6 +775,10 @@ function playStrumSoundSynth(direction, duration = 0.15) {
   const sustainLevel = 0.3;
   const releaseTime = duration * 0.6;
   
+  // 增强基础音量：0.12 → 0.25 (约 2 倍)
+  const baseVolume = 0.25 * brightness;
+  const harmonic2Volume = 0.08 * brightness;
+  
   baseChord.forEach((baseFreq, stringIndex) => {
     const jitter = 1 + (Math.random() - 0.5) * 0.01;
     const freq = baseFreq * jitter;
@@ -794,8 +798,6 @@ function playStrumSoundSynth(direction, duration = 0.15) {
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
     
-    const baseVolume = 0.12 * brightness;
-    const harmonic2Volume = 0.04 * brightness;
     const peakTime = startTime + attackTime;
     const sustainTime = startTime + attackTime + decayTime;
     const endTime = startTime + duration;
@@ -893,10 +895,15 @@ async function startListening() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.8;
+    analyser.smoothingTimeConstant = 0.5;  // 降低平滑常数，提高响应速度
     
     microphone = audioContext.createMediaStreamSource(stream);
-    microphone.connect(analyser);
+    
+    // 增加麦克风增益：创建增益节点并设置为 2.0 倍
+    const micGain = audioContext.createGain();
+    micGain.gain.value = 2.0;  // 2 倍增益
+    microphone.connect(micGain);
+    micGain.connect(analyser);
     
     isListening = true;
     detectedStrums = [];
