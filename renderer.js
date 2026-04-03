@@ -1,16 +1,8 @@
-// 吉他扫弦练习助手 - 核心音频分析引擎 v2.0
+// 吉他扫弦练习助手 - 核心音频分析引擎 v2.1
 // 新增和弦识别与转换训练功能
 
 // ========== 和弦识别模块 ==========
-// 和弦检测器通过全局对象访问（在 chord-detector.js 中导出到 window）
-import { 
-  getChordData, 
-  getChordSVG, 
-  findChord, 
-  COMMON_PROGRESSIONS, 
-  getBasicChordNames,
-  BASIC_CHORDS 
-} from './chord-library.js';
+// 和弦检测器和和弦库通过全局对象访问（在 chord-detector.js 和 chord-library.js 中导出到 window）
 
 // 和弦识别全局变量
 let chordDetector = null;
@@ -2522,7 +2514,7 @@ function updateNextChordDisplay(chordName, countdown) {
   
   // 绘制下一个和弦的指法图
   if (nextChordDiagramEl && chordName) {
-    const chord = findChord(chordName);
+    const chord = window.ChordLibrary.findChord(chordName);
     if (chord) {
       drawChordDiagramOnCanvas(nextChordDiagramEl, chord);
     }
@@ -2652,14 +2644,14 @@ function setupChordTraining() {
   if (progressionSelect) {
     progressionSelect.addEventListener('change', () => {
       const index = parseInt(progressionSelect.value);
-      if (COMMON_PROGRESSIONS[index]) {
-        currentProgression = COMMON_PROGRESSIONS[index].chords;
+      if (window.ChordLibrary.COMMON_PROGRESSIONS[index]) {
+        currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[index].chords;
         updateChordDisplay();
         console.log('[ChordTraining] 预设进行已选择:', currentProgression);
       }
     });
     // 初始化默认预设
-    currentProgression = COMMON_PROGRESSIONS[0].chords;
+    currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
   }
   
   // 自定义和弦选择按钮
@@ -2715,8 +2707,8 @@ function setTrainingMode(mode) {
   if (mode === 'free') {
     currentProgression = [];
     updateChordDisplay();
-  } else if (mode === 'preset' && COMMON_PROGRESSIONS[0]) {
-    currentProgression = COMMON_PROGRESSIONS[0].chords;
+  } else if (mode === 'preset' && window.ChordLibrary.COMMON_PROGRESSIONS[0]) {
+    currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
     updateChordDisplay();
   }
   
@@ -2854,7 +2846,7 @@ function drawChordDiagram(canvas, chordName) {
   
   try {
     // 使用 chordictionary 生成 SVG
-    const svgString = getChordSVG(chordName, width, height);
+    const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
     
     // 将 SVG 转换为图片并绘制到 Canvas
     const img = new Image();
@@ -2893,7 +2885,7 @@ function drawChordDiagramFallback(canvas, chordName) {
   
   ctx.clearRect(0, 0, width, height);
   
-  const chordData = getChordData(chordName);
+  const chordData = window.ChordLibrary.getChordData(chordName);
   
   if (!chordData) {
     ctx.fillStyle = '#666';
