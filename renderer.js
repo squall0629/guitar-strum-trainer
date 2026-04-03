@@ -243,6 +243,25 @@ function setupDemoButtons() {
       }
     });
   });
+  
+  // 同时绑定自定义节奏型的演示按钮
+  const customDemoBtns = document.querySelectorAll('.btn-demo[data-custom]');
+  customDemoBtns.forEach(btn => {
+    // 移除旧的事件监听器（避免重复绑定）
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    newBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const customIndex = parseInt(newBtn.dataset.custom);
+      
+      if (isPlayingDemo) {
+        stopDemo();
+      } else {
+        playCustomRhythm(customIndex);
+      }
+    });
+  });
 }
 
 // 播放节拍器声音 - 保留原有简洁的电子滴答声
@@ -1635,7 +1654,7 @@ function renderCustomRhythmsList() {
   if (!container) return;
   
   if (customRhythms.length === 0) {
-    container.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">暂无自定义节奏型，点击"新建节奏型"创建</div>';
+    container.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">暂无自定义节奏型，点击"+"创建</div>';
     return;
   }
   
@@ -1688,6 +1707,9 @@ function syncCustomRhythmsToSelector() {
     rhythmSelector.appendChild(option);
   });
   
+  // 重新绑定所有演示按钮事件（包括新增的自定义按钮）
+  setupDemoButtons();
+  
   // 绑定自定义试听按钮事件
   rhythmSelector.querySelectorAll('.btn-demo[data-custom]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1696,6 +1718,8 @@ function syncCustomRhythmsToSelector() {
       playCustomRhythm(customIndex);
     });
   });
+  
+  console.log('[GuitarStrumTrainer] 自定义节奏型已同步到主列表:', customRhythms.length);
 }
 
 // 选择自定义节奏型
@@ -1968,6 +1992,11 @@ function saveRhythmEditor() {
   saveCustomRhythms();
   closeRhythmEditor();
   renderCustomRhythmsList();
+  
+  // 重新绑定演示按钮事件
+  setupDemoButtons();
+  
+  console.log('[GuitarStrumTrainer] 节奏型已保存:', name);
 }
 
 // 关闭节奏型编辑器
