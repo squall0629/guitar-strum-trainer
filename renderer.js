@@ -453,22 +453,15 @@ async function loadGuitarSoundfont() {
     }
     
     // 使用 soundfont-player 加载 Steel String Guitar
-    // 音源来自 https://github.com/gleitz/midi-js-soundfonts (FluidR3_GM)
-    guitarSoundfont = await window.Soundfont.instrument('acoustic_guitar_steel', {
-      soundfont: 'MusyngKite', // 更高质量的音源
-      gain: 1.0
+    // 音源来自 https://github.com/gleitz/midi-js-soundfonts (MusyngKite)
+    // 注意：instrument 方法签名是 instrument(audioContext, name, options)
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    guitarSoundfont = await window.Soundfont.instrument(audioContext, 'acoustic_guitar_steel', {
+      soundfont: 'MusyngKite' // 更高质量的音源
     });
     
     soundfontLoaded = true;
     console.log('[GuitarStrumTrainer] ✓ 吉他音源加载完成');
-    
-    // 预加载几个音符到缓存
-    guitarSoundfont.get('E3');
-    guitarSoundfont.get('B3');
-    guitarSoundfont.get('E4');
-    guitarSoundfont.get('G#4');
-    guitarSoundfont.get('B4');
-    guitarSoundfont.get('E5');
     
   } catch (error) {
     console.error('[GuitarStrumTrainer] 音源加载失败:', error);
