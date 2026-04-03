@@ -1479,6 +1479,46 @@ function renderCustomRhythmsList() {
       </div>
     `;
   }).join('');
+  
+  // 同时在主节奏型列表中显示自定义节奏型
+  syncCustomRhythmsToSelector();
+}
+
+// 同步自定义节奏型到主节奏型选择器
+function syncCustomRhythmsToSelector() {
+  const rhythmSelector = document.getElementById('rhythmSelector');
+  if (!rhythmSelector) return;
+  
+  // 移除现有的自定义节奏型选项
+  const existingCustom = rhythmSelector.querySelectorAll('.custom-rhythm-option');
+  existingCustom.forEach(el => el.remove());
+  
+  // 添加自定义节奏型选项
+  customRhythms.forEach((rhythm, index) => {
+    const customIndex = RHYTHM_PATTERNS.length + index;
+    const option = document.createElement('div');
+    option.className = 'rhythm-option custom-rhythm-option';
+    option.dataset.customIndex = index;
+    option.innerHTML = `
+      <div class="name">${escapeHtml(rhythm.name)}</div>
+      <div class="pattern">${rhythm.notes.map(n => n.direction).join(' ')}</div>
+      <button class="btn-demo" data-custom="${index}">🔊 试听演示</button>
+    `;
+    option.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-demo')) return;
+      selectCustomRhythm(index);
+    });
+    rhythmSelector.appendChild(option);
+  });
+  
+  // 绑定自定义试听按钮事件
+  rhythmSelector.querySelectorAll('.btn-demo[data-custom]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const customIndex = parseInt(btn.dataset.custom);
+      playCustomRhythm(customIndex);
+    });
+  });
 }
 
 // 选择自定义节奏型
@@ -1491,7 +1531,8 @@ function selectCustomRhythm(index) {
   // 转换为标准节奏型格式
   const tempPattern = rhythm.notes.map(note => {
     const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    return durationMs;
+    // 根据当前 BPM 调整时值（基于 120BPM 的原始时值）
+    return durationMs * (120 / currentBPM);
   });
   
   const tempDemo = rhythm.notes.map(note => note.direction);
@@ -1511,9 +1552,15 @@ function selectCustomRhythm(index) {
   // 选择这个节奏型
   currentRhythm = tempIndex;
   
-  // 更新 UI 选中状态
+  // 更新 UI 选中状态（包括主列表和自定义列表）
   const options = document.querySelectorAll('.rhythm-option');
   options.forEach(o => o.classList.remove('active'));
+  
+  // 高亮对应的自定义节奏型选项
+  const customOption = document.querySelector(`.custom-rhythm-option[data-custom-index="${index}"]`);
+  if (customOption) {
+    customOption.classList.add('active');
+  }
   
   feedbackMessage.textContent = `已选择：${rhythm.name} - ${tempDemo.join(' ')}`;
   
@@ -1596,7 +1643,8 @@ function playCustomRhythm(index) {
   // 转换为标准节奏型格式
   const tempPattern = rhythm.notes.map(note => {
     const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    return durationMs;
+    // 根据当前 BPM 调整时值（基于 120BPM 的原始时值）
+    return durationMs * (120 / currentBPM);
   });
   
   const tempDemo = rhythm.notes.map(note => note.direction);
@@ -1608,7 +1656,8 @@ function playCustomRhythm(index) {
     pattern: tempPattern,
     beats: 4,
     description: rhythm.notes.map(n => n.direction).join(' '),
-    demo: tempDemo
+    demo: tempDemo,
+    isCustom: true
   };
   RHYTHM_PATTERNS.push(tempRhythm);
   
@@ -1635,7 +1684,7 @@ function playCustomRhythm(index) {
     textContent: ''
   });
   
-  // 播放完成后清理（3 秒后或手动停止）
+  // 播放完成后清理（10 秒后或手动停止）
   const cleanupTimeout = setTimeout(() => {
     if (isPlayingDemo) {
       stopDemo();
