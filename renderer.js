@@ -48,7 +48,7 @@ const RHYTHM_PATTERNS = [
 
 // 节拍器相关
 let metronomeEnabled = false;
-let currentBPM = 120;
+let currentBPM = 70; // 默认 70 BPM，适合练习
 let metronomeInterval = null;
 let metronomeBeat = 0;
 let audioContextForMetronome = null;
@@ -477,7 +477,8 @@ async function loadGuitarSoundfont() {
 // 2. 模拟真实扫弦：6 根弦错开 8-15ms，营造从上到下/从下到上的扫弦感
 // 3. 下扫 (D) 和上扫 (U) 使用不同的弦组合、力度和速度
 // 4. 8 分音符重扫低音区，16 分音符轻扫高音区
-// 5. 添加轻微力度变化，让每次扫弦都有细微差别
+// 5. 16 分音符也区分上下扫（下扫更轻，上扫稍强）
+// 6. 添加轻微力度变化，让每次扫弦都有细微差别
 function playStrumSound(direction, duration = 0.15) {
   if (!guitarSoundfont) {
     // 如果音源未加载，使用备选合成音色
@@ -499,11 +500,13 @@ function playStrumSound(direction, duration = 0.15) {
   
   // 扫弦速度参数
   const bassStrumSpeed = isDownStrum ? 0.008 : 0.012;   // 低音区速度 (8 分音符)
-  const trebleStrumSpeed = isDownStrum ? 0.005 : 0.008; // 高音区速度 (16 分音符，更快)
+  const trebleStrumSpeed = isDownStrum ? 0.004 : 0.006; // 高音区速度 (16 分音符，更快)
   
   // 力度参数 - 低音区重，高音区轻
-  const bassVelocity = isDownStrum ? 1.0 : 0.6;   // 低音区力度 (强)
-  const trebleVelocity = isDownStrum ? 0.4 : 0.3; // 高音区力度 (弱)
+  // 低音区：下扫强 (1.0)，上扫中 (0.6)
+  const bassVelocity = isDownStrum ? 1.0 : 0.6;
+  // 高音区：下扫很轻 (0.15)，上扫轻 (0.25) - 增强对比度
+  const trebleVelocity = isDownStrum ? 0.15 : 0.25;
   
   const now = guitarSoundfont.context.currentTime;
   let currentTime = now;
@@ -519,7 +522,7 @@ function playStrumSound(direction, duration = 0.15) {
   });
   
   // 再扫高音区 (16 分音符，轻扫) - 延迟一点，模拟扫弦动作
-  const trebleDelay = bassNotes.length * bassStrumSpeed + 0.02; // 低音区扫完后 +20ms
+  const trebleDelay = bassNotes.length * bassStrumSpeed + 0.015; // 低音区扫完后 +15ms
   trebleOrder.forEach((note, index) => {
     const delay = trebleDelay + (index * trebleStrumSpeed);
     const randomVelocity = trebleVelocity * (0.9 + Math.random() * 0.2);
