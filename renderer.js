@@ -14,14 +14,14 @@ const RHYTHM_PATTERNS = [
     pattern: [500, 250, 250], // 八分 + 十六分 + 十六分
     beats: 4,
     description: '♪ ♫♫',
-    demo: ['D', 'D', 'D']
+    demo: ['D', 'D', 'U'] // 下 下上 (两个 16 分用上下扫)
   },
   {
     name: '前十六后八',
     pattern: [250, 250, 500], // 十六分 + 十六分 + 八分
     beats: 4,
     description: '♫♫ ♪',
-    demo: ['D', 'D', 'D']
+    demo: ['D', 'U', 'D'] // 下上下 (两个 16 分用上下扫)
   },
   {
     name: '民谣常用',
@@ -505,8 +505,8 @@ function playStrumSound(direction, duration = 0.15) {
   // 力度参数 - 低音区重，高音区轻
   // 低音区：下扫强 (1.0)，上扫中 (0.6)
   const bassVelocity = isDownStrum ? 1.0 : 0.6;
-  // 高音区：下扫很轻 (0.15)，上扫轻 (0.25) - 增强对比度
-  const trebleVelocity = isDownStrum ? 0.15 : 0.25;
+  // 高音区：下扫中 (0.3)，上扫轻 (0.2) - 下扫比上扫重
+  const trebleVelocity = isDownStrum ? 0.3 : 0.2;
   
   const now = guitarSoundfont.context.currentTime;
   let currentTime = now;
