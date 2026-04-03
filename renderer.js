@@ -474,8 +474,8 @@ async function loadGuitarSoundfont() {
 // 播放真实吉他扫弦声音
 // 改进点：
 // 1. 使用 FluidR3 GM 真实钢弦吉他采样 (CC0 授权)
-// 2. 模拟真实扫弦：6 根弦错开 8-12ms，营造从上到下/从下到上的扫弦感
-// 3. 下扫 (D) 和上扫 (U) 使用不同的弦组合和力度
+// 2. 模拟真实扫弦：6 根弦错开 8-15ms，营造从上到下/从下到上的扫弦感
+// 3. 下扫 (D) 和上扫 (U) 使用不同的弦组合、力度和速度
 // 4. 添加轻微力度变化，让每次扫弦都有细微差别
 function playStrumSound(direction, duration = 0.15) {
   if (!guitarSoundfont) {
@@ -488,20 +488,21 @@ function playStrumSound(direction, duration = 0.15) {
   const chordNotes = ['E3', 'B3', 'E4', 'G#4', 'B4', 'E5'];
   const isDownStrum = direction === 'D';
   
-  // 下扫：从低音弦到高音弦 (E3 → E5)
-  // 上扫：从高音弦到低音弦 (E5 → E3)
+  // 下扫：从低音弦到高音弦 (E3 → E5) - 更响亮、更快
+  // 上扫：从高音弦到低音弦 (E5 → E3) - 更柔和、稍慢
   const strumOrder = isDownStrum ? [...chordNotes] : [...chordNotes].reverse();
   
-  // 扫弦速度参数
-  const strumSpeed = isDownStrum ? 0.008 : 0.012; // 下扫更快，上扫稍慢
+  // 扫弦速度参数 - 增强对比度
+  const strumSpeed = isDownStrum ? 0.006 : 0.015; // 下扫更快 (6ms/弦)，上扫更慢 (15ms/弦)
   
-  // 力度范围 (0.5-0.9)，模拟不同扫弦强度
-  const velocity = isDownStrum ? 0.8 : 0.6; // 下扫更强
+  // 力度范围 - 增强对比度
+  const velocity = isDownStrum ? 1.0 : 0.5; // 下扫更强 (1.0)，上扫更弱 (0.5)
   
   // 播放扫弦
   const now = guitarSoundfont.context.currentTime;
   strumOrder.forEach((note, index) => {
-    const delay = index * strumSpeed; // 每根弦错开 8-12ms
+    const delay = index * strumSpeed; // 每根弦错开时间
+    // 添加轻微的力度随机变化 (±10%)
     const randomVelocity = velocity * (0.9 + Math.random() * 0.2);
     
     // 播放音符，duration 控制延音
