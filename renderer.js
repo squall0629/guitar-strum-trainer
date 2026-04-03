@@ -260,6 +260,13 @@ function playMetronomeSound(frequency = 1000, duration = 0.05) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
   
+  // 移动端修复：确保 AudioContext 已恢复
+  if (audioContextForMetronome.state === 'suspended') {
+    audioContextForMetronome.resume().catch(err => {
+      console.warn('[GuitarStrumTrainer] AudioContext resume failed:', err);
+    });
+  }
+  
   const oscillator = audioContextForMetronome.createOscillator();
   const gainNode = audioContextForMetronome.createGain();
   
@@ -747,6 +754,13 @@ function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
 function playStrumSoundSynth(direction, duration = 0.15) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  
+  // 移动端修复：确保 AudioContext 已恢复
+  if (audioContextForMetronome.state === 'suspended') {
+    audioContextForMetronome.resume().catch(err => {
+      console.warn('[GuitarStrumTrainer] AudioContext resume failed:', err);
+    });
   }
   
   const ctx = audioContextForMetronome;
