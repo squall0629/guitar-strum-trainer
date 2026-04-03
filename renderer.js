@@ -168,6 +168,9 @@ function init() {
   // 初始化自定义节奏型功能
   initCustomRhythms();
   
+  // 初始化图表折叠功能
+  setupChartToggle();
+  
   console.log('[GuitarStrumTrainer] 初始化完成');
 }
 
@@ -609,6 +612,26 @@ function setupMicTest() {
         btnMicTest.style.color = '';
       }, 3000);
     }
+  });
+}
+
+// 设置图表折叠切换
+function setupChartToggle() {
+  const toggleBtn = document.getElementById('chartToggleBtn');
+  const chartSection = document.getElementById('statsChartSection');
+  if (!toggleBtn || !chartSection) return;
+  
+  const collapsed = localStorage.getItem('guitarStrumChartCollapsed') === 'true';
+  if (collapsed) {
+    chartSection.classList.add('collapsed');
+    toggleBtn.textContent = '▶';
+  }
+  
+  toggleBtn.addEventListener('click', () => {
+    chartSection.classList.toggle('collapsed');
+    const isCollapsed = chartSection.classList.contains('collapsed');
+    toggleBtn.textContent = isCollapsed ? '▶' : '▼';
+    localStorage.setItem('guitarStrumChartCollapsed', isCollapsed);
   });
 }
 

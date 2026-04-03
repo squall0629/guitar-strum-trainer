@@ -553,6 +553,372 @@
     .chart-stats strong {
       color: #b866ff;
     }
+
+    .chart-toggle-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 1em;
+      padding: 4px 8px;
+      float: right;
+    }
+    .chart-toggle-btn:hover {
+      color: #b866ff;
+    }
+
+    /* ===== Tablet (<=768px) ===== */
+    @media (max-width: 768px) {
+      body {
+        padding: 15px;
+        font-size: 15px;
+      }
+
+      header h1 {
+        font-size: 2em;
+      }
+
+      .main-panel {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+
+      .panel, .score-panel {
+        padding: 20px;
+      }
+
+      .panel h2, .score-panel h2 {
+        font-size: 1.2em;
+      }
+
+      .score-display {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+      }
+
+      .score-ring {
+        width: 100px;
+        height: 100px;
+      }
+
+      .score-ring svg {
+        width: 100px;
+        height: 100px;
+      }
+
+      .score-ring .ring-value {
+        font-size: 1.8em;
+      }
+
+      .total-score-ring {
+        width: 130px;
+        height: 130px;
+      }
+
+      .total-score-ring svg {
+        width: 130px;
+        height: 130px;
+      }
+
+      .total-score-ring .ring-value {
+        font-size: 2.4em;
+      }
+
+      .chart-toggle-btn {
+        display: inline-block;
+      }
+
+      .stats-chart.collapsed .chart-container,
+      .stats-chart.collapsed .chart-stats {
+        display: none;
+      }
+    }
+
+    /* ===== Phone (<=480px) ===== */
+    @media (max-width: 480px) {
+      body {
+        padding: 10px;
+        font-size: 14px;
+      }
+
+      header {
+        margin-bottom: 20px;
+      }
+
+      header h1 {
+        font-size: 1.6em;
+      }
+
+      header p {
+        font-size: 0.85em;
+      }
+
+      .main-panel {
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .panel, .score-panel {
+        padding: 15px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+      }
+
+      .panel h2, .score-panel h2 {
+        font-size: 1.1em;
+        margin-bottom: 15px;
+      }
+
+      /* Rhythm cards: single column */
+      .rhythm-selector {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .rhythm-option {
+        padding: 12px;
+      }
+
+      .rhythm-option .name {
+        font-size: 1em;
+      }
+
+      .rhythm-option .pattern {
+        font-size: 0.95em;
+      }
+
+      .rhythm-add-card {
+        padding: 12px;
+        min-height: 70px;
+      }
+
+      /* Score rings: vertical layout */
+      .score-display {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .score-item {
+        padding: 15px;
+        flex-direction: row;
+      }
+
+      .score-ring-container {
+        flex-direction: row;
+        gap: 15px;
+      }
+
+      .score-ring {
+        width: 80px;
+        height: 80px;
+      }
+
+      .score-ring svg {
+        width: 80px;
+        height: 80px;
+      }
+
+      .score-ring .ring-value {
+        font-size: 1.5em;
+      }
+
+      .score-ring .ring-label {
+        font-size: 0.8em;
+      }
+
+      .total-score-ring {
+        width: 110px;
+        height: 110px;
+      }
+
+      .total-score-ring svg {
+        width: 110px;
+        height: 110px;
+      }
+
+      .total-score-ring .ring-value {
+        font-size: 2em;
+      }
+
+      .total-score {
+        padding: 15px;
+        margin-top: 10px;
+      }
+
+      /* Buttons: full width, min 50px height */
+      button, .btn-start, .btn-stop {
+        width: 100%;
+        min-height: 50px;
+        padding: 12px 20px;
+        font-size: 1em;
+      }
+
+      .btn-demo {
+        min-height: 44px;
+        padding: 10px 15px;
+      }
+
+      .mic-test-btn {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 8px 14px;
+      }
+
+      /* Touch optimization: all clickable elements >= 44x44 */
+      .rhythm-option,
+      .rhythm-add-card,
+      .btn-demo,
+      .btn-start,
+      .btn-stop,
+      .mic-test-btn,
+      #btnAddRhythm,
+      input[type="range"],
+      input[type="checkbox"],
+      .history-item {
+        min-height: 44px;
+      }
+
+      /* Thicker sliders */
+      .metronome-settings input[type="range"],
+      .sensitivity-settings input[type="range"] {
+        height: 10px;
+        border-radius: 5px;
+      }
+
+      .metronome-settings input[type="range"]::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+      }
+
+      .sensitivity-settings input[type="range"]::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+      }
+
+      /* Firefox slider thumb */
+      .metronome-settings input[type="range"]::-moz-range-thumb,
+      .sensitivity-settings input[type="range"]::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border: none;
+        border-radius: 50%;
+      }
+
+      /* Touch active feedback */
+      .rhythm-option:active {
+        transform: scale(0.97);
+        background: rgba(184, 102, 255, 0.3);
+      }
+
+      .rhythm-add-card:active {
+        transform: scale(0.97);
+        background: rgba(0, 217, 255, 0.15);
+      }
+
+      .btn-start:active {
+        transform: scale(0.97);
+      }
+
+      .btn-stop:active {
+        transform: scale(0.97);
+      }
+
+      .btn-demo:active {
+        transform: scale(0.97);
+      }
+
+      .mic-test-btn:active {
+        transform: scale(0.95);
+      }
+
+      /* Waveform: reduced height */
+      .visualizer {
+        height: 100px;
+        margin-top: 15px;
+      }
+
+      /* Spacing: reduced gaps */
+      .history-list {
+        gap: 6px;
+        max-height: 150px;
+      }
+
+      .history-item {
+        padding: 8px 12px;
+        font-size: 0.85em;
+      }
+
+      .chart-container {
+        height: 150px;
+        padding: 8px;
+      }
+
+      .chart-stats {
+        gap: 10px;
+        padding: 8px 12px;
+        font-size: 0.8em;
+        flex-wrap: wrap;
+      }
+
+      .feedback {
+        margin-top: 15px;
+        padding: 12px;
+        min-height: 70px;
+      }
+
+      .feedback .message {
+        font-size: 1em;
+      }
+
+      .status {
+        padding: 12px;
+        margin-top: 10px;
+      }
+
+      .metronome-settings,
+      .sensitivity-settings {
+        padding: 12px;
+        margin-bottom: 10px !important;
+      }
+
+      #customRhythmsList {
+        margin-top: 10px !important;
+        gap: 8px !important;
+      }
+
+      /* Collapsible chart */
+      .chart-toggle-btn {
+        display: inline-block;
+      }
+
+      .stats-chart.collapsed .chart-container,
+      .stats-chart.collapsed .chart-stats {
+        display: none;
+      }
+
+      /* Rhythm editor modal mobile */
+      #rhythmEditorModal > div {
+        margin: 20px 10px !important;
+        padding: 20px !important;
+        max-width: 100% !important;
+      }
+
+      /* Volume meter */
+      .volume-meter {
+        height: 8px;
+      }
+
+      /* Score item values */
+      .score-item .value {
+        font-size: 1.8em;
+      }
+
+      .total-score .value {
+        font-size: 2.5em;
+      }
+    }
   </style>
 </head>
 <body>
@@ -714,8 +1080,8 @@
           </div>
         </div>
         
-        <div class="stats-chart">
-          <h3>📈 成绩趋势</h3>
+        <div class="stats-chart" id="statsChartSection">
+          <h3>📈 成绩趋势 <button class="chart-toggle-btn" id="chartToggleBtn" aria-label="折叠/展开图表">▼</button></h3>
           <div class="chart-container">
             <canvas id="statsChart"></canvas>
           </div>
