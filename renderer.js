@@ -263,7 +263,7 @@ function setupDemoButtons() {
     });
   });
   
-  // 同时绑定自定义节奏型的演示按钮
+  // 同时绑定自定义节奏型的演示按钮（主选择器中的 .btn-demo[data-custom]）
   const customDemoBtns = document.querySelectorAll('.btn-demo[data-custom]');
   customDemoBtns.forEach(btn => {
     // 移除旧的事件监听器（避免重复绑定）
@@ -291,7 +291,8 @@ function setupDemoButtons() {
         stopDemo();
       } else {
         console.log('[GuitarStrumTrainer] Starting custom demo...');
-        playCustomRhythm(customIndex);
+        // 直接调用 playCustomRhythmFromList，传递当前点击的按钮
+        playCustomRhythmFromList(customIndex, newBtn);
       }
     });
   });
@@ -1951,12 +1952,20 @@ function playCustomRhythmFromList(index, btn) {
   window.customRhythmCleanup = cleanupTimeout;
 }
 
-// 播放自定义节奏型（保留旧函数名兼容）
+// 播放自定义节奏型（保留旧函数名兼容，优先使用主选择器中的按钮）
 function playCustomRhythm(index) {
-  // 找到对应的按钮
-  const btn = document.querySelector(`.btn-custom-play[data-custom-index="${index}"]`);
+  console.log('[GuitarStrumTrainer] playCustomRhythm called with index:', index);
+  // 优先查找主选择器中的按钮（.btn-demo[data-custom]）
+  let btn = document.querySelector(`.btn-demo[data-custom="${index}"]`);
+  // 如果找不到，再查找自定义列表中的按钮
+  if (!btn) {
+    btn = document.querySelector(`.btn-custom-play[data-custom-index="${index}"]`);
+  }
   if (btn) {
+    console.log('[GuitarStrumTrainer] playCustomRhythm found button, calling playCustomRhythmFromList');
     playCustomRhythmFromList(index, btn);
+  } else {
+    console.warn('[GuitarStrumTrainer] playCustomRhythm: button not found for index', index);
   }
 }
 
