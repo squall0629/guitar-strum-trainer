@@ -58,6 +58,7 @@ let isPlayingDemo = false;
 let demoTimeout = null;
 let demoLoopCount = 0;
 let currentDemoRhythmIndex = -1;
+let playingCustomBtn = null;
 
 // 设置灵敏度
 let sensitivityLevel = 50; // 1-100
@@ -323,107 +324,38 @@ function stopMetronome() {
   }
 }
 
-// 播放扫弦演示声音 - 改进版：更真实的吉他音色
-// 改进点：
-// 1. 使用基频 + 泛音叠加模拟吉他和弦
-// 2. 添加 ADSR 包络 (Attack, Decay, Sustain, Release) 让声音更自然
-// 3. 使用 triangle 和 sawtooth 波形混合代替单一 sine
-// 4. 添加轻微频率抖动 (±0.5%) 模拟真实吉他弦的不完美
-// 5. 下扫 (D) 和上扫 (U) 使用不同的音色处理
-function playStrumSound(direction, duration = 0.15) {
+// 播放节拍器声音 - 保留原有简洁的电子滴答声
+// 与扫弦音色区分开，使用纯 sine 波确保节拍器声音清晰可辨
+function playMetronomeSound(frequency = 1000, duration = 0.05) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
   
-  const ctx = audioContextForMetronome;
-  const now = ctx.currentTime;
+  // 移动端修复：确保 AudioContext 已恢复
+  if (audioContextForMetronome.state === 'suspended') {
+    audioContextForMetronome.resume().catch(err => {
+      console.warn('[GuitarStrumTrainer] AudioContext resume failed:', err);
+    });
+  }
   
-  // 基础和弦频率 (E 大调和弦: E3, B3, E4, G#4, B4, E5)
-  const baseChord = [164.81, 246.94, 329.63, 415.30, 493.88, 659.25];
+  const oscillator = audioContextForMetronome.createOscillator();
+  const gainNode = audioContextForMetronome.createGain();
   
-  // 根据扫弦方向调整延迟和音色
-  const isDownStrum = direction === 'D';
-  const strumDelay = isDownStrum ? 0.008 : 0.012; // 下扫更快，上扫稍慢
-  const brightness = isDownStrum ? 1.0 : 0.7; // 下扫更明亮，上扫柔和
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContextForMetronome.destination);
   
-  // ADSR 包络参数
-  const attackTime = 0.005;    // 5ms 快速起音
-  const decayTime = 0.08;      // 80ms 衰减
-  const sustainLevel = 0.3;    // 延 sustain 电平 30%
-  const releaseTime = duration * 0.6; // 释放时间
+  oscillator.frequency.value = frequency;
+  oscillator.type = 'sine';
   
-  // 为每根弦创建声音
-  baseChord.forEach((baseFreq, stringIndex) => {
-    // 频率抖动: ±0.5% 模拟真实吉他
-    const jitter = 1 + (Math.random() - 0.5) * 0.01;
-    const freq = baseFreq * jitter;
-    
-    // 每根弦的起始时间错开，模拟扫弦效果
-    const startTime = now + (stringIndex * strumDelay);
-    
-    // --- 基频振荡器 (triangle 波形) ---
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.value = freq;
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    
-    // --- 二次泛音 (sawtooth 波形，音量较低) ---
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sawtooth';
-    osc2.frequency.value = freq * 2.0; // 二次谐波
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    
-    // --- 三次泛音 (triangle 波形，更弱) ---
-    const osc3 = ctx.createOscillator();
-    const gain3 = ctx.createGain();
-    osc3.type = 'triangle';
-    osc3.frequency.value = freq * 3.0; // 三次谐波
-    osc3.connect(gain3);
-    gain3.connect(ctx.destination);
-    
-    // 音量分配: 基频最强，泛音递减
-    const baseVolume = 0.25 * brightness;  // 增强音量：0.12→0.25 (约 2 倍)
-    const harmonic2Volume = 0.08 * brightness;  // 增强泛音：0.04→0.08
-    const harmonic3Volume = 0.04 * brightness;  // 增强泛音：0.02→0.04
-    
-    // 应用 ADSR 包络到基频
-    const peakTime = startTime + attackTime;
-    const sustainTime = startTime + attackTime + decayTime;
-    const endTime = startTime + duration;
-    
-    gain1.gain.setValueAtTime(0.001, startTime);
-    gain1.gain.linearRampToValueAtTime(baseVolume, peakTime);
-    gain1.gain.exponentialRampToValueAtTime(baseVolume * sustainLevel, sustainTime);
-    gain1.gain.setValueAtTime(baseVolume * sustainLevel, endTime);
-    gain1.gain.exponentialRampToValueAtTime(0.001, endTime + releaseTime);
-    
-    // 泛音衰减更快
-    gain2.gain.setValueAtTime(0.001, startTime);
-    gain2.gain.linearRampToValueAtTime(harmonic2Volume, peakTime);
-    gain2.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.5);
-    
-    gain3.gain.setValueAtTime(0.001, startTime);
-    gain3.gain.linearRampToValueAtTime(harmonic3Volume, peakTime);
-    gain3.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.3);
-    
-    // 启动和停止所有振荡器
-    osc1.start(startTime);
-    osc1.stop(endTime + releaseTime + 0.01);
-    
-    osc2.start(startTime);
-    osc2.stop(sustainTime + releaseTime * 0.5 + 0.01);
-    
-    osc3.start(startTime);
-    osc3.stop(sustainTime + releaseTime * 0.3 + 0.01);
-  });
+  gainNode.gain.setValueAtTime(0.3, audioContextForMetronome.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextForMetronome.currentTime + duration);
+  
+  oscillator.start(audioContextForMetronome.currentTime);
+  oscillator.stop(audioContextForMetronome.currentTime + duration);
 }
 
 // 播放节奏型演示 - 循环播放版本
-function playDemo(rhythmIndex, btnElement) {
+async function playDemo(rhythmIndex, btnElement) {
   isPlayingDemo = true;
   demoLoopCount = 0;
   currentDemoRhythmIndex = rhythmIndex;
@@ -443,7 +375,7 @@ function playDemo(rhythmIndex, btnElement) {
   }
   let noteIndex = 0;
   
-  function playNextNote() {
+  async function playNextNote() {
     if (!isPlayingDemo) return;
     
     // 检测一轮结束，开始新一轮
@@ -457,9 +389,9 @@ function playDemo(rhythmIndex, btnElement) {
     // 如果是自定义节奏型，传递力度参数
     if (pattern.isCustom && pattern.notes && pattern.notes[noteIndex % pattern.notes.length]) {
       const noteData = pattern.notes[noteIndex % pattern.notes.length];
-      playStrumSound(direction, 0.15, [noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity]);
+      await playStrumSound(direction, 0.15, [noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity]);
     } else {
-      playStrumSound(direction);
+      await playStrumSound(direction);
     }
     
     // 视觉反馈 - 添加空值检查（自定义节奏型没有对应的 DOM 元素）
@@ -686,11 +618,17 @@ async function loadGuitarSoundfont() {
 // 4. 8 分音符重扫低音区，16 分音符轻扫高音区
 // 5. 16 分音符也区分上下扫（下扫更轻，上扫稍强）
 // 6. 添加轻微力度变化，让每次扫弦都有细微差别
-function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
+async function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
   if (!guitarSoundfont) {
     // 如果音源未加载，使用备选合成音色
-    playStrumSoundSynth(direction, duration);
+    await playStrumSoundSynth(direction, duration);
     return;
+  }
+  
+  // 确保 AudioContext 已恢复
+  const ctx = guitarSoundfont.context;
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
   }
   
   // E 大调和弦：E3, B3, E4, G#4, B4, E5 (标准吉他调弦)
@@ -725,7 +663,7 @@ function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
     trebleVelocity = isDownStrum ? 0.3 : 0.2;
   }
   
-  const now = guitarSoundfont.context.currentTime;
+  const now = ctx.currentTime;
   let currentTime = now;
   
   // 先扫低音区 (8 分音符，重扫)
@@ -751,16 +689,14 @@ function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
 }
 
 // 备选合成音色 (当音源加载失败时使用) - 增强音量版
-function playStrumSoundSynth(direction, duration = 0.15) {
+async function playStrumSoundSynth(direction, duration = 0.15) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
   
   // 移动端修复：确保 AudioContext 已恢复
   if (audioContextForMetronome.state === 'suspended') {
-    audioContextForMetronome.resume().catch(err => {
-      console.warn('[GuitarStrumTrainer] AudioContext resume failed:', err);
-    });
+    await audioContextForMetronome.resume();
   }
   
   const ctx = audioContextForMetronome;
@@ -1857,8 +1793,6 @@ function deleteCustomRhythm(index) {
 }
 
 // 播放自定义节奏型
-let playingCustomBtn = null; // 跟踪当前播放的自定义节奏型按钮
-
 function playCustomRhythm(index) {
   if (index < 0 || index >= customRhythms.length) return;
   
