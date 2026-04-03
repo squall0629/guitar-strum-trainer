@@ -7,10 +7,18 @@
     "start": "serve .",
     "dev": "serve ."
   },
-  "keywords": ["guitar", "strumming", "practice", "audio-analysis", "chord-recognition"],
+  "keywords": [
+    "guitar",
+    "strumming",
+    "practice",
+    "audio-analysis",
+    "chord-recognition"
+  ],
   "author": "老马",
   "license": "MIT",
   "dependencies": {
+    "@tonaljs/chord-detect": "^4.9.1",
+    "chordictionary": "^0.1.0-beta.4",
     "soundfont-player": "^0.12.0",
     "tonal": "^6.4.3"
   }

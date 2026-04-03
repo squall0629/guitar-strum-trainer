@@ -1,14 +1,17 @@
 /**
- * 和弦检测器 - 基于 FFT 频谱分析和规则匹配
+ * 和弦检测器 - 基于 tonaljs chord-detect + 自研 FFT 分析
  * 
- * 功能：
- * 1. FFT 频谱分析 - 从音频数据中提取频率信息
- * 2. 峰值检测 - 识别主要音符频率
- * 3. 和弦匹配 - 与和弦库对比，找到最佳匹配
- * 4. 置信度评估 - 返回识别结果的可信度
+ * 技术方案：
+ * 1. 音频分析：自己实现（Web Audio API + FFT）
+ * 2. 和弦识别：@tonaljs/chord-detect
+ * 3. 指法图：chordictionaryjs
+ * 
+ * 流程：
+ * FFT 分析 → 峰值检测 → 提取音符 → tonaljs 识别和弦 → chordictionary 获取指法
  */
 
-import { chordData, findChord, getChordSVG, getChordTabString } from './chord-library.js';
+import { ChordDetect } from '@tonaljs/chord-detect';
+import { getChordData, getChordSVG, getChordNotes, BASIC_CHORDS } from './chord-library.js';
 import { Note } from 'tonal';
 
 /**
@@ -23,9 +26,8 @@ export class ChordDetector {
   constructor(audioContext, analyser) {
     this.audioContext = audioContext;
     this.analyser = analyser;
-    this.chordLibrary = chordData;
     
-    // 6 根吉他的基频范围 (Hz)
+    // 吉他 6 根弦的基频范围 (Hz)
     this.stringRanges = [
       { name: 'E2', min: 80, max: 85, string: 6 },    // 6 弦
       { name: 'A2', min: 108, max: 112, string: 5 },  // 5 弦
@@ -35,14 +37,17 @@ export class ChordDetector {
       { name: 'E4', min: 328, max: 332, string: 1 }   // 1 弦
     ];
     
-    // 检测阈值 (可动态调整)
+    // 检测阈值
     this.threshold = 0.15;
     
-    // 置信度阈值 (低于此值认为识别不可靠)
+    // 置信度阈值
     this.confidenceThreshold = 0.65;
     
-    // 噪音门限 (低于此能量视为噪音)
+    // 噪音门限
     this.noiseGate = 0.05;
+    
+    // 基础音高参考 (A4 = 440Hz)
+    this.A4 = 440;
   }
   
   /**
@@ -60,26 +65,21 @@ export class ChordDetector {
    */
   extractStringEnergies(freqData) {
     const sampleRate = this.audioContext.sampleRate;
-    const fftSize = freqData.length * 2; // FFT size 是数据长度的 2 倍
-    const binSize = sampleRate / fftSize; // 每个 bin 代表的频率
+    const fftSize = freqData.length * 2;
+    const binSize = sampleRate / fftSize;
     
     return this.stringRanges.map(range => {
-      // 计算频率范围对应的 bin 索引
       const startBin = Math.floor(range.min / binSize);
       const endBin = Math.floor(range.max / binSize);
       
-      // 确保索引在有效范围内
       const safeStart = Math.max(0, Math.min(startBin, freqData.length - 1));
       const safeEnd = Math.max(safeStart + 1, Math.min(endBin, freqData.length));
       
-      // 计算该范围内的平均能量
       let energy = 0;
       for (let i = safeStart; i < safeEnd; i++) {
         energy += freqData[i];
       }
       energy /= (safeEnd - safeStart);
-      
-      // 归一化到 0-1 范围
       energy = energy / 255;
       
       return {
@@ -93,33 +93,20 @@ export class ChordDetector {
   }
   
   /**
-   * 检测当前激活的琴弦
-   * @param {Array} stringEnergies - 弦能量数组
-   * @returns {Array} 布尔数组，表示每根弦是否激活
-   */
-  detectActiveStrings(stringEnergies) {
-    return stringEnergies.map(s => {
-      // 能量超过阈值且超过噪音门限
-      return s.energy > this.threshold && s.energy > this.noiseGate;
-    });
-  }
-  
-  /**
-   * 提取检测到的音符 (峰值检测)
+   * 峰值检测 - 提取主要音符频率
    * @param {Uint8Array} freqData - FFT 频域数据
    * @returns {Array} 检测到的音符列表
    */
-  extractDetectedNotes(freqData) {
+  detectPeaks(freqData) {
     const sampleRate = this.audioContext.sampleRate;
     const fftSize = freqData.length * 2;
     const binSize = sampleRate / fftSize;
     
-    const notes = [];
-    const threshold = this.threshold * 255; // 转换回 0-255 范围
+    const peaks = [];
+    const threshold = this.threshold * 255;
     
-    // 查找所有峰值
+    // 查找局部峰值
     for (let i = 1; i < freqData.length - 1; i++) {
-      // 检查是否是局部峰值
       if (freqData[i] > freqData[i - 1] && 
           freqData[i] > freqData[i + 1] && 
           freqData[i] > threshold) {
@@ -128,10 +115,9 @@ export class ChordDetector {
         
         // 只关心吉他频率范围 (80Hz - 1000Hz)
         if (freq >= 80 && freq <= 1000) {
-          // 将频率转换为音名
           const note = this.freqToNote(freq);
           if (note) {
-            notes.push({
+            peaks.push({
               note: note,
               frequency: freq,
               amplitude: freqData[i] / 255,
@@ -142,24 +128,20 @@ export class ChordDetector {
       }
     }
     
-    // 按振幅排序，取前 6 个 (吉他最多 6 根弦)
-    notes.sort((a, b) => b.amplitude - a.amplitude);
-    return notes.slice(0, 6);
+    // 按振幅排序，取前 6 个
+    peaks.sort((a, b) => b.amplitude - a.amplitude);
+    return peaks.slice(0, 6);
   }
   
   /**
    * 将频率转换为音名
    * @param {number} freq - 频率 (Hz)
-   * @returns {string|null} 音名 (如 "C3", "E2")
+   * @returns {string|null} 音名
    */
   freqToNote(freq) {
     try {
-      // 使用 tonaljs 的 Note 模块
-      // 计算与 A4 (440Hz) 的半音距离
-      const semitonesFromA4 = 12 * Math.log2(freq / 440);
-      const midiNumber = Math.round(semitonesFromA4) + 69; // A4 = MIDI 69
-      
-      // 转换为音名
+      const semitonesFromA4 = 12 * Math.log2(freq / this.A4);
+      const midiNumber = Math.round(semitonesFromA4) + 69;
       return Note.fromMidi(midiNumber);
     } catch (e) {
       return null;
@@ -167,140 +149,138 @@ export class ChordDetector {
   }
   
   /**
-   * 比较激活状态与和弦模板的匹配度
-   * @param {Array} active - 当前激活状态 [true/false, ...]
-   * @param {Array} template - 和弦模板 [0/1, ...]
+   * 使用 tonaljs 检测和弦
+   * @param {string[]} detectedNotes - 检测到的音符列表 (如 ['C3', 'E3', 'G3'])
+   * @returns {string|null} 识别的和弦名称
+   */
+  detectChordWithTonal(detectedNotes) {
+    if (!detectedNotes || detectedNotes.length === 0) {
+      return null;
+    }
+    
+    try {
+      // 使用 @tonaljs/chord-detect
+      // ChordDetect.detect 接受音符数组，返回和弦名称
+      const chordName = ChordDetect.detect(detectedNotes);
+      
+      if (chordName && chordName.length > 0) {
+        // 验证是否是基础和弦
+        const basicChordNames = BASIC_CHORDS.map(c => c.name);
+        
+        // 检查是否匹配基础和弦
+        for (const basicName of basicChordNames) {
+          if (chordName.includes(basicName) || chordName === basicName) {
+            return basicName;
+          }
+        }
+        
+        // 如果不完全匹配，返回识别结果
+        return chordName;
+      }
+    } catch (e) {
+      console.warn('[ChordDetector] tonaljs 和弦识别失败:', e);
+    }
+    
+    return null;
+  }
+  
+  /**
+   * 基于弦能量的辅助识别（验证）
+   * @param {Array} stringEnergies - 弦能量
+   * @param {string} chordName - 候选和弦
    * @returns {number} 匹配度 (0-1)
    */
-  compareTemplate(active, template) {
-    let matches = 0;
+  verifyWithStringEnergies(stringEnergies, chordName) {
+    const chordData = getChordData(chordName);
+    if (!chordData) return 0;
+    
+    const fingering = chordData.fingers || [];
+    let score = 0;
     let weight = 0;
     
     for (let i = 0; i < 6; i++) {
-      // 给低音弦更高的权重 (6 弦、5 弦更重要)
+      const expectedActive = fingering[i] > 0;
+      const actualActive = stringEnergies[i].energy > this.threshold;
       const stringWeight = 6 - i;
+      
       weight += stringWeight;
       
-      const isActive = active[i];
-      const shouldBeActive = template[i] === 1;
-      
-      if (isActive === shouldBeActive) {
-        matches += stringWeight;
+      if (expectedActive === actualActive) {
+        score += stringWeight;
       } else {
-        // 如果不匹配，扣分
-        // 应该是发声但没检测到：可能是按弦不实
-        // 应该不发声但检测到：可能是闷音不好
-        if (shouldBeActive && !isActive) {
-          matches -= stringWeight * 0.5;
-        } else if (!shouldBeActive && isActive) {
-          matches -= stringWeight * 0.3;
+        // 不匹配扣分
+        if (expectedActive && !actualActive) {
+          score -= stringWeight * 0.5;
+        } else if (!expectedActive && actualActive) {
+          score -= stringWeight * 0.3;
         }
       }
     }
     
-    return Math.max(0, matches / weight);
+    return Math.max(0, score / weight);
   }
   
   /**
-   * 基于音符的匹配 (更精确的方法)
-   * @param {Array} detectedNotes - 检测到的音符列表
-   * @param {object} chord - 和弦对象
-   * @returns {number} 匹配度 (0-1)
-   */
-  compareNotes(detectedNotes, chord) {
-    if (!chord.notes || chord.notes.length === 0) {
-      return 0;
-    }
-    
-    const expectedNotes = new Set(chord.notes);
-    let matches = 0;
-    let totalWeight = 0;
-    
-    detectedNotes.forEach(detected => {
-      const noteName = detected.note;
-      if (expectedNotes.has(noteName)) {
-        // 按振幅加权
-        matches += detected.amplitude;
-        totalWeight += detected.amplitude;
-      } else {
-        // 检测到非和弦内音，可能是杂音
-        totalWeight += detected.amplitude * 0.5;
-      }
-    });
-    
-    // 基础匹配度
-    let baseScore = totalWeight > 0 ? matches / totalWeight : 0;
-    
-    // 考虑音符数量匹配
-    const noteCountRatio = Math.min(1, detectedNotes.length / expectedNotes.size);
-    
-    // 综合评分
-    return baseScore * 0.7 + noteCountRatio * 0.3;
-  }
-  
-  /**
-   * 检测和弦
+   * 检测和弦 - 主方法
    * @param {Uint8Array} freqData - FFT 频域数据
-   * @returns {object|null} 识别结果 {chord, confidence, method}
+   * @returns {object|null} 识别结果
    */
   detect(freqData) {
     // 1. 提取弦能量
     const stringEnergies = this.extractStringEnergies(freqData);
     
-    // 2. 检测激活的弦
-    const activeStrings = this.detectActiveStrings(stringEnergies);
+    // 2. 峰值检测，提取音符
+    const detectedPeaks = this.detectPeaks(freqData);
+    const detectedNotes = detectedPeaks.map(p => p.note);
     
-    // 3. 提取检测到的音符
-    const detectedNotes = this.extractDetectedNotes(freqData);
-    
-    // 4. 与和弦库匹配
-    let bestMatch = null;
-    let bestScore = 0;
-    let bestMethod = 'template';
-    
-    for (const chord of this.chordLibrary) {
-      // 方法 1: 模板匹配
-      const templateScore = this.compareTemplate(activeStrings, chord.template);
-      
-      // 方法 2: 音符匹配
-      const noteScore = this.compareNotes(detectedNotes, chord);
-      
-      // 综合两种方法的评分 (模板匹配权重更高，因为更稳定)
-      const combinedScore = templateScore * 0.6 + noteScore * 0.4;
-      
-      if (combinedScore > bestScore) {
-        bestScore = combinedScore;
-        bestMatch = chord;
-        bestMethod = combinedScore > 0.8 ? 'both' : (templateScore > noteScore ? 'template' : 'note');
-      }
+    if (detectedNotes.length < 2) {
+      // 音符太少，无法识别和弦
+      return null;
     }
     
-    // 5. 返回结果 (需超过置信度阈值)
-    if (bestScore >= this.confidenceThreshold && bestMatch) {
-      // 使用 chordictionary 生成 SVG 指法图
-      let svg = null;
-      try {
-        svg = getChordSVG(bestMatch.name);
-      } catch (e) {
-        console.warn('[ChordDetector] SVG generation error:', e);
-      }
-      
+    // 3. 使用 tonaljs 识别和弦
+    let chordName = this.detectChordWithTonal(detectedNotes);
+    
+    // 4. 如果 tonaljs 无法识别，使用弦能量匹配作为备选
+    if (!chordName) {
+      chordName = this.detectByStringEnergy(stringEnergies);
+    }
+    
+    // 5. 如果还是没有结果，返回 null
+    if (!chordName) {
+      return null;
+    }
+    
+    // 6. 验证识别结果
+    const verifyScore = this.verifyWithStringEnergies(stringEnergies, chordName);
+    
+    // 7. 获取和弦数据
+    const chordData = getChordData(chordName);
+    const notes = getChordNotes(chordName);
+    
+    // 8. 计算置信度
+    const confidence = Math.min(1, 
+      (detectedPeaks.length / 4) * 0.4 +  // 音符数量
+      (verifyScore) * 0.4 +                 // 弦能量匹配
+      (notes.length > 0 ? 0.2 : 0)          // 和弦数据完整性
+    );
+    
+    // 9. 返回结果
+    if (confidence >= this.confidenceThreshold) {
       return {
-        chord: bestMatch.name,
-        confidence: Math.round(bestScore * 100) / 100,
-        method: bestMethod,
-        activeStrings: activeStrings,
+        chord: chordName,
+        confidence: Math.round(confidence * 100) / 100,
+        method: 'tonal',
+        detectedNotes: detectedPeaks.map(p => ({
+          note: p.note,
+          amplitude: Math.round(p.amplitude * 100) / 100
+        })),
         stringEnergies: stringEnergies.map(s => ({
           name: s.name,
           energy: Math.round(s.energy * 100) / 100
         })),
-        detectedNotes: detectedNotes.map(n => ({
-          note: n.note,
-          amplitude: Math.round(n.amplitude * 100) / 100
-        })),
-        svg: svg,
-        fingering: bestMatch.fingering,
-        tab: getChordTabString(bestMatch)
+        fingering: chordData ? chordData.fingers : null,
+        notes: notes
       };
     }
     
@@ -308,37 +288,44 @@ export class ChordDetector {
   }
   
   /**
-   * 批量检测 (用于调试/校准)
-   * @param {Array} freqDataArray - 多个频域数据样本
-   * @returns {object} 统计结果
+   * 基于弦能量的备选识别方法
+   * @param {Array} stringEnergies - 弦能量
+   * @returns {string|null} 和弦名称
    */
-  detectBatch(freqDataArray) {
-    const results = {};
+  detectByStringEnergy(stringEnergies) {
+    const activeStrings = stringEnergies.map(s => s.energy > this.threshold);
     
-    freqDataArray.forEach(data => {
-      const result = this.detect(data);
-      if (result) {
-        if (!results[result.chord]) {
-          results[result.chord] = { count: 0, totalConfidence: 0 };
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const chord of BASIC_CHORDS) {
+      const chordData = getChordData(chord.name);
+      if (!chordData) continue;
+      
+      const fingering = chordData.fingers || [];
+      let score = 0;
+      
+      for (let i = 0; i < 6; i++) {
+        const expectedActive = fingering[i] > 0;
+        const actualActive = activeStrings[i];
+        
+        if (expectedActive === actualActive) {
+          score++;
         }
-        results[result.chord].count++;
-        results[result.chord].totalConfidence += result.confidence;
       }
-    });
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = chord.name;
+      }
+    }
     
-    // 计算平均置信度
-    Object.keys(results).forEach(chord => {
-      results[chord].avgConfidence = 
-        Math.round(results[chord].totalConfidence / results[chord].count * 100) / 100;
-    });
-    
-    return results;
+    return bestScore >= 4 ? bestMatch : null;
   }
 }
 
 /**
  * 和弦转换检测器
- * 追踪和弦变化和转换时间
  */
 export class TransitionDetector {
   constructor() {
@@ -351,19 +338,14 @@ export class TransitionDetector {
   
   /**
    * 处理和弦检测结果
-   * @param {string|null} detectedChord - 识别到的和弦
-   * @param {string|null} expectedChord - 期望的和弦 (训练模式下)
-   * @param {number} timestamp - 时间戳 (毫秒)
    */
   onChordDetected(detectedChord, expectedChord = null, timestamp) {
     this.strumCount++;
     
-    // 检查是否准确
     if (expectedChord && detectedChord === expectedChord) {
       this.correctChords++;
     }
     
-    // 检测和弦转换
     if (this.lastChord && detectedChord && detectedChord !== this.lastChord) {
       const transitionTime = timestamp - this.lastStrumTime;
       
@@ -382,7 +364,6 @@ export class TransitionDetector {
   
   /**
    * 获取平均转换时间
-   * @returns {number} 平均转换时间 (ms)
    */
   getAverageTransitionTime() {
     if (this.transitions.length === 0) return 0;
@@ -391,18 +372,13 @@ export class TransitionDetector {
   }
   
   /**
-   * 获取最慢的转换
-   * @returns {object|null} 最慢的转换信息
+   * 获取最慢/最快转换
    */
   getSlowestTransition() {
     if (this.transitions.length === 0) return null;
     return this.transitions.reduce((max, t) => t.time > max.time ? t : max);
   }
   
-  /**
-   * 获取最快的转换
-   * @returns {object|null} 最快的转换信息
-   */
   getFastestTransition() {
     if (this.transitions.length === 0) return null;
     return this.transitions.reduce((min, t) => t.time < min.time ? t : min);
@@ -410,8 +386,6 @@ export class TransitionDetector {
   
   /**
    * 计算转换流畅度评分
-   * @param {number} targetTime - 目标转换时间 (ms)
-   * @returns {number} 评分 (0-100)
    */
   calculateTransitionScore(targetTime = 500) {
     if (this.transitions.length === 0) return 100;
@@ -419,16 +393,14 @@ export class TransitionDetector {
     const avgTime = this.getAverageTransitionTime();
     const deviation = Math.abs(avgTime - targetTime) / targetTime;
     
-    // 高斯衰减评分
-    const sigma = 0.3; // 30% 容差
+    const sigma = 0.3;
     const score = 100 * Math.exp(-(deviation * deviation) / (2 * sigma * sigma));
     
     return Math.round(Math.max(0, Math.min(100, score)));
   }
   
   /**
-   * 获取和弦准确率
-   * @returns {number} 准确率 (0-100)
+   * 获取准确率
    */
   getAccuracy() {
     if (this.strumCount === 0) return 0;
@@ -436,7 +408,7 @@ export class TransitionDetector {
   }
   
   /**
-   * 重置检测器
+   * 重置
    */
   reset() {
     this.lastChord = null;
@@ -448,7 +420,6 @@ export class TransitionDetector {
   
   /**
    * 获取统计数据
-   * @returns {object} 统计信息
    */
   getStats() {
     return {
@@ -458,7 +429,8 @@ export class TransitionDetector {
       transitionCount: this.transitions.length,
       avgTransitionTime: this.getAverageTransitionTime(),
       fastestTransition: this.getFastestTransition(),
-      slowestTransition: this.getSlowestTransition()
+      slowestTransition: this.getSlowestTransition(),
+      transitions: this.transitions
     };
   }
 }

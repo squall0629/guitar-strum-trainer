@@ -3,7 +3,14 @@
 
 // ========== 和弦识别模块 ==========
 import { ChordDetector, TransitionDetector } from './chord-detector.js';
-import { chordData, findChord, COMMON_PROGRESSIONS, getChordNames } from './chord-library.js';
+import { 
+  getChordData, 
+  getChordSVG, 
+  findChord, 
+  COMMON_PROGRESSIONS, 
+  getBasicChordNames,
+  BASIC_CHORDS 
+} from './chord-library.js';
 
 // 和弦识别全局变量
 let chordDetector = null;
@@ -2806,12 +2813,9 @@ function updateChordDisplay() {
   currentChordDisplay.textContent = expectedChord;
   nextChordDisplay.textContent = nextChord;
   
-  // 绘制指法图
-  const currentChordData = findChord(expectedChord);
-  const nextChordData = findChord(nextChord);
-  
-  if (currentChordCanvas) drawChordDiagram(currentChordCanvas, currentChordData);
-  if (nextChordCanvas) drawChordDiagram(nextChordCanvas, nextChordData);
+  // 绘制指法图（使用 chordictionary SVG）
+  if (currentChordCanvas) drawChordDiagram(currentChordCanvas, expectedChord);
+  if (nextChordCanvas) drawChordDiagram(nextChordCanvas, nextChord);
   
   // 更新进度
   if (progressionBar && progressionProgress) {
@@ -2826,18 +2830,21 @@ function updateChordDisplay() {
  * @param {HTMLCanvasElement} canvas - Canvas 元素
  * @param {object} chordData - 和弦数据
  */
-function drawChordDiagram(canvas, chordData) {
+/**
+ * 绘制和弦指法图 - 使用 chordictionary SVG
+ * @param {HTMLCanvasElement} canvas - Canvas 元素（用于承载 SVG）
+ * @param {string} chordName - 和弦名称 (如 'C', 'Am')
+ */
+function drawChordDiagram(canvas, chordName) {
   if (!canvas) return;
   
-  const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
   
-  // 清空
-  ctx.clearRect(0, 0, width, height);
-  
-  if (!chordData) {
-    // 绘制空提示
+  if (!chordName) {
+    // 清空并显示提示
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#666';
     ctx.font = '14px Microsoft YaHei';
     ctx.textAlign = 'center';
@@ -2845,21 +2852,68 @@ function drawChordDiagram(canvas, chordData) {
     return;
   }
   
-  const strings = chordData.fingering.strings;
-  const frets = chordData.fingering.frets || 3;
+  try {
+    // 使用 chordictionary 生成 SVG
+    const svgString = getChordSVG(chordName, width, height);
+    
+    // 将 SVG 转换为图片并绘制到 Canvas
+    const img = new Image();
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+    };
+    
+    img.onerror = () => {
+      // SVG 加载失败，使用备用 Canvas 绘制
+      drawChordDiagramFallback(canvas, chordName);
+      URL.revokeObjectURL(url);
+    };
+    
+    img.src = url;
+  } catch (e) {
+    console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
+    drawChordDiagramFallback(canvas, chordName);
+  }
+}
+
+/**
+ * 备用和弦指法图绘制（Canvas）
+ * @param {HTMLCanvasElement} canvas - Canvas 元素
+ * @param {string} chordName - 和弦名称
+ */
+function drawChordDiagramFallback(canvas, chordName) {
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
   
-  // 参数
+  ctx.clearRect(0, 0, width, height);
+  
+  const chordData = getChordData(chordName);
+  
+  if (!chordData) {
+    ctx.fillStyle = '#666';
+    ctx.font = '14px Microsoft YaHei';
+    ctx.textAlign = 'center';
+    ctx.fillText('无指法数据', width / 2, height / 2);
+    return;
+  }
+  
+  const fingering = chordData.fingers || [0, 0, 0, 0, 0, 0];
   const padding = 15;
   const diagramWidth = width - padding * 2;
   const diagramHeight = height - padding * 2 - 20;
   const stringSpacing = diagramWidth / 5;
-  const fretSpacing = diagramHeight / frets;
+  const fretSpacing = diagramHeight / 3;
   
   // 绘制品格
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 1;
-  
-  for (let i = 0; i <= frets; i++) {
+  for (let i = 0; i <= 3; i++) {
     const y = padding + i * fretSpacing;
     ctx.beginPath();
     ctx.moveTo(padding, y);
@@ -2872,43 +2926,35 @@ function drawChordDiagram(canvas, chordData) {
     const x = padding + i * stringSpacing;
     ctx.beginPath();
     ctx.moveTo(x, padding);
-    ctx.lineTo(x, padding + frets * fretSpacing);
+    ctx.lineTo(x, padding + 3 * fretSpacing);
     ctx.stroke();
   }
   
   // 绘制按弦位置
-  ctx.fillStyle = '#00d9ff';
   for (let i = 0; i < 6; i++) {
-    const fret = strings[i];
-    if (fret === null) {
-      // X 标记（不弹）
-      const x = padding + i * stringSpacing;
-      ctx.fillStyle = '#ff4757';
-      ctx.font = 'bold 12px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('×', x, padding - 5);
-      ctx.fillStyle = '#00d9ff';
-    } else if (fret === 0) {
-      // 空弦（圆圈）
-      const x = padding + i * stringSpacing;
+    const fret = fingering[i] || 0;
+    const x = padding + i * stringSpacing;
+    
+    if (fret === 0) {
+      // 空弦
       ctx.beginPath();
       ctx.arc(x, padding - 8, 5, 0, Math.PI * 2);
       ctx.stroke();
     } else if (fret > 0) {
-      // 按弦（实心圆）
-      const x = padding + i * stringSpacing;
+      // 按弦
       const y = padding + (fret - 0.5) * fretSpacing;
       ctx.beginPath();
       ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#00d9ff';
       ctx.fill();
     }
   }
   
-  // 绘制和弦名称
+  // 和弦名称
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 12px Microsoft YaHei';
   ctx.textAlign = 'center';
-  ctx.fillText(chordData.name, width / 2, height - 5);
+  ctx.fillText(chordName, width / 2, height - 5);
 }
 
 /**
