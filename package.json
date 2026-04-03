@@ -1,15 +1,17 @@
 {
   "name": "guitar-strum-trainer",
-  "version": "1.0.0",
-  "description": "吉他扫弦练习助手 - 实时分析扫弦节奏、音色、强弱并打分",
+  "version": "2.0.0",
+  "description": "吉他扫弦练习助手 - 实时分析扫弦节奏、音色、强弱并打分 (v2.0 新增和弦转换训练)",
+  "type": "module",
   "scripts": {
     "start": "serve .",
     "dev": "serve ."
   },
-  "keywords": ["guitar", "strumming", "practice", "audio-analysis"],
+  "keywords": ["guitar", "strumming", "practice", "audio-analysis", "chord-recognition"],
   "author": "老马",
   "license": "MIT",
   "dependencies": {
-    "soundfont-player": "^0.12.0"
+    "soundfont-player": "^0.12.0",
+    "tonal": "^6.4.3"
   }
 }

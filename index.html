@@ -99,6 +99,54 @@
       letter-spacing: 2px;
     }
     
+    /* 训练模式按钮 */
+    .mode-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 15px 20px;
+      background: rgba(184, 102, 255, 0.1);
+      border: 2px solid rgba(184, 102, 255, 0.3);
+      border-radius: 10px;
+      color: white;
+      font-size: 1em;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .mode-btn:hover {
+      background: rgba(184, 102, 255, 0.2);
+      border-color: #b866ff;
+    }
+    
+    .mode-btn.active {
+      background: rgba(184, 102, 255, 0.3);
+      border-color: #b866ff;
+      box-shadow: 0 0 20px rgba(184, 102, 255, 0.4);
+    }
+    
+    /* 和弦选择按钮 */
+    .chord-select-btn {
+      padding: 10px 20px;
+      background: rgba(0, 217, 255, 0.1);
+      border: 2px solid rgba(0, 217, 255, 0.3);
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .chord-select-btn:hover {
+      background: rgba(0, 217, 255, 0.2);
+      border-color: #00d9ff;
+    }
+    
+    .chord-select-btn.selected {
+      background: rgba(0, 217, 255, 0.3);
+      border-color: #00d9ff;
+      box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+    }
+    
     .rhythm-add-card {
       padding: 15px;
       background: rgba(255, 255, 255, 0.03);
@@ -924,9 +972,103 @@
 <body>
   <div class="container">
     <header>
-      <h1>🎸 吉他扫弦练习助手 <span style="font-size:0.4em; color:#666; vertical-align:middle;">v1.8</span></h1>
-      <p>实时分析扫弦节奏、音色、强弱，获得专业反馈</p>
+      <h1>🎸 吉他扫弦练习助手 <span style="font-size:0.4em; color:#666; vertical-align:middle;">v2.0</span></h1>
+      <p>实时分析扫弦节奏、音色、强弱，获得专业反馈 - 新增和弦转换训练</p>
     </header>
+    
+    <!-- 和弦训练模式选择 -->
+    <div class="panel" style="margin-bottom: 20px;">
+      <h2>🎯 训练模式</h2>
+      <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <button class="mode-btn active" id="modePreset" data-mode="preset">
+          📖 预设进行
+        </button>
+        <button class="mode-btn" id="modeCustom" data-mode="custom">
+          ✏️ 自定义
+        </button>
+        <button class="mode-btn" id="modeFree" data-mode="free">
+          🎸 自由练习
+        </button>
+      </div>
+      
+      <!-- 预设进行选择器 -->
+      <div id="presetSelector" style="margin-top: 15px;">
+        <select id="progressionSelect" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(184,102,255,0.3); border-radius: 8px; color: white; font-size: 16px;">
+          <option value="0">流行 1645 (C→Am→F→G)</option>
+          <option value="1">流行 4536 (F→G→Em→Am)</option>
+          <option value="2">卡农进行 (C→G→Am→Em→F→C→F→G)</option>
+          <option value="3">蓝调 12 小节 (C→F→G)</option>
+          <option value="4">初学者 C-G (C→G)</option>
+        </select>
+      </div>
+      
+      <!-- 自定义和弦选择器 -->
+      <div id="customChordSelector" style="margin-top: 15px; display: none;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+          <button class="chord-select-btn" data-chord="C">C</button>
+          <button class="chord-select-btn" data-chord="G">G</button>
+          <button class="chord-select-btn" data-chord="D">D</button>
+          <button class="chord-select-btn" data-chord="Am">Am</button>
+          <button class="chord-select-btn" data-chord="Em">Em</button>
+          <button class="chord-select-btn" data-chord="E">E</button>
+          <button class="chord-select-btn" data-chord="A">A</button>
+          <button class="chord-select-btn" data-chord="F">F</button>
+          <button class="chord-select-btn" data-chord="Dm">Dm</button>
+          <button class="chord-select-btn" data-chord="Cmaj7">Cmaj7</button>
+        </div>
+        <div style="padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+          <div style="color: #888; margin-bottom: 10px;">已选和弦进行：</div>
+          <div id="selectedChords" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <span style="color: #666; font-style: italic;">点击选择和弦</span>
+          </div>
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 10px;">
+          <button id="btnSaveProgression" style="padding: 8px 16px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer;">💾 保存进行</button>
+          <button id="btnClearProgression" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑️ 清空</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 和弦显示区域 -->
+    <div class="panel" style="margin-bottom: 20px;">
+      <h2>🎸 和弦训练</h2>
+      <div style="display: grid; grid-template-columns: 1fr 100px 1fr; gap: 20px; align-items: center;">
+        <!-- 当前和弦 -->
+        <div style="text-align: center;">
+          <div style="color: #888; margin-bottom: 10px;">当前和弦</div>
+          <div id="currentChordDisplay" style="font-size: 3em; font-weight: bold; color: #00d9ff; margin-bottom: 10px;">--</div>
+          <canvas id="currentChordDiagram" width="120" height="140" style="background: rgba(0,0,0,0.2); border-radius: 8px;"></canvas>
+          <div id="chordRecognitionResult" style="margin-top: 10px; padding: 8px; background: rgba(0,217,255,0.1); border-radius: 8px; font-size: 0.9em;">
+            识别：<span id="recognizedChord">--</span>
+            <span id="chordConfidence" style="color: #888; margin-left: 10px;">(--%)</span>
+          </div>
+        </div>
+        
+        <!-- 转换箭头 -->
+        <div style="text-align: center; font-size: 2em; color: #666;">→</div>
+        
+        <!-- 下一个和弦 -->
+        <div style="text-align: center;">
+          <div style="color: #888; margin-bottom: 10px;">下一个和弦</div>
+          <div id="nextChordDisplay" style="font-size: 3em; font-weight: bold; color: #ffa502; margin-bottom: 10px;">--</div>
+          <canvas id="nextChordDiagram" width="120" height="140" style="background: rgba(0,0,0,0.2); border-radius: 8px;"></canvas>
+          <div id="chordTimer" style="margin-top: 10px; padding: 8px; background: rgba(255,165,2,0.1); border-radius: 8px; font-size: 0.9em;">
+            转换时间：<span id="transitionTime">--</span> ms
+          </div>
+        </div>
+      </div>
+      
+      <!-- 和弦进行进度 -->
+      <div style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; color: #888; margin-bottom: 10px;">
+          <span>进行进度</span>
+          <span id="progressionProgress">0/0</span>
+        </div>
+        <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+          <div id="progressionBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #00d9ff, #b866ff); transition: width 0.3s;"></div>
+        </div>
+      </div>
+    </div>
     
     <div class="main-panel">
       <div class="panel">
@@ -1097,7 +1239,14 @@
   
   <!-- SoundFont Player for real guitar samples -->
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
-  <script src="renderer.js?v=1.8" defer></script>
+  <!-- Tonal.js for chord theory -->
+  <script src="https://unpkg.com/tonal@6.0.0/tonal.min.js"></script>
+  <!-- Chordictionary CSS for chord diagrams -->
+  <link rel="stylesheet" href="chordictionary.min.css">
+  <!-- Module scripts -->
+  <script type="module" src="chord-library.js" defer></script>
+  <script type="module" src="chord-detector.js" defer></script>
+  <script src="renderer.js?v=2.0" defer></script>
 
 <!-- 节奏型编辑对话框 -->
 <div id="rhythmEditorModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; overflow-y: auto;">

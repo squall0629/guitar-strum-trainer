@@ -1,4 +1,21 @@
-// 吉他扫弦练习助手 - 核心音频分析引擎
+// 吉他扫弦练习助手 - 核心音频分析引擎 v2.0
+// 新增和弦识别与转换训练功能
+
+// ========== 和弦识别模块 ==========
+import { ChordDetector, TransitionDetector } from './chord-detector.js';
+import { chordData, findChord, COMMON_PROGRESSIONS, getChordNames } from './chord-library.js';
+
+// 和弦识别全局变量
+let chordDetector = null;
+let transitionDetector = null;
+let currentTrainingMode = 'preset'; // 'preset', 'custom', 'free'
+let currentProgression = []; // 当前和弦进行
+let currentChordIndex = 0; // 当前和弦索引
+let expectedChord = null; // 期望的和弦
+let nextChord = null; // 下一个和弦
+let chordRecognitionEnabled = false; // 是否启用和弦识别
+let lastRecognizedChord = null; // 上次识别的和弦
+let chordChangeTimeout = null; // 和弦转换计时器
 
 // ========== 真实吉他音源 (FluidR3 GM - Acoustic Guitar Steel String) ==========
 // 使用 soundfont-player 加载 FluidR3 GM 音源，CC0 授权免费商用
@@ -111,6 +128,16 @@ let sensitivitySlider, sensitivityValueEl, thresholdDisplay, volumeMeterFill;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
 let btnAddRhythm, btnMicTest;
 
+// 和弦训练 DOM 元素
+let modeButtons, modePreset, modeCustom, modeFree;
+let presetSelector, progressionSelect;
+let customChordSelector, selectedChordsDisplay;
+let currentChordDisplay, nextChordDisplay;
+let currentChordCanvas, nextChordCanvas;
+let recognizedChordEl, chordConfidenceEl;
+let transitionTimeEl, progressionBar, progressionProgress;
+let btnSaveProgression, btnClearProgression;
+
 // 版本号
 const APP_VERSION = 'v1.8';
 
@@ -157,11 +184,36 @@ function init() {
   btnAddRhythm = document.getElementById('btnAddRhythm');
   btnMicTest = document.getElementById('btnMicTest');
   
+  // 和弦训练 DOM 元素
+  modePreset = document.getElementById('modePreset');
+  modeCustom = document.getElementById('modeCustom');
+  modeFree = document.getElementById('modeFree');
+  modeButtons = document.querySelectorAll('.mode-btn');
+  presetSelector = document.getElementById('presetSelector');
+  progressionSelect = document.getElementById('progressionSelect');
+  customChordSelector = document.getElementById('customChordSelector');
+  selectedChordsDisplay = document.getElementById('selectedChords');
+  currentChordDisplay = document.getElementById('currentChordDisplay');
+  nextChordDisplay = document.getElementById('nextChordDisplay');
+  currentChordCanvas = document.getElementById('currentChordDiagram');
+  nextChordCanvas = document.getElementById('nextChordDiagram');
+  recognizedChordEl = document.getElementById('recognizedChord');
+  chordConfidenceEl = document.getElementById('chordConfidence');
+  transitionTimeEl = document.getElementById('transitionTime');
+  progressionBar = document.getElementById('progressionBar');
+  progressionProgress = document.getElementById('progressionProgress');
+  btnSaveProgression = document.getElementById('btnSaveProgression');
+  btnClearProgression = document.getElementById('btnClearProgression');
+  
   console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
     btnStop: !!btnStop,
-    demoButtons: demoButtons?.length || 0
+    demoButtons: demoButtons?.length || 0,
+    chordElements: !!currentChordDisplay
   });
+  
+  // 初始化和弦训练功能
+  setupChordTraining();
   
   setupRhythmSelector();
   setupButtons();
@@ -934,6 +986,10 @@ async function startListening() {
     lastStrumTime = 0;
     expectedStrumIndex = 0;
     
+    // 初始化和弦检测器
+    initChordDetector();
+    resetChordTraining();
+    
     btnStart.style.display = 'none';
     btnStop.style.display = 'block';
     updateStatus('listening');
@@ -972,6 +1028,7 @@ async function startListening() {
 // 停止监听
 function stopListening() {
   isListening = false;
+  chordRecognitionEnabled = false;
   
   // 停止节拍器
   stopMetronome();
@@ -997,9 +1054,15 @@ function stopListening() {
     saveHistory();
   }
   
-  feedbackMessage.textContent = metronomeEnabled 
-    ? `练习结束 (节拍器：${currentBPM} BPM)，点击"开始练习"继续`
-    : '练习结束，点击"开始练习"继续';
+  // 显示和弦训练统计
+  if (transitionDetector && transitionDetector.getStats().transitionCount > 0) {
+    const stats = transitionDetector.getStats();
+    feedbackMessage.textContent = `和弦准确率：${stats.accuracy}% | 平均转换时间：${stats.avgTransitionTime}ms`;
+  } else {
+    feedbackMessage.textContent = metronomeEnabled 
+      ? `练习结束 (节拍器：${currentBPM} BPM)，点击"开始练习"继续`
+      : '练习结束，点击"开始练习"继续';
+  }
 }
 
 // 音频分析主循环
@@ -1023,6 +1086,9 @@ function analyzeAudio() {
   
   // 绘制波形
   drawWaveform(timeData);
+  
+  // 检测和弦识别
+  processChordRecognition();
   
   // 检测扫弦
   detectStrum(dataArray, timeData);
@@ -1095,6 +1161,23 @@ function detectStrum(freqData, timeData) {
     };
     
     detectedStrums.push(strum);
+    
+    // ========== 和弦识别（新增） ==========
+    if (chordRecognitionEnabled && chordDetector) {
+      const chordResult = chordDetector.detect(freqData);
+      if (chordResult) {
+        lastRecognizedChord = chordResult.chord;
+        
+        // 更新 UI 显示
+        updateChordDisplay(chordResult, expectedChord, nextChord);
+        
+        // 记录转换（训练模式下）
+        if (transitionDetector && currentTrainingMode !== 'free') {
+          transitionDetector.onChordDetected(chordResult.chord, expectedChord, now);
+        }
+      }
+    }
+    // ====================================
     lastStrumTime = now;
     
     // 保持最近 20 次扫弦
@@ -2350,7 +2433,644 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ========== 和弦识别 UI 更新（新增） ==========
+
+/**
+ * 更新和弦显示区域
+ * @param {object} chordResult - 和弦识别结果 {chord, confidence, svg, ...}
+ * @param {string|null} expectedChord - 期望的和弦
+ * @param {string|null} nextChord - 下一个和弦
+ */
+function updateChordDisplay(chordResult, expectedChord, nextChord) {
+  // 更新识别结果
+  const recognizedChordEl = document.getElementById('recognizedChord');
+  const chordConfidenceEl = document.getElementById('chordConfidence');
+  const currentChordDisplayEl = document.getElementById('currentChordDisplay');
+  const currentChordDiagramEl = document.getElementById('currentChordDiagram');
+  
+  if (recognizedChordEl) {
+    recognizedChordEl.textContent = chordResult.chord;
+    recognizedChordEl.style.color = chordResult.chord === expectedChord ? '#00ff00' : '#00d9ff';
+  }
+  
+  if (chordConfidenceEl) {
+    chordConfidenceEl.textContent = `(${Math.round(chordResult.confidence * 100)}%)`;
+  }
+  
+  if (currentChordDisplayEl) {
+    currentChordDisplayEl.textContent = chordResult.chord;
+  }
+  
+  // 绘制和弦指法图（使用 canvas）
+  if (currentChordDiagramEl && chordResult.svg) {
+    drawChordDiagramOnCanvas(currentChordDiagramEl, chordResult.svg);
+  }
+  
+  // 检查是否准确
+  if (expectedChord && chordResult.chord === expectedChord) {
+    showFeedback('✓ 和弦正确！', 'success');
+  } else if (expectedChord) {
+    showFeedback(`⚠ 应该是 ${expectedChord}，检测到 ${chordResult.chord}`, 'warning');
+  }
+}
+
+/**
+ * 在 canvas 上绘制和弦指法图
+ * @param {HTMLCanvasElement} canvas - canvas 元素
+ * @param {string} svgString - SVG 字符串
+ */
+function drawChordDiagramOnCanvas(canvas, svgString) {
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  
+  // 将 SVG 转换为 Data URL
+  const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+  
+  img.onload = function() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+  };
+  
+  img.src = url;
+}
+
+/**
+ * 更新下一个和弦显示
+ * @param {string} chordName - 和弦名称
+ * @param {number} countdown - 倒计时（秒）
+ */
+function updateNextChordDisplay(chordName, countdown) {
+  const nextChordDisplayEl = document.getElementById('nextChordDisplay');
+  const nextChordDiagramEl = document.getElementById('nextChordDiagram');
+  const chordTimerEl = document.getElementById('chordTimer');
+  
+  if (nextChordDisplayEl) {
+    nextChordDisplayEl.textContent = chordName || '--';
+  }
+  
+  if (chordTimerEl) {
+    if (countdown !== undefined) {
+      chordTimerEl.innerHTML = `切换：<span style="color: #ffa502; font-weight: bold;">${countdown.toFixed(1)}s</span>`;
+    } else {
+      chordTimerEl.innerHTML = `切换时间：<span id="transitionTime">--</span> ms`;
+    }
+  }
+  
+  // 绘制下一个和弦的指法图
+  if (nextChordDiagramEl && chordName) {
+    const chord = findChord(chordName);
+    if (chord) {
+      const svg = chordDict.getChordSVG(getChordTabString(chord));
+      if (svg) {
+        drawChordDiagramOnCanvas(nextChordDiagramEl, svg);
+      }
+    }
+  }
+}
+
+/**
+ * 显示反馈消息
+ * @param {string} message - 反馈文案
+ * @param {string} type - 类型：'success' | 'warning' | 'error'
+ */
+function showFeedback(message, type = 'info') {
+  const feedbackEl = document.getElementById('feedbackMessage');
+  if (!feedbackEl) return;
+  
+  feedbackEl.textContent = message;
+  feedbackEl.style.color = type === 'success' ? '#00ff00' : 
+                            type === 'warning' ? '#ffa502' : 
+                            type === 'error' ? '#ff4444' : '#888';
+  
+  // 3 秒后清除
+  setTimeout(() => {
+    if (feedbackEl.textContent === message) {
+      feedbackEl.textContent = '';
+    }
+  }, 3000);
+}
+
+/**
+ * 初始化和弦训练模式
+ * @param {string} mode - 模式：'preset' | 'custom' | 'free'
+ * @param {Array} progression - 和弦进行数组
+ */
+function initChordTraining(mode, progression) {
+  currentTrainingMode = mode;
+  currentProgression = progression || [];
+  currentChordIndex = 0;
+  
+  if (chordDetector && analyser && audioContext) {
+    chordRecognitionEnabled = true;
+  }
+  
+  if (currentProgression.length > 0) {
+    expectedChord = currentProgression[0];
+    nextChord = currentProgression[1] || currentProgression[0];
+    
+    // 更新 UI
+    const currentChordDisplayEl = document.getElementById('currentChordDisplay');
+    if (currentChordDisplayEl) {
+      currentChordDisplayEl.textContent = expectedChord;
+    }
+    
+    updateNextChordDisplay(nextChord);
+    
+    console.log('[ChordTraining] 初始化完成:', mode, progression);
+  }
+}
+
+/**
+ * 切换到下一个和弦
+ */
+function nextChordInProgression() {
+  if (currentProgression.length === 0) return;
+  
+  currentChordIndex = (currentChordIndex + 1) % currentProgression.length;
+  expectedChord = currentProgression[currentChordIndex];
+  nextChord = currentProgression[(currentChordIndex + 1) % currentProgression.length];
+  
+  updateNextChordDisplay(nextChord);
+  
+  console.log('[ChordTraining] 切换到和弦:', expectedChord);
+}
+
+/**
+ * 重置和弦训练
+ */
+function resetChordTraining() {
+  chordRecognitionEnabled = false;
+  currentTrainingMode = 'preset';
+  currentProgression = [];
+  currentChordIndex = 0;
+  expectedChord = null;
+  nextChord = null;
+  lastRecognizedChord = null;
+  
+  if (transitionDetector) {
+    transitionDetector.reset();
+  }
+  
+  // 清空 UI 显示
+  const recognizedChordEl = document.getElementById('recognizedChord');
+  const currentChordDisplayEl = document.getElementById('currentChordDisplay');
+  const nextChordDisplayEl = document.getElementById('nextChordDisplay');
+  
+  if (recognizedChordEl) recognizedChordEl.textContent = '--';
+  if (currentChordDisplayEl) currentChordDisplayEl.textContent = '--';
+  if (nextChordDisplayEl) nextChordDisplayEl.textContent = '--';
+  
+  console.log('[ChordTraining] 已重置');
+}
+
 // 自动保存设置（定期）
 setInterval(() => {
   saveUserSettings();
 }, 5000); // 每 5 秒自动保存
+
+// ========== 和弦训练功能 ==========
+
+/**
+ * 设置和弦训练功能
+ */
+function setupChordTraining() {
+  console.log('[ChordTraining] 初始化和弦训练功能...');
+  
+  // 模式切换
+  if (modePreset) {
+    modePreset.addEventListener('click', () => setTrainingMode('preset'));
+  }
+  if (modeCustom) {
+    modeCustom.addEventListener('click', () => setTrainingMode('custom'));
+  }
+  if (modeFree) {
+    modeFree.addEventListener('click', () => setTrainingMode('free'));
+  }
+  
+  // 预设进行选择
+  if (progressionSelect) {
+    progressionSelect.addEventListener('change', () => {
+      const index = parseInt(progressionSelect.value);
+      if (COMMON_PROGRESSIONS[index]) {
+        currentProgression = COMMON_PROGRESSIONS[index].chords;
+        updateChordDisplay();
+        console.log('[ChordTraining] 预设进行已选择:', currentProgression);
+      }
+    });
+    // 初始化默认预设
+    currentProgression = COMMON_PROGRESSIONS[0].chords;
+  }
+  
+  // 自定义和弦选择按钮
+  document.querySelectorAll('.chord-select-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const chordName = e.target.dataset.chord;
+      addChordToProgression(chordName);
+    });
+  });
+  
+  // 保存进行
+  if (btnSaveProgression) {
+    btnSaveProgression.addEventListener('click', saveCustomProgression);
+  }
+  
+  // 清空进行
+  if (btnClearProgression) {
+    btnClearProgression.addEventListener('click', () => {
+      currentProgression = [];
+      currentChordIndex = 0;
+      renderSelectedChords();
+      updateChordDisplay();
+    });
+  }
+  
+  // 初始化和弦检测器（需要 audioContext 和 analyser）
+  // 在 startListening 时初始化
+  
+  console.log('[ChordTraining] 和弦训练功能初始化完成');
+}
+
+/**
+ * 设置训练模式
+ * @param {string} mode - 'preset', 'custom', 或 'free'
+ */
+function setTrainingMode(mode) {
+  currentTrainingMode = mode;
+  
+  // 更新按钮状态
+  modeButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  
+  // 显示/隐藏选择器
+  if (presetSelector) {
+    presetSelector.style.display = mode === 'preset' ? 'block' : 'none';
+  }
+  if (customChordSelector) {
+    customChordSelector.style.display = mode === 'custom' ? 'block' : 'none';
+  }
+  
+  // 自由练习模式不需要预设
+  if (mode === 'free') {
+    currentProgression = [];
+    updateChordDisplay();
+  } else if (mode === 'preset' && COMMON_PROGRESSIONS[0]) {
+    currentProgression = COMMON_PROGRESSIONS[0].chords;
+    updateChordDisplay();
+  }
+  
+  console.log('[ChordTraining] 训练模式已切换:', mode);
+}
+
+/**
+ * 添加和弦到进行
+ * @param {string} chordName - 和弦名称
+ */
+function addChordToProgression(chordName) {
+  if (!currentProgression) {
+    currentProgression = [];
+  }
+  currentProgression.push(chordName);
+  renderSelectedChords();
+  updateChordDisplay();
+}
+
+/**
+ * 渲染已选和弦
+ */
+function renderSelectedChords() {
+  if (!selectedChordsDisplay) return;
+  
+  if (currentProgression.length === 0) {
+    selectedChordsDisplay.innerHTML = '<span style="color: #666; font-style: italic;">点击选择和弦</span>';
+    return;
+  }
+  
+  selectedChordsDisplay.innerHTML = currentProgression.map((chord, index) => `
+    <span style="background: rgba(0,217,255,0.2); padding: 5px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px;">
+      ${chord}
+      <button onclick="removeChordFromProgression(${index})" style="background: none; border: none; color: #ff4757; cursor: pointer; font-size: 1.2em;">×</button>
+    </span>
+  `).join('');
+}
+
+/**
+ * 从进行中和弦移除
+ * @param {number} index - 索引
+ */
+window.removeChordFromProgression = function(index) {
+  if (currentProgression && index >= 0 && index < currentProgression.length) {
+    currentProgression.splice(index, 1);
+    renderSelectedChords();
+    updateChordDisplay();
+  }
+};
+
+/**
+ * 保存自定义进行
+ */
+function saveCustomProgression() {
+  if (currentProgression.length === 0) {
+    alert('请先选择和弦！');
+    return;
+  }
+  
+  const name = prompt('请输入进行名称（例如：我的 1645）:');
+  if (!name) return;
+  
+  // 保存到 localStorage
+  const saved = JSON.parse(localStorage.getItem('guitar-custom-progressions') || '[]');
+  saved.push({
+    name: name,
+    chords: [...currentProgression],
+    createdAt: new Date().toISOString()
+  });
+  localStorage.setItem('guitar-custom-progressions', JSON.stringify(saved));
+  
+  alert(`"${name}" 已保存！`);
+  console.log('[ChordTraining] 自定义进行已保存:', name);
+}
+
+/**
+ * 更新和弦显示
+ */
+function updateChordDisplay() {
+  if (!currentChordDisplay || !nextChordDisplay) return;
+  
+  if (currentProgression.length === 0 || currentTrainingMode === 'free') {
+    currentChordDisplay.textContent = '--';
+    nextChordDisplay.textContent = '--';
+    if (currentChordCanvas) drawChordDiagram(currentChordCanvas, null);
+    if (nextChordCanvas) drawChordDiagram(nextChordCanvas, null);
+    return;
+  }
+  
+  currentChordIndex = currentChordIndex % currentProgression.length;
+  expectedChord = currentProgression[currentChordIndex];
+  nextChord = currentProgression[(currentChordIndex + 1) % currentProgression.length];
+  
+  currentChordDisplay.textContent = expectedChord;
+  nextChordDisplay.textContent = nextChord;
+  
+  // 绘制指法图
+  const currentChordData = findChord(expectedChord);
+  const nextChordData = findChord(nextChord);
+  
+  if (currentChordCanvas) drawChordDiagram(currentChordCanvas, currentChordData);
+  if (nextChordCanvas) drawChordDiagram(nextChordCanvas, nextChordData);
+  
+  // 更新进度
+  if (progressionBar && progressionProgress) {
+    const progress = ((currentChordIndex) / currentProgression.length) * 100;
+    progressionBar.style.width = `${progress}%`;
+    progressionProgress.textContent = `${currentChordIndex + 1}/${currentProgression.length}`;
+  }
+}
+
+/**
+ * 绘制和弦指法图
+ * @param {HTMLCanvasElement} canvas - Canvas 元素
+ * @param {object} chordData - 和弦数据
+ */
+function drawChordDiagram(canvas, chordData) {
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // 清空
+  ctx.clearRect(0, 0, width, height);
+  
+  if (!chordData) {
+    // 绘制空提示
+    ctx.fillStyle = '#666';
+    ctx.font = '14px Microsoft YaHei';
+    ctx.textAlign = 'center';
+    ctx.fillText('未选择和弦', width / 2, height / 2);
+    return;
+  }
+  
+  const strings = chordData.fingering.strings;
+  const frets = chordData.fingering.frets || 3;
+  
+  // 参数
+  const padding = 15;
+  const diagramWidth = width - padding * 2;
+  const diagramHeight = height - padding * 2 - 20;
+  const stringSpacing = diagramWidth / 5;
+  const fretSpacing = diagramHeight / frets;
+  
+  // 绘制品格
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  
+  for (let i = 0; i <= frets; i++) {
+    const y = padding + i * fretSpacing;
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+  }
+  
+  // 绘制琴弦
+  for (let i = 0; i < 6; i++) {
+    const x = padding + i * stringSpacing;
+    ctx.beginPath();
+    ctx.moveTo(x, padding);
+    ctx.lineTo(x, padding + frets * fretSpacing);
+    ctx.stroke();
+  }
+  
+  // 绘制按弦位置
+  ctx.fillStyle = '#00d9ff';
+  for (let i = 0; i < 6; i++) {
+    const fret = strings[i];
+    if (fret === null) {
+      // X 标记（不弹）
+      const x = padding + i * stringSpacing;
+      ctx.fillStyle = '#ff4757';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('×', x, padding - 5);
+      ctx.fillStyle = '#00d9ff';
+    } else if (fret === 0) {
+      // 空弦（圆圈）
+      const x = padding + i * stringSpacing;
+      ctx.beginPath();
+      ctx.arc(x, padding - 8, 5, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (fret > 0) {
+      // 按弦（实心圆）
+      const x = padding + i * stringSpacing;
+      const y = padding + (fret - 0.5) * fretSpacing;
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  
+  // 绘制和弦名称
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px Microsoft YaHei';
+  ctx.textAlign = 'center';
+  ctx.fillText(chordData.name, width / 2, height - 5);
+}
+
+/**
+ * 更新和弦识别结果显示
+ * @param {object} result - 识别结果
+ */
+function updateChordRecognition(result) {
+  if (!recognizedChordEl || !chordConfidenceEl) return;
+  
+  if (result) {
+    recognizedChordEl.textContent = result.chord;
+    chordConfidenceEl.textContent = `(${Math.round(result.confidence * 100)}%)`;
+    
+    // 颜色反馈
+    if (result.confidence >= 0.8) {
+      recognizedChordEl.style.color = '#2ed573'; // 绿色 - 高置信度
+    } else if (result.confidence >= 0.65) {
+      recognizedChordEl.style.color = '#ffa502'; // 橙色 - 中等置信度
+    } else {
+      recognizedChordEl.style.color = '#ff4757'; // 红色 - 低置信度
+    }
+  } else {
+    recognizedChordEl.textContent = '--';
+    chordConfidenceEl.textContent = '(--%)';
+    recognizedChordEl.style.color = '#888';
+  }
+}
+
+/**
+ * 更新转换时间显示
+ * @param {number} timeMs - 转换时间（毫秒）
+ */
+function updateTransitionTime(timeMs) {
+  if (!transitionTimeEl) return;
+  
+  if (timeMs) {
+    transitionTimeEl.textContent = timeMs;
+    
+    // 颜色反馈
+    if (timeMs < 300) {
+      transitionTimeEl.style.color = '#2ed573'; // 优秀
+    } else if (timeMs < 500) {
+      transitionTimeEl.style.color = '#ffa502'; // 良好
+    } else {
+      transitionTimeEl.style.color = '#ff4757'; // 需改进
+    }
+  } else {
+    transitionTimeEl.textContent = '--';
+    transitionTimeEl.style.color = '#888';
+  }
+}
+
+/**
+ * 初始化和弦检测器
+ */
+function initChordDetector() {
+  if (audioContext && analyser) {
+    chordDetector = new ChordDetector(audioContext, analyser);
+    transitionDetector = new TransitionDetector();
+    chordRecognitionEnabled = true;
+    console.log('[ChordTraining] 和弦检测器已初始化');
+  }
+}
+
+/**
+ * 处理和弦识别
+ */
+function processChordRecognition() {
+  if (!chordRecognitionEnabled || !chordDetector) return;
+  
+  const bufferLength = analyser.frequencyBinCount;
+  const freqData = new Uint8Array(bufferLength);
+  analyser.getByteFrequencyData(freqData);
+  
+  const result = chordDetector.detect(freqData);
+  
+  if (result) {
+    // 更新识别显示
+    updateChordRecognition(result);
+    
+    // 在训练模式下检查是否匹配期望和弦
+    if (currentTrainingMode !== 'free' && expectedChord) {
+      const isCorrect = result.chord === expectedChord;
+      
+      // 检测和弦转换
+      if (transitionDetector) {
+        transitionDetector.onChordDetected(result.chord, expectedChord, Date.now());
+        
+        // 如果识别正确且是当前期望和弦，更新进度
+        if (isCorrect && result.chord === expectedChord) {
+          // 检查是否需要切换到下一个和弦
+          if (lastRecognizedChord !== expectedChord) {
+            // 新的和弦被正确识别
+            currentChordIndex = (currentChordIndex + 1) % currentProgression.length;
+            updateChordDisplay();
+            
+            // 显示转换时间
+            const stats = transitionDetector.getStats();
+            if (stats.transitionCount > 0) {
+              const lastTransition = stats.transitions[stats.transitionCount - 1];
+              updateTransitionTime(lastTransition.time);
+            }
+          }
+        }
+      }
+      
+      // 实时反馈
+      if (isCorrect) {
+        feedbackMessage.textContent = `✓ ${result.chord} 和弦正确！ (${Math.round(result.confidence * 100)}%)`;
+      } else {
+        feedbackMessage.textContent = `⚠ 应该是 ${expectedChord}，检测到 ${result.chord}`;
+      }
+    } else if (currentTrainingMode === 'free') {
+      // 自由练习模式
+      feedbackMessage.textContent = `识别：${result.chord} (${Math.round(result.confidence * 100)}%)`;
+    }
+    
+    lastRecognizedChord = result.chord;
+  } else {
+    updateChordRecognition(null);
+    if (chordRecognitionEnabled) {
+      feedbackMessage.textContent = '🎸 弹奏和弦...';
+    }
+  }
+}
+
+/**
+ * 重置和弦训练状态
+ */
+function resetChordTraining() {
+  currentChordIndex = 0;
+  lastRecognizedChord = null;
+  if (transitionDetector) {
+    transitionDetector.reset();
+  }
+  updateChordDisplay();
+  updateChordRecognition(null);
+  updateTransitionTime(null);
+}
+
+/**
+ * 获取和弦训练统计数据
+ */
+function getChordTrainingStats() {
+  if (!transitionDetector) return null;
+  
+  return transitionDetector.getStats();
+}
+
+// 导出到全局作用域以便调试
+window.guitarTrainer = {
+  chordDetector: () => chordDetector,
+  transitionDetector: () => transitionDetector,
+  getProgression: () => currentProgression,
+  getStats: getChordTrainingStats,
+  setTrainingMode: setTrainingMode
+};
