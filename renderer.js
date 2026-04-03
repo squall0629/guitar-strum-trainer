@@ -1802,10 +1802,11 @@ function selectCustomRhythm(index) {
   if (!rhythm.notes || rhythm.notes.length === 0) return;
   
   // 转换为标准节奏型格式（存储基于 120BPM 的原始时值，让 playDemo 统一处理速度调整）
+  // 注意：内置节奏型的 pattern 值是标准音符时值的 2 倍，为保持一致性，自定义节奏型也乘以 2
   const tempPattern = rhythm.notes.map(note => {
     const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    // 直接存储原始时值，不提前调整 BPM
-    return durationMs;
+    // 乘以 2 以与内置节奏型的时值基准保持一致
+    return durationMs * 2;
   });
   
   const tempDemo = rhythm.notes.map(note => note.direction);
@@ -1912,10 +1913,11 @@ function playCustomRhythmFromList(index, btn) {
   }
   
   // 转换为标准节奏型格式（存储基于 120BPM 的原始时值，让 playDemo 统一处理速度调整）
+  // 注意：内置节奏型的 pattern 值是标准音符时值的 2 倍，为保持一致性，自定义节奏型也乘以 2
   const tempPattern = rhythm.notes.map(note => {
     const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    // 直接存储原始时值，不提前调整 BPM
-    return durationMs;
+    // 乘以 2 以与内置节奏型的时值基准保持一致
+    return durationMs * 2;
   });
   
   const tempDemo = rhythm.notes.map(note => note.direction);
