@@ -476,7 +476,8 @@ async function loadGuitarSoundfont() {
 // 1. 使用 FluidR3 GM 真实钢弦吉他采样 (CC0 授权)
 // 2. 模拟真实扫弦：6 根弦错开 8-15ms，营造从上到下/从下到上的扫弦感
 // 3. 下扫 (D) 和上扫 (U) 使用不同的弦组合、力度和速度
-// 4. 添加轻微力度变化，让每次扫弦都有细微差别
+// 4. 8 分音符重扫低音区，16 分音符轻扫高音区
+// 5. 添加轻微力度变化，让每次扫弦都有细微差别
 function playStrumSound(direction, duration = 0.15) {
   if (!guitarSoundfont) {
     // 如果音源未加载，使用备选合成音色
@@ -485,28 +486,44 @@ function playStrumSound(direction, duration = 0.15) {
   }
   
   // E 大调和弦：E3, B3, E4, G#4, B4, E5 (标准吉他调弦)
-  const chordNotes = ['E3', 'B3', 'E4', 'G#4', 'B4', 'E5'];
+  // 低音区：E3, B3, E4 (3 根弦) - 8 分音符，重扫
+  // 高音区：G#4, B4, E5 (3 根弦) - 16 分音符，轻扫
+  const bassNotes = ['E3', 'B3', 'E4'];   // 低音区
+  const trebleNotes = ['G#4', 'B4', 'E5']; // 高音区
   const isDownStrum = direction === 'D';
   
-  // 下扫：从低音弦到高音弦 (E3 → E5) - 更响亮、更快
-  // 上扫：从高音弦到低音弦 (E5 → E3) - 更柔和、稍慢
-  const strumOrder = isDownStrum ? [...chordNotes] : [...chordNotes].reverse();
+  // 下扫：低音区 → 高音区
+  // 上扫：高音区 → 低音区
+  const bassOrder = isDownStrum ? [...bassNotes] : [...bassNotes].reverse();
+  const trebleOrder = isDownStrum ? [...trebleNotes] : [...trebleNotes].reverse();
   
-  // 扫弦速度参数 - 增强对比度
-  const strumSpeed = isDownStrum ? 0.006 : 0.015; // 下扫更快 (6ms/弦)，上扫更慢 (15ms/弦)
+  // 扫弦速度参数
+  const bassStrumSpeed = isDownStrum ? 0.008 : 0.012;   // 低音区速度 (8 分音符)
+  const trebleStrumSpeed = isDownStrum ? 0.005 : 0.008; // 高音区速度 (16 分音符，更快)
   
-  // 力度范围 - 增强对比度
-  const velocity = isDownStrum ? 1.0 : 0.5; // 下扫更强 (1.0)，上扫更弱 (0.5)
+  // 力度参数 - 低音区重，高音区轻
+  const bassVelocity = isDownStrum ? 1.0 : 0.6;   // 低音区力度 (强)
+  const trebleVelocity = isDownStrum ? 0.4 : 0.3; // 高音区力度 (弱)
   
-  // 播放扫弦
   const now = guitarSoundfont.context.currentTime;
-  strumOrder.forEach((note, index) => {
-    const delay = index * strumSpeed; // 每根弦错开时间
-    // 添加轻微的力度随机变化 (±10%)
-    const randomVelocity = velocity * (0.9 + Math.random() * 0.2);
-    
-    // 播放音符，duration 控制延音
-    guitarSoundfont.play(note, now + delay, {
+  let currentTime = now;
+  
+  // 先扫低音区 (8 分音符，重扫)
+  bassOrder.forEach((note, index) => {
+    const delay = index * bassStrumSpeed;
+    const randomVelocity = bassVelocity * (0.9 + Math.random() * 0.2);
+    guitarSoundfont.play(note, currentTime + delay, {
+      gain: randomVelocity,
+      duration: duration
+    });
+  });
+  
+  // 再扫高音区 (16 分音符，轻扫) - 延迟一点，模拟扫弦动作
+  const trebleDelay = bassNotes.length * bassStrumSpeed + 0.02; // 低音区扫完后 +20ms
+  trebleOrder.forEach((note, index) => {
+    const delay = trebleDelay + (index * trebleStrumSpeed);
+    const randomVelocity = trebleVelocity * (0.9 + Math.random() * 0.2);
+    guitarSoundfont.play(note, currentTime + delay, {
       gain: randomVelocity,
       duration: duration
     });
