@@ -1307,3 +1307,483 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('[GuitarStrumTrainer] 初始化失败:', error);
   }
 });
+// ========== 自定义节奏型功能 ==========
+
+// 自定义节奏型数据
+let customRhythms = [];
+let editingRhythmIndex = -1;
+let currentNoteSequence = [];
+
+// 音符时值定义（毫秒，基于 120BPM）
+const NOTE_DURATIONS = {
+  'whole': { name: '全音符', ms: 2000 },
+  'half': { name: '二分音符', ms: 1000 },
+  'quarter': { name: '四分音符', ms: 500 },
+  '8th': { name: '八分音符', ms: 250 },
+  '16th': { name: '十六分音符', ms: 125 }
+};
+
+// 预设模板
+const PRESET_TEMPLATES = {
+  '8th-16th': {
+    name: '前八后十六',
+    notes: [
+      { duration: '8th', direction: 'D', velocity: 1.0 },
+      { duration: '16th', direction: 'D', velocity: 0.6 },
+      { duration: '16th', direction: 'U', velocity: 0.3 }
+    ]
+  },
+  '16th-8th': {
+    name: '前十六后八',
+    notes: [
+      { duration: '16th', direction: 'D', velocity: 0.6 },
+      { duration: '16th', direction: 'U', velocity: 0.3 },
+      { duration: '8th', direction: 'D', velocity: 1.0 }
+    ]
+  },
+  'folk': {
+    name: '民谣常用',
+    notes: [
+      { duration: '8th', direction: 'D', velocity: 1.0 },
+      { duration: '8th', direction: 'D', velocity: 1.0 },
+      { duration: '16th', direction: 'U', velocity: 0.3 },
+      { duration: '16th', direction: 'D', velocity: 0.6 },
+      { duration: '16th', direction: 'U', velocity: 0.3 },
+      { duration: '16th', direction: 'D', velocity: 0.6 }
+    ]
+  },
+  'rock': {
+    name: '摇滚八分',
+    notes: [
+      { duration: '8th', direction: 'D', velocity: 0.8 },
+      { duration: '8th', direction: 'U', velocity: 0.5 },
+      { duration: '8th', direction: 'D', velocity: 0.8 },
+      { duration: '8th', direction: 'U', velocity: 0.5 },
+      { duration: '8th', direction: 'D', velocity: 0.8 },
+      { duration: '8th', direction: 'U', velocity: 0.5 },
+      { duration: '8th', direction: 'D', velocity: 0.8 },
+      { duration: '8th', direction: 'U', velocity: 0.5 }
+    ]
+  }
+};
+
+// 初始化自定义节奏型功能
+function initCustomRhythms() {
+  loadCustomRhythms();
+  loadUserSettings();
+  renderCustomRhythmsList();
+  setupCustomRhythmButtons();
+}
+
+// 从 localStorage 加载自定义节奏型
+function loadCustomRhythms() {
+  try {
+    const stored = localStorage.getItem('guitarStrumCustomRhythms');
+    if (stored) {
+      customRhythms = JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('无法加载自定义节奏型:', e);
+    customRhythms = [];
+  }
+}
+
+// 保存自定义节奏型到 localStorage
+function saveCustomRhythms() {
+  try {
+    localStorage.setItem('guitarStrumCustomRhythms', JSON.stringify(customRhythms));
+  } catch (e) {
+    console.warn('无法保存自定义节奏型:', e);
+  }
+}
+
+// 渲染自定义节奏型列表
+function renderCustomRhythmsList() {
+  const container = document.getElementById('customRhythmsList');
+  if (!container) return;
+  
+  if (customRhythms.length === 0) {
+    container.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">暂无自定义节奏型，点击"新建节奏型"创建</div>';
+    return;
+  }
+  
+  container.innerHTML = customRhythms.map((rhythm, index) => {
+    const noteCount = rhythm.notes ? rhythm.notes.length : 0;
+    const pattern = rhythm.notes ? rhythm.notes.map(n => n.direction).join(' ') : '';
+    return `
+      <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border: 1px solid rgba(0, 217, 255, 0.3); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; color: #00d9ff; margin-bottom: 5px;">${escapeHtml(rhythm.name)}</div>
+          <div style="color: #888; font-size: 0.9em;">${noteCount} 个音符 | ${pattern}</div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="editCustomRhythm(${index})" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
+          <button onclick="playCustomRhythm(${index})" style="padding: 8px 16px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer;">🔊 试听</button>
+          <button onclick="deleteCustomRhythm(${index})" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑 删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// 设置自定义节奏型按钮
+function setupCustomRhythmButtons() {
+  const btnNew = document.getElementById('btnNewRhythm');
+  const btnExport = document.getElementById('btnExportSettings');
+  const btnImport = document.getElementById('btnImportSettings');
+  const btnSave = document.getElementById('btnSaveRhythm');
+  const btnCancel = document.getElementById('btnCancelEdit');
+  const btnAddNote = document.getElementById('btnAddNote');
+  const importInput = document.getElementById('importFileInput');
+  
+  if (btnNew) btnNew.addEventListener('click', openNewRhythmEditor);
+  if (btnExport) btnExport.addEventListener('click', exportUserSettings);
+  if (btnImport) btnImport.addEventListener('click', () => importInput.click());
+  if (importInput) importInput.addEventListener('change', importUserSettings);
+  if (btnSave) btnSave.addEventListener('click', saveRhythmEditor);
+  if (btnCancel) btnCancel.addEventListener('click', closeRhythmEditor);
+  if (btnAddNote) btnAddNote.addEventListener('click', addNoteToSequence);
+  
+  // 预设模板按钮
+  document.querySelectorAll('.btnPreset').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const preset = e.target.dataset.preset;
+      loadPresetTemplate(preset);
+    });
+  });
+}
+
+// 打开新建节奏型编辑器
+function openNewRhythmEditor() {
+  editingRhythmIndex = -1;
+  currentNoteSequence = [];
+  document.getElementById('rhythmNameInput').value = '';
+  document.getElementById('rhythmEditorModal').style.display = 'block';
+  renderNoteSequenceEditor();
+}
+
+// 编辑自定义节奏型
+function editCustomRhythm(index) {
+  if (index < 0 || index >= customRhythms.length) return;
+  
+  editingRhythmIndex = index;
+  const rhythm = customRhythms[index];
+  document.getElementById('rhythmNameInput').value = rhythm.name;
+  currentNoteSequence = JSON.parse(JSON.stringify(rhythm.notes || []));
+  document.getElementById('rhythmEditorModal').style.display = 'block';
+  renderNoteSequenceEditor();
+}
+
+// 删除自定义节奏型
+function deleteCustomRhythm(index) {
+  if (index < 0 || index >= customRhythms.length) return;
+  if (!confirm('确定要删除这个节奏型吗？')) return;
+  
+  customRhythms.splice(index, 1);
+  saveCustomRhythms();
+  renderCustomRhythmsList();
+}
+
+// 播放自定义节奏型
+function playCustomRhythm(index) {
+  if (index < 0 || index >= customRhythms.length) return;
+  
+  const rhythm = customRhythms[index];
+  if (!rhythm.notes || rhythm.notes.length === 0) return;
+  
+  // 转换为标准节奏型格式
+  const tempPattern = rhythm.notes.map(note => {
+    const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
+    return durationMs;
+  });
+  
+  const tempDemo = rhythm.notes.map(note => note.direction);
+  
+  // 临时播放
+  const tempRhythm = {
+    name: rhythm.name,
+    pattern: tempPattern,
+    beats: 4,
+    description: rhythm.notes.map(n => n.direction).join(' '),
+    demo: tempDemo
+  };
+  
+  // 保存当前节奏型索引
+  const originalIndex = currentRhythm;
+  
+  // 临时添加到 RHYTHM_PATTERNS
+  const tempIndex = RHYTHM_PATTERNS.length;
+  RHYTHM_PATTERNS.push(tempRhythm);
+  
+  // 播放演示
+  playDemo(tempIndex, { dataset: { rhythm: tempIndex } });
+  
+  // 播放完成后清理（3 秒后）
+  setTimeout(() => {
+    RHYTHM_PATTERNS.pop();
+  }, 3000);
+}
+
+// 渲染音符序列编辑器
+function renderNoteSequenceEditor() {
+  const container = document.getElementById('noteSequenceEditor');
+  if (!container) return;
+  
+  if (currentNoteSequence.length === 0) {
+    container.innerHTML = '<div style="color: #888; width: 100%; text-align: center; padding: 20px;">点击"添加音符"或选择预设模板开始</div>';
+    return;
+  }
+  
+  container.innerHTML = currentNoteSequence.map((note, index) => `
+    <div style="display: flex; gap: 5px; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+      <span style="color: #888; font-size: 0.8em;">#${index + 1}</span>
+      <select onchange="updateNote(${index}, 'duration', this.value)" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
+        ${Object.entries(NOTE_DURATIONS).map(([key, val]) => 
+          `<option value="${key}" ${note.duration === key ? 'selected' : ''}>${val.name}</option>`
+        ).join('')}
+      </select>
+      <select onchange="updateNote(${index}, 'direction', this.value)" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
+        <option value="D" ${note.direction === 'D' ? 'selected' : ''}>下扫 (D)</option>
+        <option value="U" ${note.direction === 'U' ? 'selected' : ''}>上扫 (U)</option>
+      </select>
+      <input type="range" min="0.1" max="1.0" step="0.1" value="${note.velocity || 0.5}" 
+        onchange="updateNote(${index}, 'velocity', parseFloat(this.value))" 
+        style="width: 80px;">
+      <span style="color: #00d9ff; min-width: 30px;">${Math.round((note.velocity || 0.5) * 100)}%</span>
+      <button onclick="removeNote(${index})" style="padding: 5px 10px; background: #ff4757; color: white; border: none; border-radius: 4px; cursor: pointer;">✕</button>
+    </div>
+  `).join('');
+}
+
+// 添加音符到序列
+function addNoteToSequence() {
+  currentNoteSequence.push({
+    duration: '8th',
+    direction: 'D',
+    velocity: 0.8
+  });
+  renderNoteSequenceEditor();
+}
+
+// 更新音符
+function updateNote(index, field, value) {
+  if (index < 0 || index >= currentNoteSequence.length) return;
+  currentNoteSequence[index][field] = value;
+  renderNoteSequenceEditor();
+}
+
+// 删除音符
+function removeNote(index) {
+  if (index < 0 || index >= currentNoteSequence.length) return;
+  currentNoteSequence.splice(index, 1);
+  renderNoteSequenceEditor();
+}
+
+// 加载预设模板
+function loadPresetTemplate(presetKey) {
+  const template = PRESET_TEMPLATES[presetKey];
+  if (!template) return;
+  
+  document.getElementById('rhythmNameInput').value = template.name;
+  currentNoteSequence = JSON.parse(JSON.stringify(template.notes));
+  renderNoteSequenceEditor();
+}
+
+// 保存节奏型编辑器
+function saveRhythmEditor() {
+  const name = document.getElementById('rhythmNameInput').value.trim();
+  if (!name) {
+    alert('请输入节奏型名称');
+    return;
+  }
+  
+  if (currentNoteSequence.length === 0) {
+    alert('请至少添加一个音符');
+    return;
+  }
+  
+  const rhythm = {
+    name: name,
+    notes: JSON.parse(JSON.stringify(currentNoteSequence)),
+    createdAt: Date.now()
+  };
+  
+  if (editingRhythmIndex >= 0) {
+    // 更新现有节奏型
+    customRhythms[editingRhythmIndex] = rhythm;
+  } else {
+    // 添加新节奏型
+    customRhythms.push(rhythm);
+  }
+  
+  saveCustomRhythms();
+  closeRhythmEditor();
+  renderCustomRhythmsList();
+}
+
+// 关闭节奏型编辑器
+function closeRhythmEditor() {
+  document.getElementById('rhythmEditorModal').style.display = 'none';
+  editingRhythmIndex = -1;
+  currentNoteSequence = [];
+}
+
+// ========== 用户设置保存/加载 ==========
+
+// 保存用户设置
+function saveUserSettings() {
+  const settings = {
+    bpm: currentBPM,
+    metronomeEnabled: metronomeEnabled,
+    sensitivityLevel: sensitivityLevel,
+    currentRhythm: currentRhythm,
+    customRhythms: customRhythms,
+    savedAt: Date.now()
+  };
+  
+  try {
+    localStorage.setItem('guitarStrumUserSettings', JSON.stringify(settings));
+    console.log('[GuitarStrumTrainer] 用户设置已保存');
+  } catch (e) {
+    console.warn('无法保存用户设置:', e);
+  }
+}
+
+// 加载用户设置
+function loadUserSettings() {
+  try {
+    const stored = localStorage.getItem('guitarStrumUserSettings');
+    if (!stored) return;
+    
+    const settings = JSON.parse(stored);
+    
+    // 恢复 BPM
+    if (settings.bpm) {
+      currentBPM = settings.bpm;
+      const bpmSlider = document.getElementById('bpmSlider');
+      const bpmValue = document.getElementById('bpmValue');
+      if (bpmSlider) bpmSlider.value = currentBPM;
+      if (bpmValue) bpmValue.textContent = currentBPM;
+    }
+    
+    // 恢复节拍器状态
+    if (settings.metronomeEnabled !== undefined) {
+      metronomeEnabled = settings.metronomeEnabled;
+      const metronomeToggle = document.getElementById('metronomeToggle');
+      if (metronomeToggle) metronomeToggle.checked = metronomeEnabled;
+    }
+    
+    // 恢复灵敏度
+    if (settings.sensitivityLevel) {
+      sensitivityLevel = settings.sensitivityLevel;
+      const sensitivitySlider = document.getElementById('sensitivitySlider');
+      const sensitivityValue = document.getElementById('sensitivityValue');
+      if (sensitivitySlider) sensitivitySlider.value = sensitivityLevel;
+      if (sensitivityValue) sensitivityValue.textContent = sensitivityLevel;
+      updateThreshold();
+    }
+    
+    // 恢复节奏型选择
+    if (settings.currentRhythm !== undefined && settings.currentRhythm < RHYTHM_PATTERNS.length) {
+      currentRhythm = settings.currentRhythm;
+      const options = document.querySelectorAll('.rhythm-option');
+      options.forEach((o, i) => {
+        o.classList.toggle('active', i === currentRhythm);
+      });
+    }
+    
+    // 恢复自定义节奏型
+    if (settings.customRhythms && Array.isArray(settings.customRhythms)) {
+      customRhythms = settings.customRhythms;
+    }
+    
+    console.log('[GuitarStrumTrainer] 用户设置已加载');
+  } catch (e) {
+    console.warn('无法加载用户设置:', e);
+  }
+}
+
+// 导出用户设置
+function exportUserSettings() {
+  const settings = {
+    bpm: currentBPM,
+    metronomeEnabled: metronomeEnabled,
+    sensitivityLevel: sensitivityLevel,
+    customRhythms: customRhythms,
+    exportedAt: new Date().toISOString()
+  };
+  
+  const dataStr = JSON.stringify(settings, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `guitar-strum-settings-${new Date().toISOString().split('T')[0]}.json`;
+  link.click();
+  
+  URL.revokeObjectURL(url);
+  console.log('[GuitarStrumTrainer] 设置已导出');
+}
+
+// 导入用户设置
+function importUserSettings(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const settings = JSON.parse(e.target.result);
+      
+      // 导入自定义节奏型
+      if (settings.customRhythms && Array.isArray(settings.customRhythms)) {
+        customRhythms = settings.customRhythms;
+        saveCustomRhythms();
+      }
+      
+      // 导入其他设置
+      if (settings.bpm) currentBPM = settings.bpm;
+      if (settings.metronomeEnabled !== undefined) metronomeEnabled = settings.metronomeEnabled;
+      if (settings.sensitivityLevel) sensitivityLevel = settings.sensitivityLevel;
+      
+      // 更新 UI
+      const bpmSlider = document.getElementById('bpmSlider');
+      const bpmValue = document.getElementById('bpmValue');
+      if (bpmSlider) bpmSlider.value = currentBPM;
+      if (bpmValue) bpmValue.textContent = currentBPM;
+      
+      const metronomeToggle = document.getElementById('metronomeToggle');
+      if (metronomeToggle) metronomeToggle.checked = metronomeEnabled;
+      
+      const sensitivitySlider = document.getElementById('sensitivitySlider');
+      const sensitivityValue = document.getElementById('sensitivityValue');
+      if (sensitivitySlider) sensitivitySlider.value = sensitivityLevel;
+      if (sensitivityValue) sensitivityValue.textContent = sensitivityLevel;
+      updateThreshold();
+      
+      renderCustomRhythmsList();
+      
+      alert('设置导入成功！');
+    } catch (err) {
+      alert('导入失败：文件格式错误');
+      console.error('导入设置失败:', err);
+    }
+  };
+  reader.readAsText(file);
+  
+  // 清空文件输入，允许重复导入同一文件
+  event.target.value = '';
+}
+
+// HTML 转义
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 自动保存设置（定期）
+setInterval(() => {
+  saveUserSettings();
+}, 5000); // 每 5 秒自动保存
