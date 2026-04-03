@@ -463,7 +463,14 @@ async function playDemo(rhythmIndex, btnElement) {
     const patternDuration = pattern.pattern[noteIndex % pattern.pattern.length];
     const intervalMs = patternDuration * (baseBPM / currentBPM);
     
-    console.log('[GuitarStrumTrainer] Scheduling next note in', intervalMs, 'ms');
+    console.log('[GuitarStrumTrainer] Scheduling next note:', {
+      noteIndex,
+      patternDuration,
+      baseBPM,
+      currentBPM,
+      intervalMs,
+      isCustom: pattern.isCustom
+    });
     
     noteIndex++;
     
@@ -1925,6 +1932,8 @@ function playCustomRhythmFromList(index, btn) {
     notes: rhythm.notes  // 传递力度信息
   };
   RHYTHM_PATTERNS.push(tempRhythm);
+  
+  console.log('[GuitarStrumTrainer] Custom rhythm tempPattern:', tempPattern, 'currentBPM:', currentBPM);
   
   // 保存真实按钮引用
   playingCustomBtn = btn;
