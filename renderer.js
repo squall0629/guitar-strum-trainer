@@ -83,7 +83,7 @@ let sensitivitySlider, sensitivityValue, thresholdDisplay;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
 
 // 版本号
-const APP_VERSION = 'v1.7';
+const APP_VERSION = 'v1.8';
 
 // 初始化
 function init() {
