@@ -54,11 +54,22 @@ let metronomeBeat = 0;
 let audioContextForMetronome = null;
 
 // 演示播放相关
-let isPlayingDemo = false;
+let _isPlayingDemo = false;
 let demoTimeout = null;
 let demoLoopCount = 0;
 let currentDemoRhythmIndex = -1;
 let playingCustomBtn = null;
+
+// 获取 isPlayingDemo 状态
+function getIsPlayingDemo() {
+  return _isPlayingDemo;
+}
+
+// 设置 isPlayingDemo 状态并追踪
+function setIsPlayingDemo(val) {
+  console.log('[GuitarStrumTrainer] isPlayingDemo changed:', val, 'from:', new Error().stack.split('\n')[2]);
+  _isPlayingDemo = val;
+}
 
 // 设置灵敏度
 let sensitivityLevel = 50; // 1-100
@@ -224,11 +235,16 @@ function setupDemoButtons() {
   demoButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      e.preventDefault();  // 防止默认行为
       const rhythmIndex = parseInt(btn.dataset.rhythm);
       
-      if (isPlayingDemo) {
+      console.log('[GuitarStrumTrainer] Demo button clicked:', { rhythmIndex, isPlayingDemo: getIsPlayingDemo() });
+      
+      if (getIsPlayingDemo()) {
+        console.log('[GuitarStrumTrainer] Stopping demo...');
         stopDemo();
       } else {
+        console.log('[GuitarStrumTrainer] Starting demo...');
         playDemo(rhythmIndex, btn);
       }
     });
@@ -243,11 +259,16 @@ function setupDemoButtons() {
     
     newBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      e.preventDefault();  // 防止默认行为
       const customIndex = parseInt(newBtn.dataset.custom);
       
-      if (isPlayingDemo) {
+      console.log('[GuitarStrumTrainer] Custom demo button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
+      
+      if (getIsPlayingDemo()) {
+        console.log('[GuitarStrumTrainer] Stopping custom demo...');
         stopDemo();
       } else {
+        console.log('[GuitarStrumTrainer] Starting custom demo...');
         playCustomRhythm(customIndex);
       }
     });
@@ -356,7 +377,8 @@ function playMetronomeSound(frequency = 1000, duration = 0.05) {
 
 // 播放节奏型演示 - 循环播放版本
 async function playDemo(rhythmIndex, btnElement) {
-  isPlayingDemo = true;
+  console.log('[GuitarStrumTrainer] playDemo starting, setting isPlayingDemo=true');
+  setIsPlayingDemo(true);
   demoLoopCount = 0;
   currentDemoRhythmIndex = rhythmIndex;
   
@@ -376,7 +398,8 @@ async function playDemo(rhythmIndex, btnElement) {
   let noteIndex = 0;
   
   async function playNextNote() {
-    if (!isPlayingDemo) {
+    console.log('[GuitarStrumTrainer] playNextNote check:', { isPlayingDemo: getIsPlayingDemo(), noteIndex });
+    if (!getIsPlayingDemo()) {
       console.log('[GuitarStrumTrainer] playNextNote: isPlayingDemo=false, stopping');
       return;
     }
@@ -429,7 +452,8 @@ async function playDemo(rhythmIndex, btnElement) {
 
 // 停止演示
 function stopDemo() {
-  isPlayingDemo = false;
+  console.log('[GuitarStrumTrainer] stopDemo called from:', new Error().stack.split('\n')[2]);
+  setIsPlayingDemo(false);
   if (demoTimeout) clearTimeout(demoTimeout);
   if (window.customRhythmCleanup) {
     clearTimeout(window.customRhythmCleanup);
@@ -908,7 +932,7 @@ function stopListening() {
   stopMetronome();
   
   // 停止演示
-  if (isPlayingDemo) {
+  if (getIsPlayingDemo()) {
     stopDemo();
   }
   
@@ -1819,7 +1843,7 @@ function playCustomRhythm(index) {
   if (!rhythm.notes || rhythm.notes.length === 0) return;
   
   // 如果已经在播放，点击则停止
-  if (isPlayingDemo && playingCustomBtn) {
+  if (getIsPlayingDemo() && playingCustomBtn) {
     stopDemo();
     return;
   }
@@ -1870,7 +1894,7 @@ function playCustomRhythm(index) {
   
   // 播放完成后清理（10 秒后或手动停止）
   const cleanupTimeout = setTimeout(() => {
-    if (isPlayingDemo) {
+    if (getIsPlayingDemo()) {
       stopDemo();
     }
     playingCustomBtn = null;
