@@ -408,7 +408,14 @@ function playDemo(rhythmIndex, btnElement) {
     }
     
     const direction = pattern.demo[noteIndex % pattern.demo.length];
-    playStrumSound(direction);
+    
+    // 如果是自定义节奏型，传递力度参数
+    if (pattern.isCustom && pattern.notes && pattern.notes[noteIndex % pattern.notes.length]) {
+      const noteData = pattern.notes[noteIndex % pattern.notes.length];
+      playStrumSound(direction, 0.15, [noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity, noteData.velocity]);
+    } else {
+      playStrumSound(direction);
+    }
     
     // 视觉反馈 - 添加空值检查（自定义节奏型没有对应的 DOM 元素）
     const options = rhythmSelector.querySelectorAll('.rhythm-option');
@@ -534,7 +541,7 @@ async function loadGuitarSoundfont() {
 // 4. 8 分音符重扫低音区，16 分音符轻扫高音区
 // 5. 16 分音符也区分上下扫（下扫更轻，上扫稍强）
 // 6. 添加轻微力度变化，让每次扫弦都有细微差别
-function playStrumSound(direction, duration = 0.15) {
+function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
   if (!guitarSoundfont) {
     // 如果音源未加载，使用备选合成音色
     playStrumSoundSynth(direction, duration);
@@ -558,10 +565,20 @@ function playStrumSound(direction, duration = 0.15) {
   const trebleStrumSpeed = isDownStrum ? 0.004 : 0.006; // 高音区速度 (16 分音符，更快)
   
   // 力度参数 - 低音区重，高音区轻
-  // 低音区：下扫强 (1.0)，上扫中 (0.6)
-  const bassVelocity = isDownStrum ? 1.0 : 0.6;
-  // 高音区：下扫中 (0.3)，上扫轻 (0.2) - 下扫比上扫重
-  const trebleVelocity = isDownStrum ? 0.3 : 0.2;
+  // 如果传入了自定义力度参数，使用自定义的；否则使用默认的
+  let bassVelocity, trebleVelocity;
+  
+  if (noteVelocities && Array.isArray(noteVelocities) && noteVelocities.length >= 6) {
+    // 使用自定义力度（前 3 个是低音区，后 3 个是高音区）
+    bassVelocity = noteVelocities[0];
+    trebleVelocity = noteVelocities[3];
+  } else {
+    // 默认力度
+    // 低音区：下扫强 (1.0)，上扫中 (0.6)
+    bassVelocity = isDownStrum ? 1.0 : 0.6;
+    // 高音区：下扫中 (0.3)，上扫轻 (0.2) - 下扫比上扫重
+    trebleVelocity = isDownStrum ? 0.3 : 0.2;
+  }
   
   const now = guitarSoundfont.context.currentTime;
   let currentTime = now;
