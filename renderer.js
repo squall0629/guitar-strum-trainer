@@ -187,20 +187,6 @@ function setupRhythmSelector() {
       feedbackMessage.textContent = `已选择：${pattern.name} - ${pattern.description}`;
     });
   });
-  
-  // 监听自定义节奏型变化
-  const originalRender = renderCustomRhythmsList;
-  renderCustomRhythmsList = function() {
-    originalRender.apply(this, arguments);
-    // 重新绑定选择事件
-    const customItems = document.querySelectorAll('#customRhythmsList > div');
-    customItems.forEach((item, index) => {
-      const selectArea = item.querySelector('div[onclick*="selectCustomRhythm"]');
-      if (selectArea) {
-        selectArea.addEventListener('click', () => selectCustomRhythm(index));
-      }
-    });
-  };
 }
 
 // 设置节拍器
@@ -2070,8 +2056,8 @@ function loadUserSettings() {
       });
     }
     
-    // 恢复自定义节奏型
-    if (settings.customRhythms && Array.isArray(settings.customRhythms)) {
+    // 恢复自定义节奏型（仅当用户设置中有数据时才覆盖）
+    if (settings.customRhythms && Array.isArray(settings.customRhythms) && settings.customRhythms.length > 0) {
       customRhythms = settings.customRhythms;
     }
     
