@@ -2,7 +2,7 @@
 // 新增和弦识别与转换训练功能
 
 // ========== 和弦识别模块 ==========
-import { ChordDetector, TransitionDetector } from './chord-detector.js';
+// 和弦检测器通过全局对象访问（在 chord-detector.js 中导出到 window）
 import { 
   getChordData, 
   getChordSVG, 
@@ -3012,8 +3012,8 @@ function updateTransitionTime(timeMs) {
  */
 function initChordDetector() {
   if (audioContext && analyser) {
-    chordDetector = new ChordDetector(audioContext, analyser);
-    transitionDetector = new TransitionDetector();
+    chordDetector = new window.ChordDetector(audioContext, analyser);
+    transitionDetector = new window.TransitionDetector();
     chordRecognitionEnabled = true;
     console.log('[ChordTraining] 和弦检测器已初始化');
   }

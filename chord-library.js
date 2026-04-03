@@ -1,23 +1,16 @@
 /**
- * 吉他和弦库 - 基于 chordictionaryjs
+ * 吉他和弦库 - 内置和弦数据
  * 
- * 使用 chordictionary 提供：
+ * 提供：
+ * - 10 个基础和弦定义
  * - 和弦指法数据
- * - SVG 指法图生成
- * - 和弦字典查询
- * 
- * @see https://github.com/greird/chordictionary
+ * - 常用和弦进行预设
  */
-
-import Chordictionary from 'chordictionary';
-
-// 初始化和弦字典（单例）
-const chordDict = new Chordictionary();
 
 /**
  * 基础和弦列表（首期 10 个）
  */
-export const BASIC_CHORDS = [
+const BASIC_CHORDS = [
   { name: 'C', difficulty: 1, label: 'C 大调' },
   { name: 'G', difficulty: 1, label: 'G 大调' },
   { name: 'D', difficulty: 1, label: 'D 大调' },
@@ -31,290 +24,183 @@ export const BASIC_CHORDS = [
 ];
 
 /**
+ * 和弦指法数据（简化版，用于 UI 显示）
+ * 格式：[6 弦，5 弦，4 弦，3 弦，2 弦，1 弦]
+ * null = 不弹，0 = 空弦，数字 = 按第几品
+ */
+const CHORD_FINGERINGS = {
+  'C':  [null, 3, 2, 0, 1, null],
+  'G':  [3, 2, null, null, 3, 3],
+  'D':  [null, null, 0, 2, 3, 2],
+  'Am': [null, 0, 2, 2, 1, null],
+  'Em': [0, 2, 2, 0, 0, 0],
+  'E':  [0, 2, 2, 1, 0, 0],
+  'A':  [null, 0, 2, 2, 2, null],
+  'F':  [1, 3, 3, 2, 1, 1],  // 简化版 F（横按）
+  'Dm': [null, null, 0, 2, 3, 1],
+  'Cmaj7': [null, 3, 2, 0, 0, null]
+};
+
+/**
+ * 和弦音符组成
+ */
+const CHORD_NOTES = {
+  'C': ['C3', 'E3', 'G3', 'C4', 'E4'],
+  'G': ['G2', 'B2', 'D3', 'G3', 'B3', 'D4'],
+  'D': ['D3', 'A3', 'D4', 'F#4', 'A4'],
+  'Am': ['A2', 'E3', 'A3', 'C4', 'E4'],
+  'Em': ['E2', 'B2', 'E3', 'G3', 'B3', 'E4'],
+  'E': ['E2', 'B2', 'E3', 'G#3', 'B3', 'E4'],
+  'A': ['A2', 'E3', 'A3', 'C#4', 'E4'],
+  'F': ['F2', 'C3', 'F3', 'A3', 'C4', 'F4'],
+  'Dm': ['D3', 'A3', 'D4', 'F4', 'A4'],
+  'Cmaj7': ['C3', 'E3', 'G3', 'B3', 'E4']
+};
+
+/**
+ * 常用和弦进行预设
+ */
+const COMMON_PROGRESSIONS = [
+  { name: '1645 进行', chords: ['C', 'Am', 'F', 'G'] },
+  { name: '4536 进行', chords: ['F', 'G', 'Em', 'Am'] },
+  { name: '卡农进行', chords: ['C', 'G', 'Am', 'Em', 'F', 'C', 'F', 'G'] },
+  { name: '12 小节蓝调', chords: ['C', 'F', 'G'] },
+  { name: '初学者练习', chords: ['C', 'G', 'Am', 'Em'] }
+];
+
+/**
  * 获取和弦指法数据
- * @param {string} chordName - 和弦名称 (如 'C', 'Am', 'Dm')
- * @returns {object|null} 和弦指法数据，包含按弦位置等信息
  */
-export function getChordData(chordName) {
-  try {
-    const chord = chordDict.getChord(chordName);
-    if (!chord || !chord.positions || chord.positions.length === 0) {
-      // 尝试变体名称
-      const variations = {
-        'Cmaj7': 'Cmaj7',
-        'Dm': 'Dm',
-        'Em': 'Em',
-        'Am': 'Am',
-        'E': 'E',
-        'A': 'A',
-        'F': 'F'
-      };
-      
-      if (variations[chordName]) {
-        const variant = chordDict.getChord(variations[chordName]);
-        if (variant && variant.positions && variant.positions.length > 0) {
-          return variant.positions[0];
-        }
-      }
-      
-      return null;
-    }
-    
-    // 返回第一个位置（最常用指法）
-    return chord.positions[0];
-  } catch (e) {
-    console.warn('[ChordLibrary] 获取和弦数据失败:', chordName, e);
-    return null;
-  }
+function getChordData(chordName) {
+  const fingering = CHORD_FINGERINGS[chordName];
+  const notes = CHORD_NOTES[chordName];
+  const basic = BASIC_CHORDS.find(c => c.name === chordName);
+  
+  if (!fingering || !notes) return null;
+  
+  return {
+    name: chordName,
+    fingering: fingering,
+    notes: notes,
+    difficulty: basic ? basic.difficulty : 3,
+    label: basic ? basic.label : chordName
+  };
 }
 
 /**
- * 获取和弦指法图 SVG
- * @param {string} chordName - 和弦名称
- * @param {number} width - SVG 宽度 (默认 120)
- * @param {number} height - SVG 高度 (默认 140)
- * @returns {string} SVG 字符串
+ * 生成简易 SVG 指法图
  */
-export function getChordSVG(chordName, width = 120, height = 140) {
-  try {
-    // chordictionary 的 SVG 生成可能需要特定配置
-    const chord = chordDict.getChord(chordName);
-    if (!chord || !chord.positions || chord.positions.length === 0) {
-      return createFallbackSVG(chordName, width, height);
-    }
-    
-    // 尝试使用 chordictionary 的 SVG 生成
-    if (typeof chordDict.getChordSVG === 'function') {
-      return chordDict.getChordSVG(chordName, width, height);
-    }
-    
-    // 如果库不支持 SVG 生成，使用备用方案
-    return createFallbackSVG(chordName, width, height);
-  } catch (e) {
-    console.warn('[ChordLibrary] 生成 SVG 失败:', chordName, e);
-    return createFallbackSVG(chordName, width, height);
-  }
-}
-
-/**
- * 备用 SVG 生成（当 chordictionary 不支持时）
- * @param {string} chordName - 和弦名称
- * @param {number} width - 宽度
- * @param {number} height - 高度
- * @returns {string} SVG 字符串
- */
-function createFallbackSVG(chordName, width, height) {
-  const chordData = getChordData(chordName);
+function getChordSVG(chordName, width = 120, height = 140) {
+  const fingering = CHORD_FINGERINGS[chordName];
+  if (!fingering) return '';
   
-  if (!chordData) {
-    return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <text x="${width/2}" y="${height/2}" text-anchor="middle" fill="#666" font-size="14">
-        无指法数据
-      </text>
-    </svg>`;
-  }
-  
-  // 从 chordData 提取按弦位置
-  const fingering = chordData.fingers || [0, 0, 0, 0, 0, 0];
-  const baseFret = chordData.baseFret || 1;
-  
-  // 生成 SVG
-  const padding = 15;
-  const diagramWidth = width - padding * 2;
-  const diagramHeight = height - padding * 2 - 20;
-  const stringSpacing = diagramWidth / 5;
-  const fretSpacing = diagramHeight / 3; // 显示 3 品
+  const strings = 6;
+  const frets = 4;
+  const padding = 20;
+  const stringSpacing = (width - 2 * padding) / (strings - 1);
+  const fretSpacing = (height - 2 * padding) / frets;
   
   let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
   
-  // 绘制品格线
-  svg += `<g stroke="#fff" stroke-width="1">`;
-  for (let i = 0; i <= 3; i++) {
+  // 画品格
+  for (let i = 0; i <= frets; i++) {
     const y = padding + i * fretSpacing;
-    svg += `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}"/>`;
+    svg += `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#888" stroke-width="1"/>`;
   }
   
-  // 绘制琴弦
-  for (let i = 0; i < 6; i++) {
+  // 画弦
+  for (let i = 0; i < strings; i++) {
     const x = padding + i * stringSpacing;
-    svg += `<line x1="${x}" y1="${padding}" x2="${x}" y2="${padding + 3 * fretSpacing}"/>`;
+    svg += `<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}" stroke="#888" stroke-width="${i >= 3 ? 1 : 2}"/>`;
   }
-  svg += `</g>`;
   
-  // 绘制按弦位置
-  svg += `<g fill="#00d9ff">`;
-  for (let i = 0; i < 6; i++) {
-    const fret = fingering[i] || 0;
+  // 画按弦点
+  for (let i = 0; i < strings; i++) {
+    const fret = fingering[i];
+    if (fret === null) continue;
+    
     const x = padding + i * stringSpacing;
+    const y = fret === 0 ? padding - 10 : padding + (fret - 0.5) * fretSpacing;
     
     if (fret === 0) {
-      // 空弦 - 圆圈
-      svg += `<circle cx="${x}" cy="${padding - 8}" r="5" fill="none" stroke="#fff" stroke-width="1"/>`;
-    } else if (fret > 0) {
-      // 按弦 - 实心圆
-      const y = padding + (fret - 0.5) * fretSpacing;
-      svg += `<circle cx="${x}" cy="${y}" r="8"/>`;
+      // 空弦圈
+      svg += `<circle cx="${x}" cy="${y}" r="6" fill="none" stroke="#b866ff" stroke-width="2"/>`;
+    } else {
+      // 按弦点
+      svg += `<circle cx="${x}" cy="${y}" r="8" fill="#b866ff"/>`;
     }
   }
-  svg += `</g>`;
   
-  // 和弦名称
-  svg += `<text x="${width/2}" y="${height - 5}" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">${chordName}</text>`;
-  
-  svg += `</svg>`;
+  svg += '</svg>';
   return svg;
 }
 
 /**
- * 获取和弦的音符组成
- * @param {string} chordName - 和弦名称
- * @returns {string[]} 音符数组 (如 ['C', 'E', 'G'])
+ * 获取和弦音符
  */
-export function getChordNotes(chordName) {
-  try {
-    const chord = chordDict.getChord(chordName);
-    if (chord && chord.notes) {
-      return chord.notes;
-    }
-    return [];
-  } catch (e) {
-    console.warn('[ChordLibrary] 获取和弦音符失败:', chordName, e);
-    return [];
-  }
+function getChordNotes(chordName) {
+  return CHORD_NOTES[chordName] || [];
 }
 
 /**
- * 验证和弦名称是否有效
- * @param {string} chordName - 和弦名称
- * @returns {boolean} 是否有效
+ * 验证和弦是否有效
  */
-export function isValidChord(chordName) {
-  try {
-    const chord = chordDict.getChord(chordName);
-    return !!(chord && chord.positions && chord.positions.length > 0);
-  } catch (e) {
-    return false;
-  }
+function isValidChord(chordName) {
+  return CHORD_FINGERINGS[chordName] !== undefined;
 }
 
 /**
- * 获取所有基础和弦名称
- * @returns {string[]} 和弦名称数组
+ * 获取基础和弦名称列表
  */
-export function getBasicChordNames() {
+function getBasicChordNames() {
   return BASIC_CHORDS.map(c => c.name);
 }
 
 /**
  * 获取和弦难度
- * @param {string} chordName - 和弦名称
- * @returns {number} 难度等级 (1-3)
  */
-export function getChordDifficulty(chordName) {
-  const chord = BASIC_CHORDS.find(c => c.name === chordName);
-  return chord ? chord.difficulty : 2;
+function getChordDifficulty(chordName) {
+  const basic = BASIC_CHORDS.find(c => c.name === chordName);
+  return basic ? basic.difficulty : 3;
 }
 
 /**
- * 计算两个和弦之间的转换难度
- * @param {string} chord1 - 第一个和弦
- * @param {string} chord2 - 第二个和弦
- * @returns {object} 难度评分和详细信息
+ * 计算和弦转换难度
  */
-export function calculateTransitionDifficulty(chord1, chord2) {
-  const data1 = getChordData(chord1);
-  const data2 = getChordData(chord2);
+function calculateTransitionDifficulty(chord1, chord2) {
+  const f1 = CHORD_FINGERINGS[chord1];
+  const f2 = CHORD_FINGERINGS[chord2];
   
-  if (!data1 || !data2) {
-    return { difficulty: 5, commonFingers: 0, fingerMovement: 0 };
-  }
+  if (!f1 || !f2) return 5;
   
-  const fingers1 = data1.fingers || [];
-  const fingers2 = data2.fingers || [];
-  
-  let commonFingers = 0;
-  let fingerMovement = 0;
-  
+  let diff = 0;
   for (let i = 0; i < 6; i++) {
-    const f1 = fingers1[i] || 0;
-    const f2 = fingers2[i] || 0;
-    
-    if (f1 > 0 && f2 > 0) {
-      if (f1 === f2) {
-        commonFingers++;
-      } else {
-        fingerMovement += Math.abs(f1 - f2);
-      }
-    } else if (f1 === 0 && f2 > 0) {
-      fingerMovement += 2;
-    } else if (f1 > 0 && f2 === 0) {
-      fingerMovement += 2;
-    }
+    if (f1[i] !== f2[i]) diff++;
   }
   
-  const difficulty = Math.min(10, fingerMovement / 2 - commonFingers);
-  
-  return {
-    difficulty: Math.round(difficulty * 10) / 10,
-    commonFingers,
-    fingerMovement
-  };
+  return Math.min(5, Math.round(diff / 2));
 }
 
 /**
- * 常用和弦进行预设
+ * 获取常用和弦进行
  */
-export const COMMON_PROGRESSIONS = [
-  {
-    name: '流行 1645',
-    chords: ['C', 'Am', 'F', 'G'],
-    description: '最常用的流行进行'
-  },
-  {
-    name: '流行 4536',
-    chords: ['F', 'G', 'Em', 'Am'],
-    description: '华语流行经典'
-  },
-  {
-    name: '卡农进行',
-    chords: ['C', 'G', 'Am', 'Em', 'F', 'C', 'F', 'G'],
-    description: '经典卡农变体'
-  },
-  {
-    name: '蓝调 12 小节',
-    chords: ['C', 'F', 'G'],
-    description: '基础蓝调进行'
-  },
-  {
-    name: '初学者 C-G',
-    chords: ['C', 'G'],
-    description: '最简单的两和弦转换'
-  }
-];
+const COMMON_PROGRESSIONS_MAP = {};
+COMMON_PROGRESSIONS.forEach(p => {
+  COMMON_PROGRESSIONS_MAP[p.name] = p.chords;
+});
 
-/**
- * 获取预设进行
- * @param {number} index - 预设索引
- * @returns {object|null} 进行信息
- */
-export function getProgression(index) {
-  return COMMON_PROGRESSIONS[index] || null;
+function getProgression(name) {
+  return COMMON_PROGRESSIONS_MAP[name] || [];
 }
 
-/**
- * 获取所有预设进行名称
- * @returns {string[]} 进行名称数组
- */
-export function getProgressionNames() {
+function getProgressionNames() {
   return COMMON_PROGRESSIONS.map(p => p.name);
 }
 
-// 导出 chordictionary 实例（供高级用法）
-export { chordDict };
-
-export default {
-  chordDict,
+// 导出到全局
+window.ChordLibrary = {
   BASIC_CHORDS,
+  COMMON_PROGRESSIONS,
   getChordData,
   getChordSVG,
   getChordNotes,
@@ -322,7 +208,6 @@ export default {
   getBasicChordNames,
   getChordDifficulty,
   calculateTransitionDifficulty,
-  COMMON_PROGRESSIONS,
   getProgression,
   getProgressionNames
 };

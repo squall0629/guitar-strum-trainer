@@ -3,21 +3,28 @@
  * 
  * 技术方案：
  * 1. 音频分析：自己实现（Web Audio API + FFT）
- * 2. 和弦识别：@tonaljs/chord-detect
- * 3. 指法图：chordictionaryjs
+ * 2. 和弦识别：tonaljs (通过 CDN 引入，全局变量 Tonal)
+ * 3. 指法图：chord-library.js
  * 
  * 流程：
- * FFT 分析 → 峰值检测 → 提取音符 → tonaljs 识别和弦 → chordictionary 获取指法
+ * FFT 分析 → 峰值检测 → 提取音符 → tonaljs 识别和弦 → chord-library 获取指法
  */
 
-import { ChordDetect } from '@tonaljs/chord-detect';
-import { getChordData, getChordSVG, getChordNotes, BASIC_CHORDS } from './chord-library.js';
-import { Note } from 'tonal';
+// 使用全局 Tonal 对象（通过 CDN 引入）
+const ChordDetect = Tonal.ChordDetect;
+const Note = Tonal.Note;
+
+// 使用和弦库全局对象
+const ChordLib = window.ChordLibrary || {};
+const getChordData = ChordLib.getChordData || (() => null);
+const getChordSVG = ChordLib.getChordSVG || (() => '');
+const getChordNotes = ChordLib.getChordNotes || (() => []);
+const BASIC_CHORDS = ChordLib.BASIC_CHORDS || [];
 
 /**
  * 和弦检测器类
  */
-export class ChordDetector {
+class ChordDetector {
   /**
    * 构造函数
    * @param {AudioContext} audioContext - Web Audio API 上下文
@@ -435,4 +442,6 @@ export class TransitionDetector {
   }
 }
 
-export default { ChordDetector, TransitionDetector };
+// 导出到全局（浏览器环境）
+window.ChordDetector = ChordDetector;
+window.TransitionDetector = TransitionDetector;
