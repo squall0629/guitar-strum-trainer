@@ -489,7 +489,7 @@ function playStrumSound(direction, duration = 0.15) {
   
   // 下扫：从低音弦到高音弦 (E3 → E5)
   // 上扫：从高音弦到低音弦 (E5 → E3)
-  const strumOrder = isDownStrum ? chordNotes : chordNotes.reverse();
+  const strumOrder = isDownStrum ? [...chordNotes] : [...chordNotes].reverse();
   
   // 扫弦速度参数
   const strumSpeed = isDownStrum ? 0.008 : 0.012; // 下扫更快，上扫稍慢
@@ -498,25 +498,17 @@ function playStrumSound(direction, duration = 0.15) {
   const velocity = isDownStrum ? 0.8 : 0.6; // 下扫更强
   
   // 播放扫弦
+  const now = guitarSoundfont.context.currentTime;
   strumOrder.forEach((note, index) => {
     const delay = index * strumSpeed; // 每根弦错开 8-12ms
+    const randomVelocity = velocity * (0.9 + Math.random() * 0.2);
     
-    setTimeout(() => {
-      // 添加轻微的力度随机变化 (±10%)
-      const randomVelocity = velocity * (0.9 + Math.random() * 0.2);
-      
-      // 播放音符，duration 控制延音
-      guitarSoundfont.play(note, {
-        gain: randomVelocity,
-        duration: duration
-      });
-    }, delay * 1000);
+    // 播放音符，duration 控制延音
+    guitarSoundfont.play(note, now + delay, {
+      gain: randomVelocity,
+      duration: duration
+    });
   });
-  
-  // 恢复原数组顺序（因为 reverse() 会修改原数组）
-  if (!isDownStrum) {
-    chordNotes.reverse();
-  }
 }
 
 // 备选合成音色 (当音源加载失败时使用)
