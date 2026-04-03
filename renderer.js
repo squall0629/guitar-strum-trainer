@@ -397,6 +397,10 @@ async function playDemo(rhythmIndex, btnElement) {
   if (btnElement && btnElement.textContent !== undefined) {
     btnElement.textContent = '⏹ 停止演示';
   }
+  // 禁用按钮，防止播放期间再次点击
+  if (btnElement && 'disabled' in btnElement) {
+    btnElement.disabled = true;
+  }
   
   const pattern = RHYTHM_PATTERNS[rhythmIndex];
   if (!pattern) {
@@ -480,6 +484,10 @@ function stopDemo() {
     if (btn && btn.textContent !== undefined) {
       btn.textContent = '🔊 试听演示';
     }
+    // 恢复按钮可点击状态
+    if (btn && 'disabled' in btn) {
+      btn.disabled = false;
+    }
   });
   
   // 重置自定义节奏型按钮
@@ -488,6 +496,10 @@ function stopDemo() {
     if (btn.classList.contains('playing')) {
       btn.classList.remove('playing');
       btn.textContent = '🔊 试听';
+    }
+    // 恢复按钮可点击状态
+    if ('disabled' in btn) {
+      btn.disabled = false;
     }
   });
   
@@ -1889,6 +1901,10 @@ function playCustomRhythm(index) {
   }
   if (clickedBtn && clickedBtn.textContent !== undefined) {
     clickedBtn.textContent = '⏹ 停止演示';
+  }
+  // 禁用按钮，防止播放期间再次点击
+  if (clickedBtn && 'disabled' in clickedBtn) {
+    clickedBtn.disabled = true;
   }
   
   // 播放演示
