@@ -410,10 +410,12 @@ function playDemo(rhythmIndex, btnElement) {
     const direction = pattern.demo[noteIndex % pattern.demo.length];
     playStrumSound(direction);
     
-    // 视觉反馈
+    // 视觉反馈 - 添加空值检查（自定义节奏型没有对应的 DOM 元素）
     const options = rhythmSelector.querySelectorAll('.rhythm-option');
     options.forEach(o => o.classList.remove('active'));
-    options[rhythmIndex].classList.add('active');
+    if (options[rhythmIndex]) {
+      options[rhythmIndex].classList.add('active');
+    }
     
     // 根据当前 BPM 动态计算节拍间隔
     const baseBPM = 120;
