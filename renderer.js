@@ -138,6 +138,9 @@ function init() {
   // 预加载吉他音源
   loadGuitarSoundfont();
   
+  // 初始化自定义节奏型功能
+  initCustomRhythms();
+  
   console.log('[GuitarStrumTrainer] 初始化完成');
 }
 
