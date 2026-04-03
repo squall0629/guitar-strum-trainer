@@ -476,6 +476,7 @@ async function playDemo(rhythmIndex, btnElement) {
 // 停止演示
 function stopDemo() {
   console.log('[GuitarStrumTrainer] stopDemo called from:', new Error().stack.split('\n')[2]);
+  console.log('[GuitarStrumTrainer] stopDemo: isPlayingDemo was', getIsPlayingDemo());
   setIsPlayingDemo(false);
   if (demoTimeout) clearTimeout(demoTimeout);
   if (window.customRhythmCleanup) {
@@ -485,6 +486,7 @@ function stopDemo() {
   demoLoopCount = 0;
   currentDemoRhythmIndex = -1;
   
+  console.log('[GuitarStrumTrainer] stopDemo: clearing timeout and resetting state');
   currentPlayingDemoBtn = null;
   
   // 重置所有演示按钮（包括自定义节奏型按钮）
@@ -1780,15 +1782,6 @@ function syncCustomRhythmsToSelector() {
   
   // 重新绑定所有演示按钮事件（包括新增的自定义按钮）
   setupDemoButtons();
-  
-  // 绑定自定义试听按钮事件
-  rhythmSelector.querySelectorAll('.btn-demo[data-custom]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const customIndex = parseInt(btn.dataset.custom);
-      playCustomRhythm(customIndex);
-    });
-  });
   
   console.log('[GuitarStrumTrainer] 自定义节奏型已同步到主列表:', customRhythms.length);
 }
