@@ -160,6 +160,20 @@ function setupRhythmSelector() {
       feedbackMessage.textContent = `已选择：${pattern.name} - ${pattern.description}`;
     });
   });
+  
+  // 监听自定义节奏型变化
+  const originalRender = renderCustomRhythmsList;
+  renderCustomRhythmsList = function() {
+    originalRender.apply(this, arguments);
+    // 重新绑定选择事件
+    const customItems = document.querySelectorAll('#customRhythmsList > div');
+    customItems.forEach((item, index) => {
+      const selectArea = item.querySelector('div[onclick*="selectCustomRhythm"]');
+      if (selectArea) {
+        selectArea.addEventListener('click', () => selectCustomRhythm(index));
+      }
+    });
+  };
 }
 
 // 设置节拍器
@@ -1415,18 +1429,57 @@ function renderCustomRhythmsList() {
     const pattern = rhythm.notes ? rhythm.notes.map(n => n.direction).join(' ') : '';
     return `
       <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border: 1px solid rgba(0, 217, 255, 0.3); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
-        <div>
+        <div style="cursor: pointer; flex: 1;" onclick="selectCustomRhythm(${index})">
           <div style="font-weight: bold; color: #00d9ff; margin-bottom: 5px;">${escapeHtml(rhythm.name)}</div>
           <div style="color: #888; font-size: 0.9em;">${noteCount} 个音符 | ${pattern}</div>
         </div>
         <div style="display: flex; gap: 10px;">
-          <button onclick="editCustomRhythm(${index})" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
-          <button onclick="playCustomRhythm(${index})" style="padding: 8px 16px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer;">🔊 试听</button>
-          <button onclick="deleteCustomRhythm(${index})" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑 删除</button>
+          <button onclick="editCustomRhythm(${index}); event.stopPropagation();" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
+          <button onclick="playCustomRhythm(${index}); event.stopPropagation();" style="padding: 8px 16px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer;">🔊 试听</button>
+          <button onclick="deleteCustomRhythm(${index}); event.stopPropagation();" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑 删除</button>
         </div>
       </div>
     `;
   }).join('');
+}
+
+// 选择自定义节奏型
+function selectCustomRhythm(index) {
+  if (index < 0 || index >= customRhythms.length) return;
+  
+  const rhythm = customRhythms[index];
+  if (!rhythm.notes || rhythm.notes.length === 0) return;
+  
+  // 转换为标准节奏型格式
+  const tempPattern = rhythm.notes.map(note => {
+    const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
+    return durationMs;
+  });
+  
+  const tempDemo = rhythm.notes.map(note => note.direction);
+  
+  // 临时添加到 RHYTHM_PATTERNS 末尾
+  const tempIndex = RHYTHM_PATTERNS.length;
+  const tempRhythm = {
+    name: rhythm.name,
+    pattern: tempPattern,
+    beats: 4,
+    description: rhythm.notes.map(n => n.direction).join(' '),
+    demo: tempDemo,
+    isCustom: true
+  };
+  RHYTHM_PATTERNS.push(tempRhythm);
+  
+  // 选择这个节奏型
+  currentRhythm = tempIndex;
+  
+  // 更新 UI 选中状态
+  const options = document.querySelectorAll('.rhythm-option');
+  options.forEach(o => o.classList.remove('active'));
+  
+  feedbackMessage.textContent = `已选择：${rhythm.name} - ${tempDemo.join(' ')}`;
+  
+  console.log('[GuitarStrumTrainer] 已选择自定义节奏型:', rhythm.name);
 }
 
 // 设置自定义节奏型按钮
@@ -1511,15 +1564,21 @@ function playCustomRhythm(index) {
     demo: tempDemo
   };
   
-  // 保存当前节奏型索引
-  const originalIndex = currentRhythm;
-  
   // 临时添加到 RHYTHM_PATTERNS
   const tempIndex = RHYTHM_PATTERNS.length;
   RHYTHM_PATTERNS.push(tempRhythm);
   
-  // 播放演示
-  playDemo(tempIndex, { dataset: { rhythm: tempIndex } });
+  // 播放演示 - 创建虚拟按钮对象
+  const virtualBtn = {
+    dataset: { rhythm: tempIndex },
+    classList: {
+      add: function() {},
+      remove: function() {}
+    },
+    textContent: ''
+  };
+  
+  playDemo(tempIndex, virtualBtn);
   
   // 播放完成后清理（3 秒后）
   setTimeout(() => {
