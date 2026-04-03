@@ -382,10 +382,20 @@ function playDemo(rhythmIndex, btnElement) {
   isPlayingDemo = true;
   demoLoopCount = 0;
   currentDemoRhythmIndex = rhythmIndex;
-  btnElement.classList.add('playing');
-  btnElement.textContent = '⏹ 停止演示';
+  
+  // 安全地更新按钮状态（兼容虚拟按钮对象）
+  if (btnElement && btnElement.classList) {
+    btnElement.classList.add('playing');
+  }
+  if (btnElement && btnElement.textContent !== undefined) {
+    btnElement.textContent = '⏹ 停止演示';
+  }
   
   const pattern = RHYTHM_PATTERNS[rhythmIndex];
+  if (!pattern) {
+    console.error('[GuitarStrumTrainer] 节奏型未找到:', rhythmIndex);
+    return;
+  }
   let noteIndex = 0;
   
   function playNextNote() {
