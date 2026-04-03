@@ -11,37 +11,37 @@ let soundfontLoaded = false;
 const RHYTHM_PATTERNS = [
   {
     name: '前八后十六',
-    pattern: [500, 250, 250], // 八分 + 十六分 + 十六分
+    pattern: [500, 250, 250],
     beats: 4,
-    description: '♪ ♫♫',
-    demo: ['D', 'D', 'U'] // 下 下上
+    description: '↓ ↓↑',
+    demo: ['D', 'D', 'U']
   },
   {
     name: '前十六后八',
-    pattern: [250, 250, 500], // 十六分 + 十六分 + 八分
+    pattern: [250, 250, 500],
     beats: 4,
-    description: '♫♫ ♪',
-    demo: ['D', 'U', 'D'] // 下上 下
+    description: '↓↑ ↓',
+    demo: ['D', 'U', 'D']
   },
   {
     name: '民谣常用',
-    pattern: [500, 250, 250, 250, 250, 500], // 下 下上 下上 下
+    pattern: [500, 250, 250, 250, 250, 500],
     beats: 4,
-    description: 'D DUDU D',
+    description: '↓ ↓↑↓↑ ↓',
     demo: ['D', 'D', 'U', 'D', 'U', 'D']
   },
   {
     name: '摇滚八分',
-    pattern: [250, 250, 250, 250, 250, 250, 250, 250], // 8 个八分音符
+    pattern: [250, 250, 250, 250, 250, 250, 250, 250],
     beats: 4,
-    description: 'DUDUDUDU',
+    description: '↓↑ ↓↑ ↓↑ ↓↑',
     demo: ['D', 'U', 'D', 'U', 'D', 'U', 'D', 'U']
   },
   {
     name: '华尔兹',
-    pattern: [667, 333, 333, 667, 333, 333], // 3/4 拍
+    pattern: [667, 333, 333, 667, 333, 333],
     beats: 3,
-    description: 'D UU D UU',
+    description: '↓ ↑↑ ↓ ↑↑',
     demo: ['D', 'U', 'U', 'D', 'U', 'U']
   }
 ];
@@ -90,10 +90,12 @@ let strumHistory = [];
 // DOM 元素（在 init 中初始化）
 let btnStart, btnStop, statusIndicator, statusText, rhythmSelector;
 let rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl;
+let rhythmRingEl, toneRingEl, dynamicsRingEl, totalRingEl;
 let feedbackMessage, historyList, canvas, canvasCtx;
-let metronomeToggle, bpmSlider, bpmValue, demoButtons;
-let sensitivitySlider, sensitivityValue, thresholdDisplay;
+let metronomeToggle, bpmSlider, bpmValue, demoButtons, metronomeDot;
+let sensitivitySlider, sensitivityValueEl, thresholdDisplay, volumeMeterFill;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
+let btnAddRhythm, btnMicTest;
 
 // 版本号
 const APP_VERSION = 'v1.8';
@@ -122,14 +124,24 @@ function init() {
   bpmValue = document.getElementById('bpmValue');
   demoButtons = document.querySelectorAll('.btn-demo');
   sensitivitySlider = document.getElementById('sensitivitySlider');
-  sensitivityValue = document.getElementById('sensitivityValue');
+  sensitivityValueEl = document.getElementById('sensitivityValue');
   thresholdDisplay = document.getElementById('thresholdDisplay');
+  volumeMeterFill = document.getElementById('volumeMeterFill');
   
   statsChartCanvas = document.getElementById('statsChart');
   statsChartCtx = statsChartCanvas ? statsChartCanvas.getContext('2d') : null;
   avgScoreEl = document.getElementById('avgScore');
   maxScoreEl = document.getElementById('maxScore');
   practiceCountEl = document.getElementById('practiceCount');
+  
+  rhythmRingEl = document.getElementById('rhythmRing');
+  toneRingEl = document.getElementById('toneRing');
+  dynamicsRingEl = document.getElementById('dynamicsRing');
+  totalRingEl = document.getElementById('totalRing');
+  
+  metronomeDot = document.getElementById('metronomeDot');
+  btnAddRhythm = document.getElementById('btnAddRhythm');
+  btnMicTest = document.getElementById('btnMicTest');
   
   console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
@@ -143,6 +155,8 @@ function init() {
   setupMetronome();
   setupDemoButtons();
   setupSensitivity();
+  setupAddRhythmCard();
+  setupMicTest();
   loadHistoryFromStorage();
   renderHistory();
   renderStatsChart();
@@ -258,16 +272,32 @@ function playMetronomeSound(frequency = 1000, duration = 0.05) {
 function startMetronome() {
   if (metronomeInterval) clearInterval(metronomeInterval);
   
-  const beatInterval = (60 / currentBPM) * 1000; // 毫秒
+  const beatInterval = (60 / currentBPM) * 1000;
   metronomeBeat = 0;
   
-  playMetronomeSound(1200, 0.05); // 第一拍高音
+  playMetronomeSound(1200, 0.05);
+  triggerMetronomeDot(true);
   
   metronomeInterval = setInterval(() => {
     metronomeBeat++;
     const isAccent = metronomeBeat % RHYTHM_PATTERNS[currentRhythm].beats === 0;
     playMetronomeSound(isAccent ? 1200 : 800, 0.05);
+    triggerMetronomeDot(isAccent);
   }, beatInterval);
+}
+
+// 触发节拍器呼吸灯
+function triggerMetronomeDot(isAccent) {
+  if (!metronomeDot) return;
+  metronomeDot.classList.add('accent');
+  if (isAccent) {
+    metronomeDot.classList.add('accent');
+  } else {
+    metronomeDot.classList.remove('accent');
+  }
+  setTimeout(() => {
+    metronomeDot.classList.remove('accent');
+  }, 150);
 }
 
 // 停止节拍器
@@ -482,8 +512,8 @@ function setupSensitivity() {
   
   sensitivitySlider.addEventListener('input', (e) => {
     sensitivityLevel = parseInt(e.target.value);
-    if (sensitivityValue) {
-      sensitivityValue.textContent = sensitivityLevel;
+    if (sensitivityValueEl) {
+      sensitivityValueEl.textContent = sensitivityLevel;
     }
     updateThreshold();
     
@@ -495,6 +525,86 @@ function setupSensitivity() {
   
   // 初始化阈值
   updateThreshold();
+}
+
+// 设置添加节奏型卡片
+function setupAddRhythmCard() {
+  if (!btnAddRhythm) return;
+  btnAddRhythm.addEventListener('click', () => {
+    openNewRhythmEditor();
+  });
+}
+
+// 设置麦克风检测按钮
+function setupMicTest() {
+  if (!btnMicTest) return;
+  btnMicTest.addEventListener('click', async () => {
+    try {
+      btnMicTest.textContent = '⏳ 检测中...';
+      btnMicTest.disabled = true;
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const testCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const testSource = testCtx.createMediaStreamSource(stream);
+      const testAnalyser = testCtx.createAnalyser();
+      testAnalyser.fftSize = 256;
+      testSource.connect(testAnalyser);
+      
+      const data = new Uint8Array(testAnalyser.frequencyBinCount);
+      let maxLevel = 0;
+      let checkCount = 0;
+      
+      function checkLevel() {
+        testAnalyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length;
+        maxLevel = Math.max(maxLevel, avg);
+        checkCount++;
+        
+        if (volumeMeterFill) {
+          volumeMeterFill.style.width = Math.min(100, (avg / 128) * 100) + '%';
+        }
+        
+        if (checkCount < 30) {
+          requestAnimationFrame(checkLevel);
+        } else {
+          stream.getTracks().forEach(t => t.stop());
+          testCtx.close();
+          
+          if (maxLevel > 10) {
+            btnMicTest.textContent = '✓ 正常';
+            btnMicTest.style.borderColor = '#2ed573';
+            btnMicTest.style.color = '#2ed573';
+          } else {
+            btnMicTest.textContent = '✗ 无信号';
+            btnMicTest.style.borderColor = '#ff4757';
+            btnMicTest.style.color = '#ff4757';
+          }
+          
+          btnMicTest.disabled = false;
+          setTimeout(() => {
+            btnMicTest.textContent = '🎤 检测';
+            btnMicTest.style.borderColor = '';
+            btnMicTest.style.color = '';
+            if (volumeMeterFill) volumeMeterFill.style.width = '0%';
+          }, 3000);
+        }
+      }
+      
+      checkLevel();
+    } catch (err) {
+      btnMicTest.textContent = '✗ 拒绝';
+      btnMicTest.style.borderColor = '#ff4757';
+      btnMicTest.style.color = '#ff4757';
+      btnMicTest.disabled = false;
+      setTimeout(() => {
+        btnMicTest.textContent = '🎤 检测';
+        btnMicTest.style.borderColor = '';
+        btnMicTest.style.color = '';
+      }, 3000);
+    }
+  });
 }
 
 // ========== 真实吉他音源函数 ==========
@@ -830,6 +940,14 @@ function analyzeAudio() {
   analyser.getByteFrequencyData(dataArray);
   analyser.getByteTimeDomainData(timeData);
   
+  // 更新音量电平
+  if (volumeMeterFill) {
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+    const avg = sum / dataArray.length;
+    volumeMeterFill.style.width = Math.min(100, (avg / 128) * 100) + '%';
+  }
+  
   // 绘制波形
   drawWaveform(timeData);
   
@@ -848,7 +966,7 @@ function drawWaveform(timeData) {
   canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
   
   canvasCtx.lineWidth = 2;
-  canvasCtx.strokeStyle = '#00d9ff';
+  canvasCtx.strokeStyle = '#b866ff';
   canvasCtx.beginPath();
   
   const sliceWidth = canvas.width / timeData.length;
@@ -998,11 +1116,11 @@ function updateScores() {
   dynamicsScoreEl.textContent = dynamicsScore;
   totalScoreEl.textContent = totalScore;
   
-  // 更新样式
-  updateScoreStyle(rhythmScoreEl, rhythmScore);
-  updateScoreStyle(toneScoreEl, toneScore);
-  updateScoreStyle(dynamicsScoreEl, dynamicsScore);
-  updateScoreStyle(totalScoreEl, totalScore);
+  // 更新圆环
+  updateScoreRing(rhythmRingEl, rhythmScoreEl, rhythmScore);
+  updateScoreRing(toneRingEl, toneScoreEl, toneScore);
+  updateScoreRing(dynamicsRingEl, dynamicsScoreEl, dynamicsScore);
+  updateScoreRing(totalRingEl, totalScoreEl, totalScore);
 }
 
 // 改进的节奏评分算法
@@ -1174,6 +1292,30 @@ function updateScoreStyle(element, score) {
   }
 }
 
+// 更新圆环进度条
+function updateScoreRing(ringEl, valueEl, score) {
+  if (!ringEl || !valueEl) return;
+  
+  const circumference = parseFloat(ringEl.getAttribute('stroke-dasharray'));
+  const offset = circumference - (score / 100) * circumference;
+  ringEl.setAttribute('stroke-dashoffset', offset);
+  
+  let color;
+  if (score >= 80) {
+    color = '#2ed573';
+  } else if (score >= 60) {
+    color = '#ffa502';
+  } else {
+    color = '#ff4757';
+  }
+  ringEl.setAttribute('stroke', color);
+  
+  if (typeof score === 'number') {
+    valueEl.textContent = score;
+    valueEl.style.color = color;
+  }
+}
+
 // 保存历史记录
 function saveHistory() {
   const pattern = RHYTHM_PATTERNS[currentRhythm];
@@ -1308,8 +1450,8 @@ function renderStatsChart() {
   // 绘制渐变填充区域
   if (points.length > 1) {
     const gradient = statsChartCtx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
-    gradient.addColorStop(0, 'rgba(0, 217, 255, 0.3)');
-    gradient.addColorStop(1, 'rgba(0, 217, 255, 0.02)');
+    gradient.addColorStop(0, 'rgba(184, 102, 255, 0.3)');
+    gradient.addColorStop(1, 'rgba(184, 102, 255, 0.02)');
     
     statsChartCtx.beginPath();
     statsChartCtx.moveTo(points[0].x, height - padding.bottom);
@@ -1327,9 +1469,27 @@ function renderStatsChart() {
     for (let i = 1; i < points.length; i++) {
       statsChartCtx.lineTo(points[i].x, points[i].y);
     }
-    statsChartCtx.strokeStyle = '#00d9ff';
+    statsChartCtx.strokeStyle = '#b866ff';
     statsChartCtx.lineWidth = 2;
     statsChartCtx.stroke();
+  }
+  
+  // 绘制平均分线
+  if (points.length > 1) {
+    const avgY = padding.top + chartHeight - (avgScore / 100) * chartHeight;
+    statsChartCtx.beginPath();
+    statsChartCtx.moveTo(padding.left, avgY);
+    statsChartCtx.lineTo(width - padding.right, avgY);
+    statsChartCtx.strokeStyle = 'rgba(255, 165, 2, 0.6)';
+    statsChartCtx.lineWidth = 1.5;
+    statsChartCtx.setLineDash([6, 4]);
+    statsChartCtx.stroke();
+    statsChartCtx.setLineDash([]);
+    
+    statsChartCtx.fillStyle = '#ffa502';
+    statsChartCtx.font = 'bold 10px sans-serif';
+    statsChartCtx.textAlign = 'left';
+    statsChartCtx.fillText(`平均 ${avgScore}`, padding.left + 4, avgY - 5);
   }
   
   // 绘制数据点
@@ -1481,12 +1641,12 @@ function renderCustomRhythmsList() {
   
   container.innerHTML = customRhythms.map((rhythm, index) => {
     const noteCount = rhythm.notes ? rhythm.notes.length : 0;
-    const pattern = rhythm.notes ? rhythm.notes.map(n => n.direction).join(' ') : '';
+    const pattern = rhythm.notes ? rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' ') : '';
     return `
-      <div style="padding: 15px; background: rgba(0, 217, 255, 0.1); border: 1px solid rgba(0, 217, 255, 0.3); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+      <div style="padding: 15px; background: rgba(184, 102, 255, 0.08); border: 1px solid rgba(184, 102, 255, 0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
         <div style="cursor: pointer; flex: 1;" onclick="selectCustomRhythm(${index})">
-          <div style="font-weight: bold; color: #00d9ff; margin-bottom: 5px;">${escapeHtml(rhythm.name)}</div>
-          <div style="color: #888; font-size: 0.9em;">${noteCount} 个音符 | ${pattern}</div>
+          <div style="font-weight: bold; color: #b866ff; margin-bottom: 5px;">${escapeHtml(rhythm.name)}</div>
+          <div style="color: #888; font-size: 1.1em; font-family: monospace; letter-spacing: 2px;">${pattern}</div>
         </div>
         <div style="display: flex; gap: 10px;">
           <button onclick="editCustomRhythm(${index}); event.stopPropagation();" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
@@ -1512,13 +1672,13 @@ function syncCustomRhythmsToSelector() {
   
   // 添加自定义节奏型选项
   customRhythms.forEach((rhythm, index) => {
-    const customIndex = RHYTHM_PATTERNS.length + index;
+    const arrowPattern = rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' ');
     const option = document.createElement('div');
     option.className = 'rhythm-option custom-rhythm-option';
     option.dataset.customIndex = index;
     option.innerHTML = `
       <div class="name">${escapeHtml(rhythm.name)}</div>
-      <div class="pattern">${rhythm.notes.map(n => n.direction).join(' ')}</div>
+      <div class="pattern">${arrowPattern}</div>
       <button class="btn-demo" data-custom="${index}">🔊 试听演示</button>
     `;
     option.addEventListener('click', (e) => {
@@ -1560,7 +1720,7 @@ function selectCustomRhythm(index) {
     name: rhythm.name,
     pattern: tempPattern,
     beats: 4,
-    description: rhythm.notes.map(n => n.direction).join(' '),
+    description: rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' '),
     demo: tempDemo,
     isCustom: true
   };
@@ -1672,7 +1832,7 @@ function playCustomRhythm(index) {
     name: rhythm.name,
     pattern: tempPattern,
     beats: 4,
-    description: rhythm.notes.map(n => n.direction).join(' '),
+    description: rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' '),
     demo: tempDemo,
     isCustom: true
   };
@@ -1866,9 +2026,9 @@ function loadUserSettings() {
     if (settings.sensitivityLevel) {
       sensitivityLevel = settings.sensitivityLevel;
       const sensitivitySlider = document.getElementById('sensitivitySlider');
-      const sensitivityValue = document.getElementById('sensitivityValue');
+      const sensitivityValueEl = document.getElementById('sensitivityValue');
       if (sensitivitySlider) sensitivitySlider.value = sensitivityLevel;
-      if (sensitivityValue) sensitivityValue.textContent = sensitivityLevel;
+      if (sensitivityValueEl) sensitivityValueEl.textContent = sensitivityLevel;
       updateThreshold();
     }
     
@@ -1946,9 +2106,9 @@ function importUserSettings(event) {
       if (metronomeToggle) metronomeToggle.checked = metronomeEnabled;
       
       const sensitivitySlider = document.getElementById('sensitivitySlider');
-      const sensitivityValue = document.getElementById('sensitivityValue');
+      const sensitivityValueEl = document.getElementById('sensitivityValue');
       if (sensitivitySlider) sensitivitySlider.value = sensitivityLevel;
-      if (sensitivityValue) sensitivityValue.textContent = sensitivityLevel;
+      if (sensitivityValueEl) sensitivityValueEl.textContent = sensitivityLevel;
       updateThreshold();
       
       renderCustomRhythmsList();
