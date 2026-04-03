@@ -231,6 +231,9 @@ function setupMetronome() {
   });
 }
 
+// 演示按钮点击保护时间戳（防止快速重复点击）
+let lastDemoClickTime = 0;
+
 // 设置演示按钮
 function setupDemoButtons() {
   demoButtons.forEach(btn => {
@@ -238,10 +241,13 @@ function setupDemoButtons() {
       e.stopPropagation();
       e.preventDefault();  // 防止默认行为
       
-      if (btn.disabled) {
-        console.log('[GuitarStrumTrainer] Demo button is disabled, ignoring click');
+      // 防止快速重复点击（100ms 内只响应一次）
+      const now = Date.now();
+      if (now - lastDemoClickTime < 100) {
+        console.log('[GuitarStrumTrainer] Demo click too fast, ignoring');
         return;
       }
+      lastDemoClickTime = now;
       
       const rhythmIndex = parseInt(btn.dataset.rhythm);
       
@@ -267,6 +273,15 @@ function setupDemoButtons() {
     newBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();  // 防止默认行为
+      
+      // 防止快速重复点击（100ms 内只响应一次）
+      const now = Date.now();
+      if (now - lastDemoClickTime < 100) {
+        console.log('[GuitarStrumTrainer] Custom demo click too fast, ignoring');
+        return;
+      }
+      lastDemoClickTime = now;
+      
       const customIndex = parseInt(newBtn.dataset.custom);
       
       console.log('[GuitarStrumTrainer] Custom demo button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
@@ -397,10 +412,6 @@ async function playDemo(rhythmIndex, btnElement) {
   if (btnElement && btnElement.textContent !== undefined) {
     btnElement.textContent = '⏹ 停止演示';
   }
-  // 禁用按钮，防止播放期间再次点击
-  if (btnElement && 'disabled' in btnElement) {
-    btnElement.disabled = true;
-  }
   
   const pattern = RHYTHM_PATTERNS[rhythmIndex];
   if (!pattern) {
@@ -484,10 +495,6 @@ function stopDemo() {
     if (btn && btn.textContent !== undefined) {
       btn.textContent = '🔊 试听演示';
     }
-    // 恢复按钮可点击状态
-    if (btn && 'disabled' in btn) {
-      btn.disabled = false;
-    }
   });
   
   // 重置自定义节奏型按钮
@@ -496,10 +503,6 @@ function stopDemo() {
     if (btn.classList.contains('playing')) {
       btn.classList.remove('playing');
       btn.textContent = '🔊 试听';
-    }
-    // 恢复按钮可点击状态
-    if ('disabled' in btn) {
-      btn.disabled = false;
     }
   });
   
@@ -1901,10 +1904,6 @@ function playCustomRhythm(index) {
   }
   if (clickedBtn && clickedBtn.textContent !== undefined) {
     clickedBtn.textContent = '⏹ 停止演示';
-  }
-  // 禁用按钮，防止播放期间再次点击
-  if (clickedBtn && 'disabled' in clickedBtn) {
-    clickedBtn.disabled = true;
   }
   
   // 播放演示
