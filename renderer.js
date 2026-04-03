@@ -8,38 +8,39 @@ let soundfontLoading = false;
 let soundfontLoaded = false;
 
 // 节奏型定义 (单位：毫秒，基于 120BPM)
+// 120BPM 时：一拍=500ms，四分音符=500ms，八分音符=250ms，十六分音符=125ms
 const RHYTHM_PATTERNS = [
   {
     name: '前八后十六',
-    pattern: [500, 250, 250],
+    pattern: [250, 125, 125],  // 八分 + 十六分 + 十六分 = 一拍 (500ms)
     beats: 4,
     description: '↓ ↓↑',
     demo: ['D', 'D', 'U']
   },
   {
     name: '前十六后八',
-    pattern: [250, 250, 500],
+    pattern: [125, 125, 250],  // 十六分 + 十六分 + 八分 = 一拍 (500ms)
     beats: 4,
     description: '↓↑ ↓',
     demo: ['D', 'U', 'D']
   },
   {
     name: '民谣常用',
-    pattern: [500, 250, 250, 250, 250, 500],
+    pattern: [250, 125, 125, 125, 125, 250],  // 两拍 (1000ms)
     beats: 4,
     description: '↓ ↓↑↓↑ ↓',
     demo: ['D', 'D', 'U', 'D', 'U', 'D']
   },
   {
     name: '摇滚八分',
-    pattern: [250, 250, 250, 250, 250, 250, 250, 250],
+    pattern: [125, 125, 125, 125, 125, 125, 125, 125],  // 两拍 (1000ms)
     beats: 4,
     description: '↓↑ ↓↑ ↓↑ ↓↑',
     demo: ['D', 'U', 'D', 'U', 'D', 'U', 'D', 'U']
   },
   {
     name: '华尔兹',
-    pattern: [667, 333, 333, 667, 333, 333],
+    pattern: [333, 167, 167, 333, 167, 167],  // 两拍 (1000ms)，3/4 拍
     beats: 3,
     description: '↓ ↑↑ ↓ ↑↑',
     demo: ['D', 'U', 'U', 'D', 'U', 'U']
@@ -1862,12 +1863,11 @@ function selectCustomRhythm(index) {
   const rhythm = customRhythms[index];
   if (!rhythm.notes || rhythm.notes.length === 0) return;
   
-  // 转换为标准节奏型格式（存储基于 120BPM 的原始时值，让 playDemo 统一处理速度调整）
-  // 注意：内置节奏型的 pattern 值是标准音符时值的 2 倍，为保持一致性，自定义节奏型也乘以 2
+  // 转换为标准节奏型格式（使用标准音符时值）
   const tempPattern = rhythm.notes.map(note => {
     const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    // 乘以 2 以与内置节奏型的时值基准保持一致
-    return durationMs * 2;
+    // 直接使用标准时值，不乘以倍数
+    return durationMs;
   });
   
   const tempDemo = rhythm.notes.map(note => note.direction);
@@ -1996,12 +1996,11 @@ function playCustomRhythmFromList(index, btn) {
     return;
   }
   
-  // 转换为标准节奏型格式（存储基于 120BPM 的原始时值，让 playDemo 统一处理速度调整）
-  // 注意：内置节奏型的 pattern 值是标准音符时值的 2 倍，为保持一致性，自定义节奏型也乘以 2
+  // 转换为标准节奏型格式（使用标准音符时值）
   const tempPattern = rhythm.notes.map(note => {
     const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    // 乘以 2 以与内置节奏型的时值基准保持一致
-    return durationMs * 2;
+    // 直接使用标准时值，不乘以倍数
+    return durationMs;
   });
   
   const tempDemo = rhythm.notes.map(note => note.direction);
