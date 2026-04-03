@@ -435,13 +435,38 @@ function playDemo(rhythmIndex, btnElement) {
 function stopDemo() {
   isPlayingDemo = false;
   if (demoTimeout) clearTimeout(demoTimeout);
+  if (window.customRhythmCleanup) {
+    clearTimeout(window.customRhythmCleanup);
+    window.customRhythmCleanup = null;
+  }
   demoLoopCount = 0;
   currentDemoRhythmIndex = -1;
   
+  // 重置所有演示按钮（包括自定义节奏型按钮）
   demoButtons.forEach(btn => {
-    btn.classList.remove('playing');
-    btn.textContent = '🔊 试听演示';
+    if (btn && btn.classList) {
+      btn.classList.remove('playing');
+    }
+    if (btn && btn.textContent !== undefined) {
+      btn.textContent = '🔊 试听演示';
+    }
   });
+  
+  // 重置自定义节奏型按钮
+  const customPlayBtns = document.querySelectorAll('#customRhythmsList button[onclick*="playCustomRhythm"]');
+  customPlayBtns.forEach(btn => {
+    if (btn.classList.contains('playing')) {
+      btn.classList.remove('playing');
+      btn.textContent = '🔊 试听';
+    }
+  });
+  
+  playingCustomBtn = null;
+  
+  // 清理临时节奏型
+  if (RHYTHM_PATTERNS.length > 5) {
+    RHYTHM_PATTERNS.pop();
+  }
 }
 
 // 设置灵敏度
@@ -1554,11 +1579,19 @@ function deleteCustomRhythm(index) {
 }
 
 // 播放自定义节奏型
+let playingCustomBtn = null; // 跟踪当前播放的自定义节奏型按钮
+
 function playCustomRhythm(index) {
   if (index < 0 || index >= customRhythms.length) return;
   
   const rhythm = customRhythms[index];
   if (!rhythm.notes || rhythm.notes.length === 0) return;
+  
+  // 如果已经在播放，点击则停止
+  if (isPlayingDemo && playingCustomBtn) {
+    stopDemo();
+    return;
+  }
   
   // 转换为标准节奏型格式
   const tempPattern = rhythm.notes.map(note => {
@@ -1568,7 +1601,8 @@ function playCustomRhythm(index) {
   
   const tempDemo = rhythm.notes.map(note => note.direction);
   
-  // 临时播放
+  // 临时添加到 RHYTHM_PATTERNS
+  const tempIndex = RHYTHM_PATTERNS.length;
   const tempRhythm = {
     name: rhythm.name,
     pattern: tempPattern,
@@ -1576,30 +1610,41 @@ function playCustomRhythm(index) {
     description: rhythm.notes.map(n => n.direction).join(' '),
     demo: tempDemo
   };
-  
-  // 临时添加到 RHYTHM_PATTERNS
-  const tempIndex = RHYTHM_PATTERNS.length;
   RHYTHM_PATTERNS.push(tempRhythm);
   
-  // 创建完整的虚拟按钮对象
-  let isPlaying = false;
-  const virtualBtn = {
+  // 找到被点击的按钮
+  const clickedBtn = event.target;
+  playingCustomBtn = clickedBtn;
+  
+  // 更新按钮状态
+  if (clickedBtn && clickedBtn.classList) {
+    clickedBtn.classList.add('playing');
+  }
+  if (clickedBtn && clickedBtn.textContent !== undefined) {
+    clickedBtn.textContent = '⏹ 停止演示';
+  }
+  
+  // 播放演示
+  playDemo(tempIndex, {
     dataset: { rhythm: tempIndex },
     classList: {
-      add: function(cls) { if (cls === 'playing') isPlaying = true; },
-      remove: function(cls) { if (cls === 'playing') isPlaying = false; },
-      toggle: function(cls) { isPlaying = !isPlaying; return isPlaying; }
+      add: function() {},
+      remove: function() {},
+      toggle: function() {}
     },
-    textContent: '🔊 试听演示',
-    getAttribute: function() { return null; }
-  };
+    textContent: ''
+  });
   
-  playDemo(tempIndex, virtualBtn);
+  // 播放完成后清理（3 秒后或手动停止）
+  const cleanupTimeout = setTimeout(() => {
+    if (isPlayingDemo) {
+      stopDemo();
+    }
+    playingCustomBtn = null;
+  }, 10000); // 10 秒后自动停止
   
-  // 播放完成后清理（3 秒后）
-  setTimeout(() => {
-    RHYTHM_PATTERNS.pop();
-  }, 3000);
+  // 保存清理函数引用，可以在 stopDemo 中清除
+  window.customRhythmCleanup = cleanupTimeout;
 }
 
 // 渲染音符序列编辑器
