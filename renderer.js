@@ -1711,9 +1711,42 @@ function renderCustomRhythmsList() {
     return;
   }
   
+  // 生成带时值间隔的箭头模式
+  function generateArrowPattern(notes) {
+    if (!notes || notes.length === 0) return '';
+    
+    const arrows = notes.map(n => ({
+      arrow: n.direction === 'D' ? '↓' : '↑',
+      duration: n.duration
+    }));
+    
+    let result = arrows[0].arrow;
+    for (let i = 1; i < arrows.length; i++) {
+      const prevDuration = arrows[i - 1].duration;
+      const currDuration = arrows[i].duration;
+      
+      // 根据时值决定间隔：8 分和 16 分之间用宽间隔，两个 16 分之间用窄间隔
+      // 8th=八分音符，16th=十六分音符
+      const isPrevShort = prevDuration === '16th';
+      const isCurrShort = currDuration === '16th';
+      
+      if (isPrevShort && isCurrShort) {
+        // 两个 16 分音符之间：窄间隔（不换行，直接连）
+        result += arrows[i].arrow;
+      } else if (isPrevShort || isCurrShort) {
+        // 8 分和 16 分之间：中等间隔（一个空格）
+        result += ' ' + arrows[i].arrow;
+      } else {
+        // 两个 8 分或更长：宽间隔（两个空格）
+        result += '  ' + arrows[i].arrow;
+      }
+    }
+    return result;
+  }
+  
   container.innerHTML = customRhythms.map((rhythm, index) => {
     const noteCount = rhythm.notes ? rhythm.notes.length : 0;
-    const pattern = rhythm.notes ? rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' ') : '';
+    const pattern = rhythm.notes ? generateArrowPattern(rhythm.notes) : '';
     return `
       <div style="padding: 15px; background: rgba(184, 102, 255, 0.08); border: 1px solid rgba(184, 102, 255, 0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
         <div style="cursor: pointer; flex: 1;" onclick="selectCustomRhythm(${index})">
@@ -1770,9 +1803,37 @@ function syncCustomRhythmsToSelector() {
   const existingCustom = rhythmSelector.querySelectorAll('.custom-rhythm-option');
   existingCustom.forEach(el => el.remove());
   
+  // 生成带时值间隔的箭头模式（与 renderCustomRhythmsList 保持一致）
+  function generateArrowPattern(notes) {
+    if (!notes || notes.length === 0) return '';
+    
+    const arrows = notes.map(n => ({
+      arrow: n.direction === 'D' ? '↓' : '↑',
+      duration: n.duration
+    }));
+    
+    let result = arrows[0].arrow;
+    for (let i = 1; i < arrows.length; i++) {
+      const prevDuration = arrows[i - 1].duration;
+      const currDuration = arrows[i].duration;
+      
+      const isPrevShort = prevDuration === '16th';
+      const isCurrShort = currDuration === '16th';
+      
+      if (isPrevShort && isCurrShort) {
+        result += arrows[i].arrow;
+      } else if (isPrevShort || isCurrShort) {
+        result += ' ' + arrows[i].arrow;
+      } else {
+        result += '  ' + arrows[i].arrow;
+      }
+    }
+    return result;
+  }
+  
   // 添加自定义节奏型选项
   customRhythms.forEach((rhythm, index) => {
-    const arrowPattern = rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' ');
+    const arrowPattern = generateArrowPattern(rhythm.notes);
     const option = document.createElement('div');
     option.className = 'rhythm-option custom-rhythm-option';
     option.dataset.customIndex = index;
@@ -1813,11 +1874,34 @@ function selectCustomRhythm(index) {
   
   // 临时添加到 RHYTHM_PATTERNS 末尾
   const tempIndex = RHYTHM_PATTERNS.length;
+  
+  // 生成带时值间隔的 description（与内置节奏型格式一致）
+  const tempDescription = (() => {
+    let result = rhythm.notes[0].direction === 'D' ? '↓' : '↑';
+    for (let i = 1; i < rhythm.notes.length; i++) {
+      const prevDuration = rhythm.notes[i - 1].duration;
+      const currDuration = rhythm.notes[i].duration;
+      const arrow = rhythm.notes[i].direction === 'D' ? '↓' : '↑';
+      
+      const isPrevShort = prevDuration === '16th';
+      const isCurrShort = currDuration === '16th';
+      
+      if (isPrevShort && isCurrShort) {
+        result += arrow;
+      } else if (isPrevShort || isCurrShort) {
+        result += ' ' + arrow;
+      } else {
+        result += '  ' + arrow;
+      }
+    }
+    return result;
+  })();
+  
   const tempRhythm = {
     name: rhythm.name,
     pattern: tempPattern,
     beats: 4,
-    description: rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' '),
+    description: tempDescription,
     demo: tempDemo,
     isCustom: true
   };
@@ -1924,11 +2008,34 @@ function playCustomRhythmFromList(index, btn) {
   
   // 临时添加到 RHYTHM_PATTERNS
   const tempIndex = RHYTHM_PATTERNS.length;
+  
+  // 生成带时值间隔的 description（与内置节奏型格式一致）
+  const tempDescription = (() => {
+    let result = rhythm.notes[0].direction === 'D' ? '↓' : '↑';
+    for (let i = 1; i < rhythm.notes.length; i++) {
+      const prevDuration = rhythm.notes[i - 1].duration;
+      const currDuration = rhythm.notes[i].duration;
+      const arrow = rhythm.notes[i].direction === 'D' ? '↓' : '↑';
+      
+      const isPrevShort = prevDuration === '16th';
+      const isCurrShort = currDuration === '16th';
+      
+      if (isPrevShort && isCurrShort) {
+        result += arrow;
+      } else if (isPrevShort || isCurrShort) {
+        result += ' ' + arrow;
+      } else {
+        result += '  ' + arrow;
+      }
+    }
+    return result;
+  })();
+  
   const tempRhythm = {
     name: rhythm.name,
     pattern: tempPattern,
     beats: 4,
-    description: rhythm.notes.map(n => n.direction === 'D' ? '↓' : '↑').join(' '),
+    description: tempDescription,
     demo: tempDemo,
     isCustom: true,
     notes: rhythm.notes  // 传递力度信息
