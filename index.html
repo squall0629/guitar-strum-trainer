@@ -976,8 +976,24 @@
       <p>实时分析扫弦节奏、音色、强弱，获得专业反馈 - 新增和弦转换训练</p>
     </header>
     
-    <!-- 和弦训练模式选择 -->
+    <!-- 练习模式切换 -->
     <div class="panel" style="margin-bottom: 20px;">
+      <h2>🎮 练习模式</h2>
+      <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <button class="mode-btn active" id="practiceModeRhythm" data-practice-mode="rhythm">
+          🥁 纯节奏训练
+        </button>
+        <button class="mode-btn" id="practiceModeComprehensive" data-practice-mode="comprehensive">
+          🎸 和弦 + 节奏综合
+        </button>
+      </div>
+      <div style="margin-top: 10px; font-size: 0.85em; color: #888;" id="practiceModeDescription">
+        💡 纯节奏模式：专注节奏准确度，任意和弦均可练习
+      </div>
+    </div>
+    
+    <!-- 和弦训练模式选择 -->
+    <div class="panel chord-training-panel" style="margin-bottom: 20px;">
       <h2>🎯 训练模式</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <button class="mode-btn active" id="modePreset" data-mode="preset">

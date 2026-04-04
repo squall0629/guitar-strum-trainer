@@ -16,6 +16,9 @@ let chordRecognitionEnabled = false; // 是否启用和弦识别
 let lastRecognizedChord = null; // 上次识别的和弦
 let chordChangeTimeout = null; // 和弦转换计时器
 
+// 练习模式：'rhythm' = 纯节奏训练, 'comprehensive' = 和弦+节奏综合
+let practiceMode = 'rhythm'; // 默认纯节奏训练
+
 // 练习数据统计
 let practiceStartTime = 0; // 练习开始时间
 let practiceChordCorrect = 0; // 和弦识别正确次数
@@ -145,6 +148,10 @@ let currentChordCanvas, nextChordCanvas;
 let recognizedChordEl, chordConfidenceEl;
 let transitionTimeEl, progressionBar, progressionProgress;
 let btnSaveProgression, btnClearProgression;
+let chordTrainingPanel;
+
+// 练习模式 DOM 元素
+let practiceModeRhythm, practiceModeComprehensive, practiceModeDescription;
 
 // 版本号
 const APP_VERSION = 'v1.8';
@@ -213,6 +220,12 @@ function init() {
   btnSaveProgression = document.getElementById('btnSaveProgression');
   btnClearProgression = document.getElementById('btnClearProgression');
   practiceReportModal = document.getElementById('practiceReportModal');
+  chordTrainingPanel = document.querySelector('.chord-training-panel');
+  
+  // 练习模式 DOM 元素
+  practiceModeRhythm = document.getElementById('practiceModeRhythm');
+  practiceModeComprehensive = document.getElementById('practiceModeComprehensive');
+  practiceModeDescription = document.getElementById('practiceModeDescription');
   
   console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
@@ -223,6 +236,9 @@ function init() {
   
   // 初始化和弦训练功能
   setupChordTraining();
+  
+  // 初始化练习模式切换
+  setupPracticeMode();
   
   setupRhythmSelector();
   setupButtons();
@@ -1008,6 +1024,13 @@ async function startListening() {
     initChordDetector();
     resetChordTraining();
     
+    // 根据练习模式设置和弦识别
+    if (practiceMode === 'comprehensive') {
+      chordRecognitionEnabled = true;
+    } else {
+      chordRecognitionEnabled = false;
+    }
+    
     btnStart.style.display = 'none';
     btnStop.style.display = 'block';
     updateStatus('listening');
@@ -1077,8 +1100,8 @@ function stopListening() {
     showPracticeReport();
   }
   
-  // 显示和弦训练统计
-  if (transitionDetector && transitionDetector.getStats().transitionCount > 0) {
+  // 显示和弦训练统计（仅综合模式）
+  if (practiceMode === 'comprehensive' && transitionDetector && transitionDetector.getStats().transitionCount > 0) {
     const stats = transitionDetector.getStats();
     feedbackMessage.textContent = `和弦准确率：${stats.accuracy}% | 平均转换时间：${stats.avgTransitionTime}ms`;
   } else {
@@ -1282,12 +1305,25 @@ function updateScores() {
   // 强弱评分 - 改进版
   const dynamicsScore = calculateDynamicsScore(detectedStrums, pattern);
   
-  // 总分 (加权平均)
-  const totalScore = Math.round(
-    rhythmScore * 0.5 + 
-    toneScore * 0.3 + 
-    dynamicsScore * 0.2
-  );
+  // 根据练习模式调整总分计算权重
+  let totalScore;
+  if (practiceMode === 'rhythm') {
+    // 纯节奏模式：总分只基于节奏、音色、强弱
+    totalScore = Math.round(
+      rhythmScore * 0.5 + 
+      toneScore * 0.3 + 
+      dynamicsScore * 0.2
+    );
+  } else {
+    // 综合模式：加入和弦评分
+    const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
+    totalScore = Math.round(
+      rhythmScore * 0.35 + 
+      toneScore * 0.2 + 
+      dynamicsScore * 0.15 +
+      accuracy * 0.3
+    );
+  }
   
   // 更新显示
   rhythmScoreEl.textContent = rhythmScore;
@@ -1523,6 +1559,7 @@ function saveHistory() {
     strums: detectedStrums.length,
     bpm: currentBPM,
     mode: currentTrainingMode,
+    practiceMode: practiceMode,
     chordAccuracy: accuracy,
     avgTransitionTime: avgTransitionTime,
     transitionCount: transitionCount,
@@ -1564,11 +1601,13 @@ function loadHistoryFromStorage() {
 function renderHistory() {
   historyList.innerHTML = strumHistory.map(item => {
     const modeLabel = item.mode === 'preset' ? '📖' : item.mode === 'custom' ? '✏️' : item.mode === 'free' ? '🎸' : '';
-    const accuracyInfo = item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
-    const transTimeInfo = item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
+    const practiceModeLabel = item.practiceMode === 'comprehensive' ? '🎸综合' : '🥁节奏';
+    // 纯节奏模式不显示和弦相关信息
+    const accuracyInfo = item.practiceMode === 'comprehensive' && item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
+    const transTimeInfo = item.practiceMode === 'comprehensive' && item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
     return `
       <div class="history-item">
-        <span class="time">${item.time} - ${item.rhythm} ${modeLabel}</span>
+        <span class="time">${item.time} - ${item.rhythm} ${modeLabel} ${practiceModeLabel}</span>
         <span class="score">${item.score}分 (${item.strums}次扫弦${accuracyInfo}${transTimeInfo})</span>
       </div>
     `;
@@ -2671,6 +2710,61 @@ setInterval(() => {
 // ========== 和弦训练功能 ==========
 
 /**
+ * 设置练习模式切换
+ */
+function setupPracticeMode() {
+  if (!practiceModeRhythm || !practiceModeComprehensive) return;
+  
+  practiceModeRhythm.addEventListener('click', () => setPracticeMode('rhythm'));
+  practiceModeComprehensive.addEventListener('click', () => setPracticeMode('comprehensive'));
+  
+  // 初始化显示
+  updatePracticeModeUI();
+}
+
+/**
+ * 设置练习模式
+ * @param {string} mode - 'rhythm' 纯节奏训练 | 'comprehensive' 和弦+节奏综合
+ */
+function setPracticeMode(mode) {
+  practiceMode = mode;
+  updatePracticeModeUI();
+  console.log('[PracticeMode] 练习模式已切换:', mode);
+}
+
+/**
+ * 更新练习模式 UI 显示
+ */
+function updatePracticeModeUI() {
+  // 更新按钮状态
+  if (practiceModeRhythm) {
+    practiceModeRhythm.classList.toggle('active', practiceMode === 'rhythm');
+  }
+  if (practiceModeComprehensive) {
+    practiceModeComprehensive.classList.toggle('active', practiceMode === 'comprehensive');
+  }
+  
+  // 更新描述文字
+  if (practiceModeDescription) {
+    if (practiceMode === 'rhythm') {
+      practiceModeDescription.textContent = '💡 纯节奏模式：专注节奏准确度，任意和弦均可练习';
+    } else {
+      practiceModeDescription.textContent = '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
+    }
+  }
+  
+  // 条件显示和弦训练面板
+  if (chordTrainingPanel) {
+    chordTrainingPanel.style.display = practiceMode === 'comprehensive' ? 'block' : 'none';
+  }
+  
+  // 纯节奏模式关闭和弦识别
+  if (practiceMode === 'rhythm') {
+    chordRecognitionEnabled = false;
+  }
+}
+
+/**
  * 设置和弦训练功能
  */
 function setupChordTraining() {
@@ -3053,8 +3147,9 @@ function initChordDetector() {
   if (audioContext && analyser) {
     chordDetector = new window.ChordDetector(audioContext, analyser);
     transitionDetector = new window.TransitionDetector();
-    chordRecognitionEnabled = true;
-    console.log('[ChordTraining] 和弦检测器已初始化');
+    // 根据练习模式决定是否启用和弦识别
+    chordRecognitionEnabled = practiceMode === 'comprehensive';
+    console.log('[ChordTraining] 和弦检测器已初始化, chordRecognitionEnabled:', chordRecognitionEnabled);
   }
 }
 
@@ -3074,46 +3169,47 @@ function processChordRecognition() {
     // 更新识别显示
     updateChordRecognition(result);
     
-      // 在训练模式下检查是否匹配期望和弦
-      if (currentTrainingMode !== 'free' && expectedChord) {
-        const isCorrect = result.chord === expectedChord;
+    // 在训练模式下检查是否匹配期望和弦
+    if (currentTrainingMode !== 'free' && expectedChord) {
+      const isCorrect = result.chord === expectedChord;
+      
+      // 记录和弦识别统计
+      practiceChordTotal++;
+      if (isCorrect) {
+        practiceChordCorrect++;
+      }
+    
+      // 检测和弦转换
+      if (transitionDetector) {
+        transitionDetector.onChordDetected(result.chord, expectedChord, Date.now());
         
-        // 记录和弦识别统计
-        practiceChordTotal++;
-        if (isCorrect) {
-          practiceChordCorrect++;
+        // 记录转换时间到练习数据
+        const stats = transitionDetector.getStats();
+        if (stats.transitionCount > 0) {
+          const lastTransition = stats.transitions[stats.transitionCount - 1];
+          practiceTransitionTimes.push(lastTransition.time);
         }
       
-        // 检测和弦转换
-        if (transitionDetector) {
-          transitionDetector.onChordDetected(result.chord, expectedChord, Date.now());
+      // 如果识别正确且是当前期望和弦，更新进度
+      if (isCorrect && result.chord === expectedChord) {
+        // 检查是否需要切换到下一个和弦
+        if (lastRecognizedChord !== expectedChord) {
+          // 新的和弦被正确识别
+          currentChordIndex = (currentChordIndex + 1) % currentProgression.length;
+          updateChordDisplay();
           
-          // 记录转换时间到练习数据
+          // 显示转换时间
           const stats = transitionDetector.getStats();
           if (stats.transitionCount > 0) {
             const lastTransition = stats.transitions[stats.transitionCount - 1];
-            practiceTransitionTimes.push(lastTransition.time);
-          }
-        
-        // 如果识别正确且是当前期望和弦，更新进度
-        if (isCorrect && result.chord === expectedChord) {
-          // 检查是否需要切换到下一个和弦
-          if (lastRecognizedChord !== expectedChord) {
-            // 新的和弦被正确识别
-            currentChordIndex = (currentChordIndex + 1) % currentProgression.length;
-            updateChordDisplay();
-            
-            // 显示转换时间
-            const stats = transitionDetector.getStats();
-            if (stats.transitionCount > 0) {
-              const lastTransition = stats.transitions[stats.transitionCount - 1];
-              updateTransitionTime(lastTransition.time);
-            }
+            updateTransitionTime(lastTransition.time);
           }
         }
       }
-      
-      // 实时反馈
+    }
+    
+    // 实时反馈 - 根据练习模式调整
+    if (practiceMode === 'comprehensive') {
       if (isCorrect) {
         feedbackMessage.textContent = `✓ ${result.chord} 和弦正确！ (${Math.round(result.confidence * 100)}%)`;
       } else {
@@ -3207,23 +3303,35 @@ function showPracticeReport() {
   const fluencyScore = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
   const totalScore = parseInt(totalScoreEl.textContent) || 0;
   
+  // 根据练习模式显示不同报告内容
+  const reportTransitionsEl = document.getElementById('reportTransitions');
+  const reportAvgTimeEl = document.getElementById('reportAvgTime');
+  const reportAccuracyEl = document.getElementById('reportAccuracy');
+  const reportFluencyEl = document.getElementById('reportFluency');
+  const reportBestEl = document.getElementById('reportBestTransition');
+  const reportWorstEl = document.getElementById('reportWorstTransition');
+  
   document.getElementById('reportDuration').textContent = duration + 's';
-  document.getElementById('reportTransitions').textContent = transitionCount;
-  document.getElementById('reportAvgTime').textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
-  document.getElementById('reportAccuracy').textContent = accuracy > 0 ? accuracy + '%' : '--';
-  document.getElementById('reportFluency').textContent = fluencyScore > 0 ? fluencyScore : '--';
   document.getElementById('reportTotalScore').textContent = totalScore;
   
-  if (bestTransition !== null) {
-    document.getElementById('reportBestTransition').textContent = Math.round(bestTransition) + 'ms';
+  if (practiceMode === 'comprehensive') {
+    // 综合模式：显示完整和弦相关指标
+    reportTransitionsEl.textContent = transitionCount;
+    reportAvgTimeEl.textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
+    reportAccuracyEl.textContent = accuracy > 0 ? accuracy + '%' : '--';
+    reportFluencyEl.textContent = fluencyScore > 0 ? fluencyScore : '--';
+    
+    reportBestEl.textContent = bestTransition !== null ? Math.round(bestTransition) + 'ms' : '--';
+    reportWorstEl.textContent = worstTransition !== null ? Math.round(worstTransition) + 'ms' : '--';
   } else {
-    document.getElementById('reportBestTransition').textContent = '--';
-  }
-  
-  if (worstTransition !== null) {
-    document.getElementById('reportWorstTransition').textContent = Math.round(worstTransition) + 'ms';
-  } else {
-    document.getElementById('reportWorstTransition').textContent = '--';
+    // 纯节奏模式：隐藏和弦相关指标，显示节奏相关指标
+    reportTransitionsEl.textContent = '--';
+    reportAvgTimeEl.textContent = '--';
+    reportAccuracyEl.textContent = '--';
+    reportFluencyEl.textContent = '--';
+    
+    reportBestEl.textContent = '--';
+    reportWorstEl.textContent = '--';
   }
   
   renderTrendCharts();
