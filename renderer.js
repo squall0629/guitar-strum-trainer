@@ -126,6 +126,10 @@ let lastStrumTime = 0;
 let expectedStrumIndex = 0;
 let strumHistory = [];
 
+// 预分配的音频缓冲区（避免每帧分配）
+let freqDataCache = null;
+let timeDataCache = null;
+
 // DOM 元素（在 init 中初始化）
 let btnStart, btnStop, statusIndicator, statusText, rhythmSelector;
 let rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl;
@@ -1121,6 +1125,9 @@ function stopListening() {
   isListening = false;
   chordRecognitionEnabled = false;
   
+  // 重置转换时间记录
+  practiceTransitionTimes = [];
+  
   // 停止节拍器
   stopMetronome();
   
@@ -1166,28 +1173,32 @@ function analyzeAudio() {
   if (!isListening) return;
   
   const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-  const timeData = new Uint8Array(bufferLength);
   
-  analyser.getByteFrequencyData(dataArray);
-  analyser.getByteTimeDomainData(timeData);
+  // 使用预分配的缓冲区，避免每帧分配
+  if (!freqDataCache || freqDataCache.length !== bufferLength) {
+    freqDataCache = new Uint8Array(bufferLength);
+    timeDataCache = new Uint8Array(bufferLength);
+  }
+  
+  analyser.getByteFrequencyData(freqDataCache);
+  analyser.getByteTimeDomainData(timeDataCache);
   
   // 更新音量电平
   if (volumeMeterFill) {
     let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-    const avg = sum / dataArray.length;
+    for (let i = 0; i < freqDataCache.length; i++) sum += freqDataCache[i];
+    const avg = sum / freqDataCache.length;
     volumeMeterFill.style.width = Math.min(100, (avg / 128) * 100) + '%';
   }
   
   // 绘制波形
-  drawWaveform(timeData);
+  drawWaveform(timeDataCache);
   
   // 检测和弦识别
   processChordRecognition();
   
   // 检测扫弦
-  detectStrum(dataArray, timeData);
+  detectStrum(freqDataCache, timeDataCache);
   
   // 更新评分
   updateScores();
@@ -1535,14 +1546,14 @@ function calculateUniformDynamics(amplitudes) {
   
   // 同时检查绝对力度 (不能太轻)
   const avgAmplitude = avgAmp;
-  let力度Bonus = 0;
+  let dynamicsBonus = 0;
   if (avgAmplitude > 0.2) {
-    力度Bonus = 10; // 力度充足的奖励
+    dynamicsBonus = 10; // 力度充足的奖励
   } else if (avgAmplitude < 0.1) {
-    力度Bonus = -15; // 力度不足的惩罚
+    dynamicsBonus = -15; // 力度不足的惩罚
   }
   
-  return Math.round(Math.max(0, Math.min(100, score + 力度Bonus)));
+  return Math.round(Math.max(0, Math.min(100, score + dynamicsBonus)));
 }
 
 // 更新评分样式
@@ -3238,6 +3249,9 @@ function processChordRecognition() {
         if (stats.transitionCount > 0) {
           const lastTransition = stats.transitions[stats.transitionCount - 1];
           practiceTransitionTimes.push(lastTransition.time);
+          if (practiceTransitionTimes.length > 100) {
+            practiceTransitionTimes.shift();
+          }
         }
       
       // 如果识别正确且是当前期望和弦，更新进度
