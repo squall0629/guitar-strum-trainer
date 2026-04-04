@@ -34,6 +34,7 @@ let soundfontLoaded = false;
 
 // 节奏型定义 (单位：毫秒，基于 120BPM)
 // 120BPM 时：一拍=500ms，四分音符=500ms，八分音符=250ms，十六分音符=125ms
+// 注意：此为预设节奏型（只读），自定义节奏型使用 customRhythms 独立管理
 const RHYTHM_PATTERNS = [
   {
     name: '前八后十六',
@@ -71,6 +72,54 @@ const RHYTHM_PATTERNS = [
     demo: ['D', 'U', 'U', 'D', 'U', 'U']
   }
 ];
+
+// 获取当前激活的节奏型（支持预设和自定义）
+function getActiveRhythm(index) {
+  if (index >= 0 && index < RHYTHM_PATTERNS.length) {
+    return RHYTHM_PATTERNS[index];
+  }
+  const customIndex = index - RHYTHM_PATTERNS.length;
+  if (customIndex >= 0 && customIndex < customRhythms.length) {
+    const rhythm = customRhythms[customIndex];
+    if (!rhythm.notes || rhythm.notes.length === 0) return null;
+    
+    const tempPattern = rhythm.notes.map(note => {
+      return NOTE_DURATIONS[note.duration]?.ms || 250;
+    });
+    const tempDemo = rhythm.notes.map(note => note.direction);
+    
+    const tempDescription = (() => {
+      let result = rhythm.notes[0].direction === 'D' ? '↓' : '↑';
+      for (let i = 1; i < rhythm.notes.length; i++) {
+        const prevDuration = rhythm.notes[i - 1].duration;
+        const currDuration = rhythm.notes[i].duration;
+        const arrow = rhythm.notes[i].direction === 'D' ? '↓' : '↑';
+        const isPrevShort = prevDuration === '16th';
+        const isCurrShort = currDuration === '16th';
+        if (isPrevShort && isCurrShort) {
+          result += arrow;
+        } else if (isPrevShort || isCurrShort) {
+          result += ' ' + arrow;
+        } else {
+          result += '  ' + arrow;
+        }
+      }
+      return result;
+    })();
+    
+    return {
+      name: rhythm.name,
+      pattern: tempPattern,
+      beats: 4,
+      description: tempDescription,
+      demo: tempDemo,
+      isCustom: true,
+      notes: rhythm.notes,
+      customIndex: customIndex
+    };
+  }
+  return null;
+}
 
 // 节拍器相关
 let metronomeEnabled = false;
@@ -129,6 +178,9 @@ let strumHistory = [];
 // 预分配的音频缓冲区（避免每帧分配）
 let freqDataCache = null;
 let timeDataCache = null;
+
+// Blob URL 追踪（用于和弦指法图绘制，防止内存泄漏）
+let _chordDiagramBlobUrl = null;
 
 // DOM 元素（在 init 中初始化）
 let btnStart, btnStop, statusIndicator, statusText, rhythmSelector;
@@ -363,7 +415,8 @@ function setupRhythmSelector() {
       option.classList.add('active');
       currentRhythm = index;
       
-      const pattern = RHYTHM_PATTERNS[index];
+      const pattern = getActiveRhythm(index);
+      if (!pattern) return;
       feedbackMessage.textContent = `已选择：${pattern.name} - ${pattern.description}`;
     });
   });
@@ -504,7 +557,7 @@ function startMetronome() {
   
   metronomeInterval = setInterval(() => {
     metronomeBeat++;
-    const isAccent = metronomeBeat % RHYTHM_PATTERNS[currentRhythm].beats === 0;
+    const isAccent = metronomeBeat % getActiveRhythm(currentRhythm).beats === 0;
     playMetronomeSound(isAccent ? 1200 : 800, 0.05);
     triggerMetronomeDot(isAccent);
   }, beatInterval);
@@ -549,7 +602,7 @@ async function playDemo(rhythmIndex, btnElement) {
     btnElement.textContent = '⏹ 停止演示';
   }
   
-  const pattern = RHYTHM_PATTERNS[rhythmIndex];
+  const pattern = getActiveRhythm(rhythmIndex);
   if (!pattern) {
     console.error('[GuitarStrumTrainer] 节奏型未找到:', rhythmIndex);
     return;
@@ -661,11 +714,6 @@ function stopDemo() {
   });
   
   playingCustomBtn = null;
-  
-  // 清理临时节奏型
-  if (RHYTHM_PATTERNS.length > 5) {
-    RHYTHM_PATTERNS.pop();
-  }
 }
 
 // 设置灵敏度
@@ -1092,9 +1140,11 @@ async function startListening() {
     // 如果开启了节拍器，启动节拍器
     if (metronomeEnabled) {
       startMetronome();
-      feedbackMessage.textContent = `🎯 开始练习：${RHYTHM_PATTERNS[currentRhythm].name} (节拍器：${currentBPM} BPM)`;
+      const activeRhythm = getActiveRhythm(currentRhythm);
+      feedbackMessage.textContent = `🎯 开始练习：${activeRhythm.name} (节拍器：${currentBPM} BPM)`;
     } else {
-      feedbackMessage.textContent = `🎯 开始练习：${RHYTHM_PATTERNS[currentRhythm].name}`;
+      const activeRhythm = getActiveRhythm(currentRhythm);
+      feedbackMessage.textContent = `🎯 开始练习：${activeRhythm.name}`;
     }
     
     // 开始分析循环
@@ -1299,7 +1349,7 @@ function detectStrum(freqData, timeData) {
 
 // 提供实时反馈
 function provideFeedback(strum) {
-  const pattern = RHYTHM_PATTERNS[currentRhythm];
+  const pattern = getActiveRhythm(currentRhythm);
   const expectedInterval = pattern.pattern[expectedStrumIndex];
   
   let feedback = '';
@@ -1355,7 +1405,7 @@ function updateScores() {
     return;
   }
   
-  const pattern = RHYTHM_PATTERNS[currentRhythm];
+  const pattern = getActiveRhythm(currentRhythm);
   
   // 节奏评分 - 改进版
   const rhythmScore = calculateRhythmScore(detectedStrums, pattern);
@@ -1594,7 +1644,7 @@ function updateScoreRing(ringEl, valueEl, score) {
 
 // 保存历史记录
 function saveHistory() {
-  const pattern = RHYTHM_PATTERNS[currentRhythm];
+  const pattern = getActiveRhythm(currentRhythm);
   const totalScore = parseInt(totalScoreEl.textContent) || 0;
   
   const transitionStats = transitionDetector ? transitionDetector.getStats() : null;
@@ -1700,6 +1750,9 @@ function renderStatsChart() {
   const rect = statsChartCanvas.getBoundingClientRect();
   statsChartCanvas.width = rect.width * dpr;
   statsChartCanvas.height = rect.height * dpr;
+  
+  // 重置变换矩阵，防止缩放累积
+  statsChartCtx.setTransform(1, 0, 0, 1, 0, 0);
   statsChartCtx.scale(dpr, dpr);
   
   const width = rect.width;
@@ -2092,52 +2145,8 @@ function selectCustomRhythm(index) {
   const rhythm = customRhythms[index];
   if (!rhythm.notes || rhythm.notes.length === 0) return;
   
-  // 转换为标准节奏型格式（使用标准音符时值）
-  const tempPattern = rhythm.notes.map(note => {
-    const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    // 直接使用标准时值，不乘以倍数
-    return durationMs;
-  });
-  
-  const tempDemo = rhythm.notes.map(note => note.direction);
-  
-  // 临时添加到 RHYTHM_PATTERNS 末尾
-  const tempIndex = RHYTHM_PATTERNS.length;
-  
-  // 生成带时值间隔的 description（与内置节奏型格式一致）
-  const tempDescription = (() => {
-    let result = rhythm.notes[0].direction === 'D' ? '↓' : '↑';
-    for (let i = 1; i < rhythm.notes.length; i++) {
-      const prevDuration = rhythm.notes[i - 1].duration;
-      const currDuration = rhythm.notes[i].duration;
-      const arrow = rhythm.notes[i].direction === 'D' ? '↓' : '↑';
-      
-      const isPrevShort = prevDuration === '16th';
-      const isCurrShort = currDuration === '16th';
-      
-      if (isPrevShort && isCurrShort) {
-        result += arrow;
-      } else if (isPrevShort || isCurrShort) {
-        result += ' ' + arrow;
-      } else {
-        result += '  ' + arrow;
-      }
-    }
-    return result;
-  })();
-  
-  const tempRhythm = {
-    name: rhythm.name,
-    pattern: tempPattern,
-    beats: 4,
-    description: tempDescription,
-    demo: tempDemo,
-    isCustom: true
-  };
-  RHYTHM_PATTERNS.push(tempRhythm);
-  
-  // 选择这个节奏型
-  currentRhythm = tempIndex;
+  // 使用独立索引管理（预设数量 + 自定义索引）
+  currentRhythm = RHYTHM_PATTERNS.length + index;
   
   // 更新 UI 选中状态（包括主列表和自定义列表）
   const options = document.querySelectorAll('.rhythm-option');
@@ -2149,6 +2158,7 @@ function selectCustomRhythm(index) {
     customOption.classList.add('active');
   }
   
+  const tempDemo = rhythm.notes.map(note => note.direction);
   feedbackMessage.textContent = `已选择：${rhythm.name} - ${tempDemo.join(' ')}`;
   
   console.log('[GuitarStrumTrainer] 已选择自定义节奏型:', rhythm.name);
@@ -2225,52 +2235,8 @@ function playCustomRhythmFromList(index, btn) {
     return;
   }
   
-  // 转换为标准节奏型格式（使用标准音符时值）
-  const tempPattern = rhythm.notes.map(note => {
-    const durationMs = NOTE_DURATIONS[note.duration]?.ms || 250;
-    // 直接使用标准时值，不乘以倍数
-    return durationMs;
-  });
-  
-  const tempDemo = rhythm.notes.map(note => note.direction);
-  
-  // 临时添加到 RHYTHM_PATTERNS
-  const tempIndex = RHYTHM_PATTERNS.length;
-  
-  // 生成带时值间隔的 description（与内置节奏型格式一致）
-  const tempDescription = (() => {
-    let result = rhythm.notes[0].direction === 'D' ? '↓' : '↑';
-    for (let i = 1; i < rhythm.notes.length; i++) {
-      const prevDuration = rhythm.notes[i - 1].duration;
-      const currDuration = rhythm.notes[i].duration;
-      const arrow = rhythm.notes[i].direction === 'D' ? '↓' : '↑';
-      
-      const isPrevShort = prevDuration === '16th';
-      const isCurrShort = currDuration === '16th';
-      
-      if (isPrevShort && isCurrShort) {
-        result += arrow;
-      } else if (isPrevShort || isCurrShort) {
-        result += ' ' + arrow;
-      } else {
-        result += '  ' + arrow;
-      }
-    }
-    return result;
-  })();
-  
-  const tempRhythm = {
-    name: rhythm.name,
-    pattern: tempPattern,
-    beats: 4,
-    description: tempDescription,
-    demo: tempDemo,
-    isCustom: true,
-    notes: rhythm.notes  // 传递力度信息
-  };
-  RHYTHM_PATTERNS.push(tempRhythm);
-  
-  console.log('[GuitarStrumTrainer] Custom rhythm tempPattern:', tempPattern, 'currentBPM:', currentBPM);
+  // 使用独立索引管理（预设数量 + 自定义索引）
+  const rhythmIndex = RHYTHM_PATTERNS.length + index;
   
   // 保存真实按钮引用
   playingCustomBtn = btn;
@@ -2283,8 +2249,8 @@ function playCustomRhythmFromList(index, btn) {
     btn.textContent = '⏹ 停止演示';
   }
   
-  // 播放演示 - 传递真实按钮对象
-  playDemo(tempIndex, btn);
+  // 播放演示 - 传递真实按钮对象和节奏索引
+  playDemo(rhythmIndex, btn);
   
   // 播放完成后清理（10 秒后或手动停止）
   const cleanupTimeout = setTimeout(() => {
@@ -2480,7 +2446,8 @@ function loadUserSettings() {
     }
     
     // 恢复节奏型选择
-    if (settings.currentRhythm !== undefined && settings.currentRhythm < RHYTHM_PATTERNS.length) {
+    const maxRhythmIndex = RHYTHM_PATTERNS.length + customRhythms.length;
+    if (settings.currentRhythm !== undefined && settings.currentRhythm < maxRhythmIndex) {
       currentRhythm = settings.currentRhythm;
       const options = document.querySelectorAll('.rhythm-option');
       options.forEach((o, i) => {
@@ -3046,29 +3013,39 @@ function drawChordDiagram(canvas, chordName) {
     return;
   }
   
-  try {
-    // 使用 chordictionary 生成 SVG
-    const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
-    
-    // 将 SVG 转换为图片并绘制到 Canvas
-    const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-    
-    img.onload = () => {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-    };
-    
-    img.onerror = () => {
-      // SVG 加载失败，使用备用 Canvas 绘制
-      drawChordDiagramFallback(canvas, chordName);
-      URL.revokeObjectURL(url);
-    };
-    
-    img.src = url;
+    try {
+      // 释放旧的 Blob URL（防止内存泄漏）
+      if (_chordDiagramBlobUrl) {
+        URL.revokeObjectURL(_chordDiagramBlobUrl);
+        _chordDiagramBlobUrl = null;
+      }
+
+      // 使用 chordictionary 生成 SVG
+      const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
+      
+      // 将 SVG 转换为图片并绘制到 Canvas
+      const img = new Image();
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      _chordDiagramBlobUrl = URL.createObjectURL(svgBlob);
+      
+      img.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(_chordDiagramBlobUrl);
+        _chordDiagramBlobUrl = null;
+      };
+      
+      img.onerror = () => {
+        // SVG 加载失败，使用备用 Canvas 绘制
+        drawChordDiagramFallback(canvas, chordName);
+        if (_chordDiagramBlobUrl) {
+          URL.revokeObjectURL(_chordDiagramBlobUrl);
+          _chordDiagramBlobUrl = null;
+        }
+      };
+      
+      img.src = _chordDiagramBlobUrl;
   } catch (e) {
     console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
     drawChordDiagramFallback(canvas, chordName);

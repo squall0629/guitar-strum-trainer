@@ -1431,12 +1431,48 @@
   
   <!-- Chart.js for trend charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Chart.js CDN fallback
+    if (typeof Chart === 'undefined') {
+      console.warn('[GuitarStrumTrainer] Chart.js CDN 加载失败，尝试备用 CDN');
+      var chartFallback = document.createElement('script');
+      chartFallback.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
+      chartFallback.onerror = function() {
+        console.error('[GuitarStrumTrainer] Chart.js 所有 CDN 均加载失败，图表功能不可用');
+      };
+      document.head.appendChild(chartFallback);
+    }
+  </script>
   
   <!-- SoundFont Player for real guitar samples -->
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+  <script>
+    // SoundFont Player CDN fallback
+    if (typeof window.Soundfont === 'undefined') {
+      console.warn('[GuitarStrumTrainer] SoundFont Player CDN 加载失败，尝试备用 CDN');
+      var sfFallback = document.createElement('script');
+      sfFallback.src = 'https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js';
+      sfFallback.onerror = function() {
+        console.warn('[GuitarStrumTrainer] SoundFont Player 所有 CDN 均加载失败，将使用合成音色');
+      };
+      document.head.appendChild(sfFallback);
+    }
+  </script>
   
   <!-- Tonal.js for chord theory -->
   <script src="https://cdn.jsdelivr.net/npm/tonal@6.4.3/browser/tonal.min.js"></script>
+  <script>
+    // Tonal.js CDN fallback
+    if (typeof window.Tonal === 'undefined' && typeof tonal === 'undefined') {
+      console.warn('[GuitarStrumTrainer] Tonal.js CDN 加载失败，尝试备用 CDN');
+      var tonalFallback = document.createElement('script');
+      tonalFallback.src = 'https://unpkg.com/tonal@6.4.3/browser/tonal.min.js';
+      tonalFallback.onerror = function() {
+        console.error('[GuitarStrumTrainer] Tonal.js 所有 CDN 均加载失败，和弦理论功能不可用');
+      };
+      document.head.appendChild(tonalFallback);
+    }
+  </script>
   
   <!-- Chord Library -->
   <script src="chord-library.js"></script>
