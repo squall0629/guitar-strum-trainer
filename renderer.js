@@ -449,35 +449,6 @@ function stopMetronome() {
   }
 }
 
-// 播放节拍器声音 - 保留原有简洁的电子滴答声
-// 与扫弦音色区分开，使用纯 sine 波确保节拍器声音清晰可辨
-function playMetronomeSound(frequency = 1000, duration = 0.05) {
-  if (!audioContextForMetronome) {
-    audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  
-  // 移动端修复：确保 AudioContext 已恢复
-  if (audioContextForMetronome.state === 'suspended') {
-    audioContextForMetronome.resume().catch(err => {
-      console.warn('[GuitarStrumTrainer] AudioContext resume failed:', err);
-    });
-  }
-  
-  const oscillator = audioContextForMetronome.createOscillator();
-  const gainNode = audioContextForMetronome.createGain();
-  
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContextForMetronome.destination);
-  
-  oscillator.frequency.value = frequency;
-  oscillator.type = 'sine';
-  
-  gainNode.gain.setValueAtTime(0.3, audioContextForMetronome.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextForMetronome.currentTime + duration);
-  
-  oscillator.start(audioContextForMetronome.currentTime);
-  oscillator.stop(audioContextForMetronome.currentTime + duration);
-}
 
 // 播放节奏型演示 - 循环播放版本
 async function playDemo(rhythmIndex, btnElement) {
@@ -2787,7 +2758,7 @@ function setupChordTraining() {
       const index = parseInt(progressionSelect.value);
       if (window.ChordLibrary.COMMON_PROGRESSIONS[index]) {
         currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[index].chords;
-        updateChordDisplay();
+        updateChordProgressionDisplay();
         console.log('[ChordTraining] 预设进行已选择:', currentProgression);
       }
     });
@@ -2814,7 +2785,7 @@ function setupChordTraining() {
       currentProgression = [];
       currentChordIndex = 0;
       renderSelectedChords();
-      updateChordDisplay();
+      updateChordProgressionDisplay();
     });
   }
   
@@ -2847,10 +2818,10 @@ function setTrainingMode(mode) {
   // 自由练习模式不需要预设
   if (mode === 'free') {
     currentProgression = [];
-    updateChordDisplay();
+    updateChordProgressionDisplay();
   } else if (mode === 'preset' && window.ChordLibrary.COMMON_PROGRESSIONS[0]) {
     currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
-    updateChordDisplay();
+    updateChordProgressionDisplay();
   }
   
   console.log('[ChordTraining] 训练模式已切换:', mode);
@@ -2866,7 +2837,7 @@ function addChordToProgression(chordName) {
   }
   currentProgression.push(chordName);
   renderSelectedChords();
-  updateChordDisplay();
+  updateChordProgressionDisplay();
 }
 
 /**
@@ -2896,7 +2867,7 @@ window.removeChordFromProgression = function(index) {
   if (currentProgression && index >= 0 && index < currentProgression.length) {
     currentProgression.splice(index, 1);
     renderSelectedChords();
-    updateChordDisplay();
+    updateChordProgressionDisplay();
   }
 };
 
@@ -2928,7 +2899,7 @@ function saveCustomProgression() {
 /**
  * 更新和弦显示
  */
-function updateChordDisplay() {
+function updateChordProgressionDisplay() {
   if (!currentChordDisplay || !nextChordDisplay) return;
   
   if (currentProgression.length === 0 || currentTrainingMode === 'free') {
@@ -3196,7 +3167,7 @@ function processChordRecognition() {
         if (lastRecognizedChord !== expectedChord) {
           // 新的和弦被正确识别
           currentChordIndex = (currentChordIndex + 1) % currentProgression.length;
-          updateChordDisplay();
+          updateChordProgressionDisplay();
           
           // 显示转换时间
           const stats = transitionDetector.getStats();
@@ -3238,7 +3209,7 @@ function resetChordTraining() {
   if (transitionDetector) {
     transitionDetector.reset();
   }
-  updateChordDisplay();
+  updateChordProgressionDisplay();
   updateChordRecognition(null);
   updateTransitionTime(null);
 }
@@ -3491,3 +3462,5 @@ window.guitarTrainer = {
   getStats: getChordTrainingStats,
   setTrainingMode: setTrainingMode
 };
+}
+
