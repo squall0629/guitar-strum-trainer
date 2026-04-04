@@ -1414,7 +1414,7 @@ function calculateRhythmScore(strums, pattern) {
     
     // 使用高斯衰减函数，提供更平滑的评分
     // σ = 0.15 表示 15% 偏差时得分约 60 分
-    const sigma = 0.15;
+    const sigma = 0.25;
     const score = 100 * Math.exp(-(deviationPercent * deviationPercent) / (2 * sigma * sigma));
     
     totalScore += Math.max(0, Math.min(100, score));
@@ -1445,8 +1445,8 @@ function calculateToneScore(strums) {
     
     // 使用范围评分而非单点评分
     // 理想范围: 60-200 (更宽容)
-    const idealMin = 60;
-    const idealMax = 200;
+    const idealMin = 10;
+    const idealMax = 50;
     const idealCenter = (idealMin + idealMax) / 2;
     const range = (idealMax - idealMin) / 2;
     
