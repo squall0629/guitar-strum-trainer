@@ -3014,38 +3014,30 @@ function drawChordDiagram(canvas, chordName) {
   }
   
     try {
-      // 释放旧的 Blob URL（防止内存泄漏）
-      if (_chordDiagramBlobUrl) {
-        URL.revokeObjectURL(_chordDiagramBlobUrl);
-        _chordDiagramBlobUrl = null;
-      }
-
       // 使用 chordictionary 生成 SVG
       const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
       
       // 将 SVG 转换为图片并绘制到 Canvas
       const img = new Image();
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      _chordDiagramBlobUrl = URL.createObjectURL(svgBlob);
+      const blobUrl = URL.createObjectURL(svgBlob);
       
       img.onload = () => {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        URL.revokeObjectURL(_chordDiagramBlobUrl);
-        _chordDiagramBlobUrl = null;
+        // 延迟释放 Blob URL，确保浏览器完成绘制
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       };
       
       img.onerror = () => {
+        console.warn('[ChordDiagram] SVG 加载失败，使用备用方案');
         // SVG 加载失败，使用备用 Canvas 绘制
         drawChordDiagramFallback(canvas, chordName);
-        if (_chordDiagramBlobUrl) {
-          URL.revokeObjectURL(_chordDiagramBlobUrl);
-          _chordDiagramBlobUrl = null;
-        }
+        URL.revokeObjectURL(blobUrl);
       };
       
-      img.src = _chordDiagramBlobUrl;
+      img.src = blobUrl;
   } catch (e) {
     console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
     drawChordDiagramFallback(canvas, chordName);
