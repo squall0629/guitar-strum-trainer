@@ -157,6 +157,36 @@ let practiceModeRhythm, practiceModeComprehensive, practiceModeDescription;
 const APP_VERSION = 'v1.8';
 
 // 初始化
+function setupPracticeReport() {
+  const btnClose1 = document.getElementById('btnCloseReport');
+  const btnClose2 = document.getElementById('btnCloseReport2');
+  const modal = document.getElementById('practiceReportModal');
+  
+  if (btnClose1) {
+    btnClose1.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+  
+  if (btnClose2) {
+    btnClose2.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+  
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  }
+}
+
+/**
+ * 显示练习报告弹窗
+ */
+function showPracticeReport() {
 function init() {
   console.log(`[GuitarStrumTrainer] ${APP_VERSION} 开始初始化...`);
   
@@ -3228,36 +3258,6 @@ function getChordTrainingStats() {
 /**
  * 设置练习报告模态框
  */
-function setupPracticeReport() {
-  const btnClose1 = document.getElementById('btnCloseReport');
-  const btnClose2 = document.getElementById('btnCloseReport2');
-  const modal = document.getElementById('practiceReportModal');
-  
-  if (btnClose1) {
-    btnClose1.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-  }
-  
-  if (btnClose2) {
-    btnClose2.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-  }
-  
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        modal.style.display = 'none';
-      }
-    });
-  }
-}
-
-/**
- * 显示练习报告弹窗
- */
-function showPracticeReport() {
   if (!practiceReportModal) return;
   
   const duration = practiceStartTime > 0 ? Math.round((Date.now() - practiceStartTime) / 1000) : 0;
