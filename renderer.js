@@ -187,6 +187,55 @@ function setupPracticeReport() {
  * 显示练习报告弹窗
  */
 function showPracticeReport() {
+  if (!practiceReportModal) return;
+  
+  const duration = practiceStartTime > 0 ? Math.round((Date.now() - practiceStartTime) / 1000) : 0;
+  
+  const transitionStats = transitionDetector ? transitionDetector.getStats() : null;
+  const transitionCount = transitionStats ? transitionStats.transitionCount : 0;
+  const avgTransitionTime = transitionStats ? Math.round(transitionStats.avgTransitionTime) : 0;
+  
+  const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
+  
+  const bestTransition = practiceTransitionTimes.length > 0 ? Math.min(...practiceTransitionTimes) : null;
+  const worstTransition = practiceTransitionTimes.length > 0 ? Math.max(...practiceTransitionTimes) : null;
+  
+  const fluencyScore = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
+  const totalScore = parseInt(totalScoreEl.textContent) || 0;
+  
+  const reportTransitionsEl = document.getElementById('reportTransitions');
+  const reportAvgTimeEl = document.getElementById('reportAvgTime');
+  const reportAccuracyEl = document.getElementById('reportAccuracy');
+  const reportFluencyEl = document.getElementById('reportFluency');
+  const reportBestEl = document.getElementById('reportBestTransition');
+  const reportWorstEl = document.getElementById('reportWorstTransition');
+  
+  document.getElementById('reportDuration').textContent = duration + 's';
+  document.getElementById('reportTotalScore').textContent = totalScore;
+  
+  if (practiceMode === 'comprehensive') {
+    reportTransitionsEl.textContent = transitionCount;
+    reportAvgTimeEl.textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
+    reportAccuracyEl.textContent = accuracy > 0 ? accuracy + '%' : '--';
+    reportFluencyEl.textContent = fluencyScore > 0 ? fluencyScore : '--';
+    
+    reportBestEl.textContent = bestTransition !== null ? Math.round(bestTransition) + 'ms' : '--';
+    reportWorstEl.textContent = worstTransition !== null ? Math.round(worstTransition) + 'ms' : '--';
+  } else {
+    reportTransitionsEl.textContent = '--';
+    reportAvgTimeEl.textContent = '--';
+    reportAccuracyEl.textContent = '--';
+    reportFluencyEl.textContent = '--';
+    
+    reportBestEl.textContent = '--';
+    reportWorstEl.textContent = '--';
+  }
+  
+  renderTrendCharts();
+  
+  practiceReportModal.style.display = 'block';
+}
+
 function init() {
   console.log(`[GuitarStrumTrainer] ${APP_VERSION} 开始初始化...`);
   
@@ -3251,63 +3300,6 @@ function getChordTrainingStats() {
   if (!transitionDetector) return null;
   
   return transitionDetector.getStats();
-}
-
-// ========== 练习报告功能 ==========
-
-/**
- * 设置练习报告模态框
- */
-  if (!practiceReportModal) return;
-  
-  const duration = practiceStartTime > 0 ? Math.round((Date.now() - practiceStartTime) / 1000) : 0;
-  
-  const transitionStats = transitionDetector ? transitionDetector.getStats() : null;
-  const transitionCount = transitionStats ? transitionStats.transitionCount : 0;
-  const avgTransitionTime = transitionStats ? Math.round(transitionStats.avgTransitionTime) : 0;
-  
-  const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
-  
-  const bestTransition = practiceTransitionTimes.length > 0 ? Math.min(...practiceTransitionTimes) : null;
-  const worstTransition = practiceTransitionTimes.length > 0 ? Math.max(...practiceTransitionTimes) : null;
-  
-  const fluencyScore = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
-  const totalScore = parseInt(totalScoreEl.textContent) || 0;
-  
-  // 根据练习模式显示不同报告内容
-  const reportTransitionsEl = document.getElementById('reportTransitions');
-  const reportAvgTimeEl = document.getElementById('reportAvgTime');
-  const reportAccuracyEl = document.getElementById('reportAccuracy');
-  const reportFluencyEl = document.getElementById('reportFluency');
-  const reportBestEl = document.getElementById('reportBestTransition');
-  const reportWorstEl = document.getElementById('reportWorstTransition');
-  
-  document.getElementById('reportDuration').textContent = duration + 's';
-  document.getElementById('reportTotalScore').textContent = totalScore;
-  
-  if (practiceMode === 'comprehensive') {
-    // 综合模式：显示完整和弦相关指标
-    reportTransitionsEl.textContent = transitionCount;
-    reportAvgTimeEl.textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
-    reportAccuracyEl.textContent = accuracy > 0 ? accuracy + '%' : '--';
-    reportFluencyEl.textContent = fluencyScore > 0 ? fluencyScore : '--';
-    
-    reportBestEl.textContent = bestTransition !== null ? Math.round(bestTransition) + 'ms' : '--';
-    reportWorstEl.textContent = worstTransition !== null ? Math.round(worstTransition) + 'ms' : '--';
-  } else {
-    // 纯节奏模式：隐藏和弦相关指标，显示节奏相关指标
-    reportTransitionsEl.textContent = '--';
-    reportAvgTimeEl.textContent = '--';
-    reportAccuracyEl.textContent = '--';
-    reportFluencyEl.textContent = '--';
-    
-    reportBestEl.textContent = '--';
-    reportWorstEl.textContent = '--';
-  }
-  
-  renderTrendCharts();
-  
-  practiceReportModal.style.display = 'block';
 }
 
 /**
