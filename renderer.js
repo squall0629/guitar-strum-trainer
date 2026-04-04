@@ -1,9 +1,4 @@
 // 吉他扫弦练习助手 - 核心音频分析引擎 v2.1
-// iOS Safari 兼容性支持
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-const isIOSafari = isIOS && isSafari;
-
 // 新增和弦识别与转换训练功能
 
 // ========== 和弦识别模块 ==========
@@ -1052,12 +1047,6 @@ async function startListening() {
     
     // 创建音频上下文
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // iOS Safari 兼容性：恢复 AudioContext
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
-    }
-    
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 2048;
     analyser.smoothingTimeConstant = 0.5;  // 降低平滑常数，提高响应速度
@@ -3465,4 +3454,5 @@ window.guitarTrainer = {
   getStats: getChordTrainingStats,
   setTrainingMode: setTrainingMode
 };
+}
 
