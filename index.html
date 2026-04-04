@@ -1048,6 +1048,94 @@
         min-width: 44px;
         padding: 10px !important;
       }
+
+      /* ===== Mode buttons: vertical stack on phone ===== */
+      .panel > div[style*="display: flex"][style*="gap: 15px"],
+      .panel > div[style*="display: flex; gap: 15px"] {
+        flex-direction: column !important;
+      }
+
+      .mode-btn {
+        width: 100% !important;
+        min-height: 50px !important;
+        font-size: 1em !important;
+        padding: 14px 16px !important;
+      }
+
+      /* ===== Chord select buttons: optimize touch area ===== */
+      .chord-select-btn {
+        min-height: 48px !important;
+        min-width: 48px !important;
+        padding: 10px 16px !important;
+        font-size: 1.05em !important;
+        flex: 0 1 auto !important;
+      }
+
+      .chord-select-btn:active {
+        transform: scale(0.95);
+      }
+
+      /* ===== Chord display: single column on phone ===== */
+      .panel > div[style*="grid-template-columns: 1fr 100px 1fr"] {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+      }
+
+      /* Arrow between chords: rotate for vertical layout */
+      .panel > div[style*="grid-template-columns: 1fr 100px 1fr"] > div:nth-child(2) {
+        transform: rotate(90deg);
+        font-size: 1.5em !important;
+      }
+
+      /* Chord diagrams: larger on phone */
+      canvas#currentChordDiagram,
+      canvas#nextChordDiagram {
+        width: 150px !important;
+        height: 170px !important;
+      }
+
+      /* Save/Clear buttons full width */
+      #customChordSelector > div:last-child {
+        flex-direction: column !important;
+      }
+
+      #btnSaveProgression,
+      #btnClearProgression {
+        width: 100% !important;
+        min-height: 48px !important;
+      }
+
+      /* Practice mode description */
+      #practiceModeDescription {
+        font-size: 0.9em !important;
+        line-height: 1.5 !important;
+      }
+
+      /* Report modal grid: single column */
+      #practiceReportModal > div > div:first-child {
+        flex-direction: column !important;
+        gap: 10px !important;
+      }
+
+      #practiceReportModal > div > div:nth-child(2) {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+      }
+
+      #practiceReportModal > div > div:nth-child(3) {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+      }
+
+      #practiceReportModal > div > div:nth-child(4) {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+      }
+
+      /* Report modal close button */
+      #btnCloseReport2 {
+        min-height: 48px !important;
+      }
     }
   </style>
 </head>
