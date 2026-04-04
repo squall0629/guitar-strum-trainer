@@ -106,8 +106,8 @@ let strumThreshold = 0.15; // 根据灵敏度动态计算
 function updateThreshold() {
   // 灵敏度 1-100 映射到阈值 0.50-0.08 (更宽松的范围，更容易触发)
   // 灵敏度越高，阈值越低（更容易触发）
-  strumThreshold = 0.50 - (sensitivityLevel - 1) * (0.42 / 99);
-  strumThreshold = Math.max(0.08, Math.min(0.50, strumThreshold));
+  strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.28 / 99);
+  strumThreshold = Math.max(0.02, Math.min(0.30, strumThreshold));
   
   const thresholdDisplay = document.getElementById('thresholdDisplay');
   if (thresholdDisplay) {
