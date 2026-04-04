@@ -16,6 +16,12 @@ let chordRecognitionEnabled = false; // 是否启用和弦识别
 let lastRecognizedChord = null; // 上次识别的和弦
 let chordChangeTimeout = null; // 和弦转换计时器
 
+// 练习数据统计
+let practiceStartTime = 0; // 练习开始时间
+let practiceChordCorrect = 0; // 和弦识别正确次数
+let practiceChordTotal = 0; // 和弦识别总次数
+let practiceTransitionTimes = []; // 每次转换的时间记录
+
 // ========== 真实吉他音源 (FluidR3 GM - Acoustic Guitar Steel String) ==========
 // 使用 soundfont-player 加载 FluidR3 GM 音源，CC0 授权免费商用
 let guitarSoundfont = null;
@@ -126,6 +132,9 @@ let metronomeToggle, bpmSlider, bpmValue, demoButtons, metronomeDot;
 let sensitivitySlider, sensitivityValueEl, thresholdDisplay, volumeMeterFill;
 let statsChartCanvas, statsChartCtx, avgScoreEl, maxScoreEl, practiceCountEl;
 let btnAddRhythm, btnMicTest;
+let practiceReportModal;
+let accuracyTrendChartInstance = null;
+let transitionTimeTrendChartInstance = null;
 
 // 和弦训练 DOM 元素
 let modeButtons, modePreset, modeCustom, modeFree;
@@ -203,6 +212,7 @@ function init() {
   progressionProgress = document.getElementById('progressionProgress');
   btnSaveProgression = document.getElementById('btnSaveProgression');
   btnClearProgression = document.getElementById('btnClearProgression');
+  practiceReportModal = document.getElementById('practiceReportModal');
   
   console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
@@ -235,6 +245,9 @@ function init() {
   
   // 初始化图表折叠功能
   setupChartToggle();
+  
+  // 初始化练习报告模态框
+  setupPracticeReport();
   
   console.log('[GuitarStrumTrainer] 初始化完成');
 }
@@ -985,6 +998,12 @@ async function startListening() {
     lastStrumTime = 0;
     expectedStrumIndex = 0;
     
+    // 重置练习数据统计
+    practiceStartTime = Date.now();
+    practiceChordCorrect = 0;
+    practiceChordTotal = 0;
+    practiceTransitionTimes = [];
+    
     // 初始化和弦检测器
     initChordDetector();
     resetChordTraining();
@@ -1051,6 +1070,11 @@ function stopListening() {
   // 保存历史记录
   if (detectedStrums.length > 0) {
     saveHistory();
+  }
+  
+  // 显示练习报告
+  if (detectedStrums.length > 0) {
+    showPracticeReport();
   }
   
   // 显示和弦训练统计
@@ -1476,6 +1500,17 @@ function saveHistory() {
   const pattern = RHYTHM_PATTERNS[currentRhythm];
   const totalScore = parseInt(totalScoreEl.textContent) || 0;
   
+  const transitionStats = transitionDetector ? transitionDetector.getStats() : null;
+  const transitionCount = transitionStats ? transitionStats.transitionCount : 0;
+  const avgTransitionTime = transitionStats ? Math.round(transitionStats.avgTransitionTime) : 0;
+  
+  const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
+  
+  const bestTransition = practiceTransitionTimes.length > 0 ? Math.round(Math.min(...practiceTransitionTimes)) : 0;
+  const worstTransition = practiceTransitionTimes.length > 0 ? Math.round(Math.max(...practiceTransitionTimes)) : 0;
+  
+  const duration = practiceStartTime > 0 ? Math.round((Date.now() - practiceStartTime) / 1000) : 0;
+  
   const historyItem = {
     date: new Date().toISOString(),
     time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
@@ -1486,7 +1521,14 @@ function saveHistory() {
     toneScore: parseInt(toneScoreEl.textContent) || 0,
     dynamicsScore: parseInt(dynamicsScoreEl.textContent) || 0,
     strums: detectedStrums.length,
-    bpm: currentBPM
+    bpm: currentBPM,
+    mode: currentTrainingMode,
+    chordAccuracy: accuracy,
+    avgTransitionTime: avgTransitionTime,
+    transitionCount: transitionCount,
+    bestTransition: bestTransition,
+    worstTransition: worstTransition,
+    duration: duration
   };
   
   strumHistory.unshift(historyItem);
@@ -1520,12 +1562,17 @@ function loadHistoryFromStorage() {
 
 // 渲染历史记录
 function renderHistory() {
-  historyList.innerHTML = strumHistory.map(item => `
-    <div class="history-item">
-      <span class="time">${item.time} - ${item.rhythm}</span>
-      <span class="score">${item.score}分 (${item.strums}次扫弦)</span>
-    </div>
-  `).join('');
+  historyList.innerHTML = strumHistory.map(item => {
+    const modeLabel = item.mode === 'preset' ? '📖' : item.mode === 'custom' ? '✏️' : item.mode === 'free' ? '🎸' : '';
+    const accuracyInfo = item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
+    const transTimeInfo = item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
+    return `
+      <div class="history-item">
+        <span class="time">${item.time} - ${item.rhythm} ${modeLabel}</span>
+        <span class="score">${item.score}分 (${item.strums}次扫弦${accuracyInfo}${transTimeInfo})</span>
+      </div>
+    `;
+  }).join('');
 }
 
 // 窗口大小改变时调整画布
@@ -3027,13 +3074,26 @@ function processChordRecognition() {
     // 更新识别显示
     updateChordRecognition(result);
     
-    // 在训练模式下检查是否匹配期望和弦
-    if (currentTrainingMode !== 'free' && expectedChord) {
-      const isCorrect = result.chord === expectedChord;
+      // 在训练模式下检查是否匹配期望和弦
+      if (currentTrainingMode !== 'free' && expectedChord) {
+        const isCorrect = result.chord === expectedChord;
+        
+        // 记录和弦识别统计
+        practiceChordTotal++;
+        if (isCorrect) {
+          practiceChordCorrect++;
+        }
       
-      // 检测和弦转换
-      if (transitionDetector) {
-        transitionDetector.onChordDetected(result.chord, expectedChord, Date.now());
+        // 检测和弦转换
+        if (transitionDetector) {
+          transitionDetector.onChordDetected(result.chord, expectedChord, Date.now());
+          
+          // 记录转换时间到练习数据
+          const stats = transitionDetector.getStats();
+          if (stats.transitionCount > 0) {
+            const lastTransition = stats.transitions[stats.transitionCount - 1];
+            practiceTransitionTimes.push(lastTransition.time);
+          }
         
         // 如果识别正确且是当前期望和弦，更新进度
         if (isCorrect && result.chord === expectedChord) {
@@ -3094,6 +3154,225 @@ function getChordTrainingStats() {
   if (!transitionDetector) return null;
   
   return transitionDetector.getStats();
+}
+
+// ========== 练习报告功能 ==========
+
+/**
+ * 设置练习报告模态框
+ */
+function setupPracticeReport() {
+  const btnClose1 = document.getElementById('btnCloseReport');
+  const btnClose2 = document.getElementById('btnCloseReport2');
+  const modal = document.getElementById('practiceReportModal');
+  
+  if (btnClose1) {
+    btnClose1.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+  
+  if (btnClose2) {
+    btnClose2.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+  
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    });
+  }
+}
+
+/**
+ * 显示练习报告弹窗
+ */
+function showPracticeReport() {
+  if (!practiceReportModal) return;
+  
+  const duration = practiceStartTime > 0 ? Math.round((Date.now() - practiceStartTime) / 1000) : 0;
+  
+  const transitionStats = transitionDetector ? transitionDetector.getStats() : null;
+  const transitionCount = transitionStats ? transitionStats.transitionCount : 0;
+  const avgTransitionTime = transitionStats ? Math.round(transitionStats.avgTransitionTime) : 0;
+  
+  const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
+  
+  const bestTransition = practiceTransitionTimes.length > 0 ? Math.min(...practiceTransitionTimes) : null;
+  const worstTransition = practiceTransitionTimes.length > 0 ? Math.max(...practiceTransitionTimes) : null;
+  
+  const fluencyScore = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
+  const totalScore = parseInt(totalScoreEl.textContent) || 0;
+  
+  document.getElementById('reportDuration').textContent = duration + 's';
+  document.getElementById('reportTransitions').textContent = transitionCount;
+  document.getElementById('reportAvgTime').textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
+  document.getElementById('reportAccuracy').textContent = accuracy > 0 ? accuracy + '%' : '--';
+  document.getElementById('reportFluency').textContent = fluencyScore > 0 ? fluencyScore : '--';
+  document.getElementById('reportTotalScore').textContent = totalScore;
+  
+  if (bestTransition !== null) {
+    document.getElementById('reportBestTransition').textContent = Math.round(bestTransition) + 'ms';
+  } else {
+    document.getElementById('reportBestTransition').textContent = '--';
+  }
+  
+  if (worstTransition !== null) {
+    document.getElementById('reportWorstTransition').textContent = Math.round(worstTransition) + 'ms';
+  } else {
+    document.getElementById('reportWorstTransition').textContent = '--';
+  }
+  
+  renderTrendCharts();
+  
+  practiceReportModal.style.display = 'block';
+}
+
+/**
+ * 计算流畅度评分
+ */
+function calculateFluencyScore(avgTime, transitions, duration) {
+  if (transitions.length === 0 || duration === 0) return 0;
+  
+  let timeScore = 0;
+  if (avgTime > 0) {
+    if (avgTime < 300) {
+      timeScore = 100;
+    } else if (avgTime < 500) {
+      timeScore = 100 - ((avgTime - 300) / 200) * 30;
+    } else if (avgTime < 1000) {
+      timeScore = 70 - ((avgTime - 500) / 500) * 40;
+    } else {
+      timeScore = Math.max(0, 30 - ((avgTime - 1000) / 1000) * 30);
+    }
+  }
+  
+  let consistencyScore = 0;
+  if (transitions.length > 1) {
+    const mean = transitions.reduce((a, b) => a + b, 0) / transitions.length;
+    const variance = transitions.reduce((sum, t) => sum + Math.pow(t - mean, 2), 0) / transitions.length;
+    const stdDev = Math.sqrt(variance);
+    const cv = mean > 0 ? stdDev / mean : 0;
+    consistencyScore = Math.max(0, 100 * Math.exp(-cv * 2));
+  }
+  
+  return Math.round(timeScore * 0.6 + consistencyScore * 0.4);
+}
+
+/**
+ * 渲染趋势图表（使用 Chart.js）
+ */
+function renderTrendCharts() {
+  if (typeof Chart === 'undefined') {
+    console.warn('[GuitarStrumTrainer] Chart.js 未加载，跳过趋势图表');
+    return;
+  }
+  
+  const recentHistory = strumHistory.slice(0, 10).reverse();
+  
+  if (recentHistory.length === 0) {
+    return;
+  }
+  
+  const labels = recentHistory.map((_, i) => `#${i + 1}`);
+  const accuracies = recentHistory.map(h => h.chordAccuracy || 0);
+  const avgTimes = recentHistory.map(h => h.avgTransitionTime || 0);
+  
+  if (accuracyTrendChartInstance) {
+    accuracyTrendChartInstance.destroy();
+  }
+  
+  const accuracyCtx = document.getElementById('accuracyTrendChart');
+  if (accuracyCtx) {
+    accuracyTrendChartInstance = new Chart(accuracyCtx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '和弦准确率 (%)',
+          data: accuracies,
+          borderColor: '#2ed573',
+          backgroundColor: 'rgba(46, 213, 115, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointBackgroundColor: '#2ed573',
+          pointBorderColor: '#1a1a2e',
+          pointBorderWidth: 2,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#888' }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#666' },
+            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+          },
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { color: '#666' },
+            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+          }
+        }
+      }
+    });
+  }
+  
+  if (transitionTimeTrendChartInstance) {
+    transitionTimeTrendChartInstance.destroy();
+  }
+  
+  const timeCtx = document.getElementById('transitionTimeTrendChart');
+  if (timeCtx) {
+    transitionTimeTrendChartInstance = new Chart(timeCtx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '平均转换时间 (ms)',
+          data: avgTimes,
+          borderColor: '#ffa502',
+          backgroundColor: 'rgba(255, 165, 2, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointBackgroundColor: '#ffa502',
+          pointBorderColor: '#1a1a2e',
+          pointBorderWidth: 2,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#888' }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#666' },
+            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+          },
+          y: {
+            min: 0,
+            ticks: { color: '#666' },
+            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+          }
+        }
+      }
+    });
+  }
 }
 
 // 导出到全局作用域以便调试

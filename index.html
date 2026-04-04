@@ -1237,6 +1237,9 @@
     </div>
   </div>
   
+  <!-- Chart.js for trend charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <!-- SoundFont Player for real guitar samples -->
   <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
   
@@ -1282,6 +1285,75 @@
     <div style="display: flex; gap: 10px; margin-top: 20px;">
       <button id="btnSaveRhythm" style="flex: 1; padding: 12px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">💾 保存节奏型</button>
       <button id="btnCancelEdit" style="flex: 1; padding: 12px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">❌ 取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 练习报告模态框 -->
+<div id="practiceReportModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; overflow-y: auto;">
+  <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); margin: 30px auto; padding: 30px; border-radius: 15px; max-width: 700px; border: 1px solid rgba(184, 102, 255, 0.3); color: #fff;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+      <h2 style="color: #b866ff; margin: 0;">📊 练习报告</h2>
+      <button id="btnCloseReport" style="background: none; border: none; color: #888; font-size: 1.5em; cursor: pointer; padding: 5px 10px;">✕</button>
+    </div>
+    
+    <!-- 核心指标 -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+      <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center;">
+        <div style="color: #888; font-size: 0.85em; margin-bottom: 5px;">练习时长</div>
+        <div id="reportDuration" style="font-size: 1.8em; font-weight: bold; color: #00d9ff;">--</div>
+      </div>
+      <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center;">
+        <div style="color: #888; font-size: 0.85em; margin-bottom: 5px;">和弦转换次数</div>
+        <div id="reportTransitions" style="font-size: 1.8em; font-weight: bold; color: #2ed573;">--</div>
+      </div>
+      <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center;">
+        <div style="color: #888; font-size: 0.85em; margin-bottom: 5px;">平均转换时间</div>
+        <div id="reportAvgTime" style="font-size: 1.8em; font-weight: bold; color: #ffa502;">--</div>
+      </div>
+    </div>
+    
+    <!-- 评分指标 -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+      <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center;">
+        <div style="color: #888; font-size: 0.85em; margin-bottom: 5px;">和弦准确率</div>
+        <div id="reportAccuracy" style="font-size: 1.8em; font-weight: bold; color: #2ed573;">--</div>
+      </div>
+      <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center;">
+        <div style="color: #888; font-size: 0.85em; margin-bottom: 5px;">流畅度评分</div>
+        <div id="reportFluency" style="font-size: 1.8em; font-weight: bold; color: #b866ff;">--</div>
+      </div>
+      <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; text-align: center;">
+        <div style="color: #888; font-size: 0.85em; margin-bottom: 5px;">综合得分</div>
+        <div id="reportTotalScore" style="font-size: 1.8em; font-weight: bold; color: #00d9ff;">--</div>
+      </div>
+    </div>
+    
+    <!-- 最佳/最差转换 -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+      <div style="background: rgba(46, 213, 115, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(46, 213, 115, 0.3);">
+        <div style="color: #2ed573; font-size: 0.9em; margin-bottom: 5px;">⚡ 最佳转换</div>
+        <div id="reportBestTransition" style="font-size: 1.4em; font-weight: bold;">--</div>
+      </div>
+      <div style="background: rgba(255, 71, 87, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(255, 71, 87, 0.3);">
+        <div style="color: #ff4757; font-size: 0.9em; margin-bottom: 5px;">⏱ 最差转换</div>
+        <div id="reportWorstTransition" style="font-size: 1.4em; font-weight: bold;">--</div>
+      </div>
+    </div>
+    
+    <!-- 趋势图表 -->
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #b866ff; font-size: 1.1em; margin-bottom: 15px;">📈 最近 10 次练习趋势</h3>
+      <div style="height: 200px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 10px; margin-bottom: 10px;">
+        <canvas id="accuracyTrendChart"></canvas>
+      </div>
+      <div style="height: 200px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 10px;">
+        <canvas id="transitionTimeTrendChart"></canvas>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+      <button id="btnCloseReport2" style="flex: 1; padding: 12px; background: linear-gradient(135deg, #b866ff 0%, #8a3fd4 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: bold;">关闭</button>
     </div>
   </div>
 </div>
