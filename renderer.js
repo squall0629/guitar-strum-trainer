@@ -473,14 +473,18 @@ function init() {
   historyList = document.getElementById('historyList');
   canvas = document.getElementById('waveform');
   canvasCtx = canvas ? canvas.getContext('2d') : null;
+  if (canvas) {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
   
   // Windows 录音机波形图
   recorderCanvas = document.getElementById('recorderWaveform');
   recorderCtx = recorderCanvas ? recorderCanvas.getContext('2d') : null;
   if (recorderCanvas) {
-    // 设置 canvas 实际像素尺寸
+    // 设置 canvas 实际像素尺寸（和上方波形一致）
     recorderCanvas.width = recorderCanvas.offsetWidth || 600;
-    recorderCanvas.height = recorderCanvas.offsetHeight || 80;
+    recorderCanvas.height = recorderCanvas.offsetHeight || 120;
   }
   
   metronomeToggle = document.getElementById('metronomeToggle');
@@ -1469,11 +1473,13 @@ function analyzeAudio() {
 
 // 绘制波形
 function drawWaveform(timeData, rms) {
+  if (!canvas || !canvasCtx) return;
+  
   canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
   
   canvasCtx.lineWidth = 2;
-  canvasCtx.strokeStyle = '#b866ff';
+  canvasCtx.strokeStyle = '#b866ff';  // 紫色
   canvasCtx.beginPath();
   
   const sliceWidth = canvas.width / timeData.length;
@@ -1510,17 +1516,17 @@ function drawRecorderWaveform(timeData, rms) {
   }
   
   // 清空画布
-  recorderCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  recorderCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   recorderCtx.fillRect(0, 0, recorderCanvas.width, recorderCanvas.height);
   
   // 绘制波形（从右向左滚动）
   const gradient = recorderCtx.createLinearGradient(0, 0, recorderCanvas.width, 0);
-  gradient.addColorStop(0, 'rgba(184, 102, 255, 0.2)');
-  gradient.addColorStop(0.5, 'rgba(184, 102, 255, 0.6)');
+  gradient.addColorStop(0, 'rgba(184, 102, 255, 0.3)');
+  gradient.addColorStop(0.5, 'rgba(184, 102, 255, 0.7)');
   gradient.addColorStop(1, 'rgba(184, 102, 255, 1.0)');
   
   recorderCtx.fillStyle = gradient;
-  recorderCtx.strokeStyle = '#b866ff';
+  recorderCtx.strokeStyle = '#b866ff';  // 紫色，和上方波形一致
   recorderCtx.lineWidth = 1;
   
   const barWidth = recorderCanvas.width / RECORDER_BUFFER_SIZE;
