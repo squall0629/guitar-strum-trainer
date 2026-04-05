@@ -192,7 +192,7 @@ ChordDetector.prototype.verifyWithStringEnergies = function(stringEnergies, chor
   var chordData = window.ChordLibrary.getChordData(chordName);
   if (!chordData) return 0;
   
-  var fingering = chordData.fingers || [];
+  var fingering = chordData.fingering || [];
   var score = 0;
   var weight = 0;
   
@@ -282,7 +282,7 @@ ChordDetector.prototype.detect = function(freqData) {
           energy: Math.round(s.energy * 100) / 100
         };
       }),
-      fingering: chordData ? chordData.fingers : null,
+      fingering: chordData ? chordData.fingering : null,
       notes: notes
     };
   }

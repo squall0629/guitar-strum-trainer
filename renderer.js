@@ -2051,8 +2051,8 @@ if (DEBUG)     console.log('[DEBUG calculateToneScore] No strums, returning 0');
     
     // 使用范围评分而非单点评分
     // 理想范围: 60-200 (更宽容)
-    const idealMin = 0.5;
-    const idealMax = 5;
+    const idealMin = 60;
+    const idealMax = 200;
     const idealCenter = (idealMin + idealMax) / 2;
     const range = (idealMax - idealMin) / 2;
     
@@ -3092,11 +3092,11 @@ function importUserSettings(event) {
         metronomeEnabled = settings.metronomeEnabled;
       }
       
-      // 验证并导入 sensitivityLevel（范围 1-10）
+      // 验证并导入 sensitivityLevel（范围 1-100）
       if (settings.sensitivityLevel !== undefined) {
         const sens = Number(settings.sensitivityLevel);
-        if (typeof sens !== 'number' || isNaN(sens) || sens < 1 || sens > 10) {
-          throw new Error('sensitivityLevel 必须是 1-10 之间的数字');
+        if (typeof sens !== 'number' || isNaN(sens) || sens < 1 || sens > 100) {
+          throw new Error('sensitivityLevel 必须是 1-100 之间的数字');
         }
         sensitivityLevel = sens;
       }
@@ -3690,7 +3690,7 @@ function drawChordDiagramFallback(canvas, chordName) {
     return;
   }
   
-  const fingering = chordData.fingers || [0, 0, 0, 0, 0, 0];
+  const fingering = chordData.fingering || [0, 0, 0, 0, 0, 0];
   const padding = 15;
   const diagramWidth = width - padding * 2;
   const diagramHeight = height - padding * 2 - 20;
