@@ -1454,8 +1454,12 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   // 1. Flux 峰值 + RMS 超过 50% 阈值 = 强检测到
   // 2. Flux 峰值 + RMS 超过 30% 阈值 = 中等检测到
   // 3. 仅 RMS 超过阈值 = 弱检测到（传统模式）
-  const minStrumInterval = 200;  // 最小扫弦间隔 (ms) - 增加到 200ms 防止录音回放误检
+  // 最小扫弦间隔根据 BPM 动态调整（基于 120BPM 的 200ms，按比例缩放）
+  const baseMinInterval = 200;  // 120BPM 基准
+  const minStrumInterval = Math.round(baseMinInterval * (120 / currentBPM));  // 根据 BPM 缩放
   const timeSinceLastStrum = now - lastStrumTime;
+  
+  console.log('[DEBUG 扫弦间隔] BPM:', currentBPM, 'minStrumInterval:', minStrumInterval, 'ms, timeSinceLastStrum:', timeSinceLastStrum);
   
   let onsetDetected = false;
   let confidence = 0;
