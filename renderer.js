@@ -479,9 +479,12 @@ function init() {
   canvas = document.getElementById('waveform');
   canvasCtx = canvas ? canvas.getContext('2d') : null;
   if (canvas) {
-    canvas.width = canvas.offsetWidth || 600;
-    canvas.height = canvas.offsetHeight || 120;
-    console.log('[DEBUG Canvas] waveform canvas:', canvas.width, 'x', canvas.height);
+    // 延迟设置尺寸，确保 DOM 已渲染
+    setTimeout(() => {
+      canvas.width = canvas.offsetWidth || 600;
+      canvas.height = canvas.offsetHeight || 120;
+      console.log('[DEBUG Canvas] waveform canvas:', canvas.width, 'x', canvas.height);
+    }, 100);
   }
   
   // Windows 录音机波形图
@@ -489,18 +492,22 @@ function init() {
   recorderCtx = recorderCanvas ? recorderCanvas.getContext('2d') : null;
   if (recorderCanvas) {
     // 设置 canvas 实际像素尺寸（和上方波形一致）
-    recorderCanvas.width = recorderCanvas.offsetWidth || 600;
-    recorderCanvas.height = recorderCanvas.offsetHeight || 120;
-    console.log('[DEBUG Canvas] recorder canvas:', recorderCanvas.width, 'x', recorderCanvas.height);
+    setTimeout(() => {
+      recorderCanvas.width = recorderCanvas.offsetWidth || 600;
+      recorderCanvas.height = recorderCanvas.offsetHeight || 120;
+      console.log('[DEBUG Canvas] recorder canvas:', recorderCanvas.width, 'x', recorderCanvas.height);
+    }, 100);
   }
   
   // 时域频谱图
   spectrumCanvas = document.getElementById('spectrumWaveform');
   spectrumCtx = spectrumCanvas ? spectrumCanvas.getContext('2d') : null;
   if (spectrumCanvas) {
-    spectrumCanvas.width = spectrumCanvas.offsetWidth || 600;
-    spectrumCanvas.height = spectrumCanvas.offsetHeight || 120;
-    console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.width, 'x', spectrumCanvas.height);
+    setTimeout(() => {
+      spectrumCanvas.width = spectrumCanvas.offsetWidth || 600;
+      spectrumCanvas.height = spectrumCanvas.offsetHeight || 120;
+      console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.width, 'x', spectrumCanvas.height);
+    }, 100);
   }
   
   metronomeToggle = document.getElementById('metronomeToggle');
@@ -1491,10 +1498,15 @@ function analyzeAudio() {
 }
 
 // 绘制波形
+let _drawCount = 0;
 function drawWaveform(timeData, rms) {
-  if (!canvas || !canvasCtx || !timeData) return;
+  _drawCount++;
+  if (!canvas || !canvasCtx || !timeData) {
+    if (_drawCount === 1) console.log('[DEBUG drawWaveform] canvas or timeData missing');
+    return;
+  }
   if (canvas.width === 0 || canvas.height === 0) {
-    console.log('[DEBUG drawWaveform] canvas size is 0:', canvas.width, 'x', canvas.height);
+    if (_drawCount <= 5) console.log('[DEBUG drawWaveform] canvas size is 0:', canvas.width, 'x', canvas.height, 'frame:', _drawCount);
     return;
   }
   
@@ -1523,14 +1535,24 @@ function drawWaveform(timeData, rms) {
   
   canvasCtx.stroke();
   
+  if (_drawCount <= 3) console.log('[DEBUG drawWaveform] drawn successfully, frame:', _drawCount);
+  
   // 绘制 Windows 录音机风格波形（使用相同的 RMS）
   drawRecorderWaveform(timeData, rms);
 }
 
 // 绘制 Windows 录音机风格波形（使用传入的 RMS 值）
+let _recorderDrawCount = 0;
 function drawRecorderWaveform(timeData, rms) {
-  if (!recorderCanvas || !recorderCtx) return;
-  if (recorderCanvas.width === 0 || recorderCanvas.height === 0) return;
+  _recorderDrawCount++;
+  if (!recorderCanvas || !recorderCtx) {
+    if (_recorderDrawCount === 1) console.log('[DEBUG drawRecorderWaveform] recorderCanvas missing');
+    return;
+  }
+  if (recorderCanvas.width === 0 || recorderCanvas.height === 0) {
+    if (_recorderDrawCount <= 5) console.log('[DEBUG drawRecorderWaveform] canvas size is 0:', recorderCanvas.width, 'x', recorderCanvas.height, 'frame:', _recorderDrawCount);
+    return;
+  }
   
   // 直接使用传入的 RMS 值（和音量指示条一致）
   // 添加到波形缓冲区
@@ -1571,13 +1593,26 @@ function drawRecorderWaveform(timeData, rms) {
   
   // 绘制轮廓线
   recorderCtx.stroke();
+  
+  if (_recorderDrawCount <= 3) console.log('[DEBUG drawRecorderWaveform] drawn successfully, frame:', _recorderDrawCount);
 }
 
 // 绘制时域频谱图（STFT 短时傅里叶变换 + 彩虹色热力图）
+let _spectrumDrawCount = 0;
 function drawSpectrumWaveform(freqData) {
-  if (!spectrumCanvas || !spectrumCtx) return;
-  if (spectrumCanvas.width === 0 || spectrumCanvas.height === 0) return;
-  if (!freqData) return;
+  _spectrumDrawCount++;
+  if (!spectrumCanvas || !spectrumCtx) {
+    if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWaveform] spectrumCanvas missing');
+    return;
+  }
+  if (spectrumCanvas.width === 0 || spectrumCanvas.height === 0) {
+    if (_spectrumDrawCount <= 5) console.log('[DEBUG drawSpectrumWaveform] canvas size is 0:', spectrumCanvas.width, 'x', spectrumCanvas.height, 'frame:', _spectrumDrawCount);
+    return;
+  }
+  if (!freqData) {
+    if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWaveform] freqData missing');
+    return;
+  }
   
   // 添加当前频谱到历史缓冲区
   spectrumHistory.push(new Uint8Array(freqData));
@@ -1621,6 +1656,8 @@ function drawSpectrumWaveform(freqData) {
   spectrumCtx.font = '10px Arial';
   spectrumCtx.fillText('5kHz', 5, spectrumCanvas.height - 5);
   spectrumCtx.fillText('0Hz', 5, spectrumCanvas.height - 10);
+  
+  if (_spectrumDrawCount <= 3) console.log('[DEBUG drawSpectrumWaveform] drawn successfully, frame:', _spectrumDrawCount);
 }
 
 // ========== Spectral Flux Onset Detection 算法实现 ==========
