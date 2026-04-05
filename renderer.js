@@ -179,6 +179,14 @@ let strumHistory = [];
 let freqDataCache = null;
 let timeDataCache = null;
 
+// ========== Spectral Flux Onset Detection 全局变量 ==========
+let previousSpectrum = null;  // 上一帧频谱
+let fluxBuffer = [];          // Spectral Flux 缓冲区
+let fluxBufferSize = 43;      // 约 1 秒的缓冲区 (43 帧 @ ~43fps)
+let fluxThreshold = 0;        // 自适应阈值
+let fluxPeakCooldown = 0;     // 峰值检测冷却时间 (帧数)
+const FLUX_COOLDOWN_FRAMES = 3;  // 峰值后冷却 3 帧 (~70ms)
+
 // Blob URL 追踪（用于和弦指法图绘制，防止内存泄漏）
 let _chordDiagramBlobUrl = null;
 
@@ -1116,6 +1124,12 @@ async function startListening() {
     lastStrumTime = 0;
     expectedStrumIndex = 0;
     
+    // 重置 Spectral Flux Onset Detection 状态
+    previousSpectrum = null;
+    fluxBuffer = [];
+    fluxThreshold = 0;
+    fluxPeakCooldown = 0;
+    
     // 重置练习数据统计
     practiceStartTime = Date.now();
     practiceChordCorrect = 0;
@@ -1284,7 +1298,162 @@ function drawWaveform(timeData) {
   canvasCtx.stroke();
 }
 
-// 扫弦检测
+// ========== Spectral Flux Onset Detection 算法实现 ==========
+
+/**
+ * 计算 Spectral Flux - 频谱能量变化率
+ * 只累加正差异（能量上升部分），对 onset 更敏感
+ * @param {Uint8Array} currentSpectrum - 当前帧频谱
+ * @param {Uint8Array} previousSpectrum - 上一帧频谱
+ * @returns {number} Spectral Flux 值
+ */
+function computeSpectralFlux(currentSpectrum, previousSpectrum) {
+  if (!previousSpectrum || currentSpectrum.length !== previousSpectrum.length) {
+    return 0;
+  }
+  
+  let flux = 0;
+  // 只关注中高频区域 (20%-90%)，吉他扫弦的主要能量范围
+  const startBin = Math.floor(currentSpectrum.length * 0.2);
+  const endBin = Math.floor(currentSpectrum.length * 0.9);
+  
+  for (let i = startBin; i < endBin; i++) {
+    const diff = currentSpectrum[i] - previousSpectrum[i];
+    if (diff > 0) {
+      flux += diff * diff;  // 平方增强大变化的权重
+    }
+  }
+  
+  return flux / (endBin - startBin);  // 归一化
+}
+
+/**
+ * 自适应阈值计算 - 使用滑动窗口统计
+ * @returns {number} 动态阈值
+ */
+function computeAdaptiveThreshold() {
+  if (fluxBuffer.length < 10) {
+    return 0.5;  // 初始阈值
+  }
+  
+  // 计算局部均值和标准差
+  const recentFlux = fluxBuffer.slice(-Math.min(20, fluxBuffer.length));
+  const mean = recentFlux.reduce((a, b) => a + b, 0) / recentFlux.length;
+  const variance = recentFlux.reduce((sum, f) => sum + Math.pow(f - mean, 2), 0) / recentFlux.length;
+  const stdDev = Math.sqrt(variance);
+  
+  // 阈值 = 均值 + 0.5 * 标准差 (保守检测)
+  // 根据灵敏度调整：灵敏度越高，阈值越低
+  const sensitivityFactor = 1.0 - (sensitivityLevel - 1) * (0.5 / 99);  // 0.5-1.0
+  const threshold = mean + sensitivityFactor * stdDev;
+  
+  return Math.max(0.1, threshold);  // 最小阈值
+}
+
+/**
+ * 峰值检测 - 检测 Spectral Flux 的局部最大值
+ * @param {number} currentFlux - 当前 Flux 值
+ * @param {number} threshold - 动态阈值
+ * @returns {boolean} 是否检测到峰值
+ */
+function detectFluxPeak(currentFlux, threshold) {
+  // 冷却期检查
+  if (fluxPeakCooldown > 0) {
+    fluxPeakCooldown--;
+    return false;
+  }
+  
+  if (fluxBuffer.length < 3) {
+    return false;
+  }
+  
+  // 检查是否为局部最大值
+  const prevFlux = fluxBuffer[fluxBuffer.length - 2];
+  const prevPrevFlux = fluxBuffer[fluxBuffer.length - 3];
+  
+  // 峰值条件：当前值 > 前一值 > 前前一值，且超过阈值
+  const isRising = currentFlux > prevFlux && prevFlux > prevPrevFlux;
+  const isAboveThreshold = currentFlux > threshold;
+  
+  // 额外检查：峰值应该显著高于前几帧
+  const isSignificantPeak = currentFlux > prevFlux * 1.2;  // 至少 20% 增长
+  
+  if (isRising && isAboveThreshold && isSignificantPeak) {
+    fluxPeakCooldown = FLUX_COOLDOWN_FRAMES;  // 进入冷却期
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * 混合检测策略 - 结合 Spectral Flux 和传统 RMS 检测
+ * Spectral Flux 对扫弦 onset 更敏感，RMS 作为辅助验证
+ * @param {Uint8Array} freqData - 频域数据
+ * @param {Uint8Array} timeData - 时域数据
+ * @param {number} rms - RMS 音量
+ * @returns {object} 检测结果 { onsets: {flux: bool, rms: bool}, confidence: number }
+ */
+function detectOnsetWithFlux(freqData, timeData, rms) {
+  const now = Date.now();
+  
+  // 计算 Spectral Flux
+  const currentFlux = computeSpectralFlux(freqData, previousSpectrum);
+  
+  // 更新频谱历史
+  if (previousSpectrum === null || previousSpectrum.length !== freqData.length) {
+    previousSpectrum = new Uint8Array(freqData.length);
+  }
+  previousSpectrum.set(freqData);
+  
+  // 更新 Flux 缓冲区
+  fluxBuffer.push(currentFlux);
+  if (fluxBuffer.length > fluxBufferSize) {
+    fluxBuffer.shift();
+  }
+  
+  // 计算自适应阈值
+  fluxThreshold = computeAdaptiveThreshold();
+  
+  // 检测峰值
+  const fluxPeak = detectFluxPeak(currentFlux, fluxThreshold);
+  
+  // RMS 辅助检测（传统方法）
+  const rmsThreshold = strumThreshold * 100;  // 调整 RMS 阈值范围
+  const rmsOnset = rms > rmsThreshold;
+  
+  // 混合策略：
+  // 1. Flux 峰值 + RMS 超过 50% 阈值 = 强检测到
+  // 2. Flux 峰值 + RMS 上升 = 中等检测到
+  // 3. 仅 RMS 超过阈值 = 弱检测到（传统模式）
+  const minStrumInterval = 80;  // 最小扫弦间隔 (ms)
+  const timeSinceLastStrum = now - lastStrumTime;
+  
+  let onsetDetected = false;
+  let confidence = 0;
+  
+  if (timeSinceLastStrum > minStrumInterval) {
+    if (fluxPeak && rms > rmsThreshold * 0.5) {
+      onsetDetected = true;
+      confidence = 0.9;  // 高置信度
+    } else if (fluxPeak && rms > rmsThreshold * 0.3) {
+      onsetDetected = true;
+      confidence = 0.7;  // 中等置信度
+    } else if (rmsOnset && !fluxPeak && timeSinceLastStrum > minStrumInterval * 1.5) {
+      onsetDetected = true;
+      confidence = 0.5;  // 低置信度（仅 RMS）
+    }
+  }
+  
+  return {
+    onset: onsetDetected,
+    confidence: confidence,
+    flux: currentFlux,
+    threshold: fluxThreshold
+  };
+}
+
+// 扫弦检测 - 基于 Spectral Flux 的改进版本
 function detectStrum(freqData, timeData) {
   const now = Date.now();
   
@@ -1304,17 +1473,19 @@ function detectStrum(freqData, timeData) {
   }
   highFreqEnergy /= (freqData.length - highFreqStart);
   
-  // 最小扫弦间隔 (ms)
-  const MIN_STRUM_INTERVAL = 100;
+  // 使用 Spectral Flux Onset Detection
+  const onsetResult = detectOnsetWithFlux(freqData, timeData, rms);
   
-  // 使用动态阈值（根据用户设置的灵敏度）
-  if (rms > strumThreshold && now - lastStrumTime > MIN_STRUM_INTERVAL) {
-    // 检测到扫弦
+  // 检测到扫弦
+  if (onsetResult.onset) {
     const strum = {
       time: now,
       amplitude: rms,
       tone: highFreqEnergy,
-      interval: lastStrumTime > 0 ? now - lastStrumTime : 0
+      interval: lastStrumTime > 0 ? now - lastStrumTime : 0,
+      flux: onsetResult.flux,
+      fluxThreshold: onsetResult.threshold,
+      confidence: onsetResult.confidence
     };
     
     detectedStrums.push(strum);
