@@ -1063,11 +1063,8 @@
         display: block !important;
       }
 
-      /* Grid layout for chord training on mobile */
-      .panel > div[style*="grid-template-columns: 1fr 100px 1fr"] {
-        grid-template-columns: 1fr !important;
-        gap: 15px !important;
-      }
+      /* Grid layout for chord training on mobile - ONLY in phone media query */
+      /* Removed - this was affecting desktop layout */
 
       /* Mode buttons full width on mobile - ONLY in phone media query */
       .panel > div[style*="display: flex"][style*="gap: 15px"] {
@@ -1105,16 +1102,7 @@
       }
 
       /* ===== Chord display: single column on phone ===== */
-      .panel > div[style*="grid-template-columns: 1fr 100px 1fr"] {
-        grid-template-columns: 1fr !important;
-        gap: 15px !important;
-      }
-
-      /* Arrow between chords: rotate for vertical layout */
-      .panel > div[style*="grid-template-columns: 1fr 100px 1fr"] > div:nth-child(2) {
-        transform: rotate(90deg);
-        font-size: 1.5em !important;
-      }
+      /* Removed - this was affecting desktop layout */
 
       /* Chord diagrams: larger on phone */
       #currentChordDiagram,
