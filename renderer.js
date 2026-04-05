@@ -616,7 +616,7 @@ if (DEBUG)       console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.w
   
   setupRhythmSelector();
   setupButtons();
-  setupCanvas();
+  
   setupMetronome();
   setupDemoButtons();
   setupSensitivity();
