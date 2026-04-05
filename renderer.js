@@ -2816,11 +2816,13 @@ function setupChordTraining() {
       if (window.ChordLibrary.COMMON_PROGRESSIONS[index]) {
         currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[index].chords;
         updateChordProgressionDisplay();
+        updateProgressionDetail(index);
         console.log('[ChordTraining] 预设进行已选择:', currentProgression);
       }
     });
     // 初始化默认预设
     currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
+    updateProgressionDetail(0);
   }
   
   // 自定义和弦选择按钮
@@ -2872,13 +2874,18 @@ function setTrainingMode(mode) {
     customChordSelector.style.display = mode === 'custom' ? 'block' : 'none';
   }
   
+  // 自由练习模式隐藏详情
+  const progressionDetailEl = document.getElementById('progressionDetail');
+  
   // 自由练习模式不需要预设
   if (mode === 'free') {
     currentProgression = [];
     updateChordProgressionDisplay();
+    if (progressionDetailEl) progressionDetailEl.style.display = 'none';
   } else if (mode === 'preset' && window.ChordLibrary.COMMON_PROGRESSIONS[0]) {
     currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
     updateChordProgressionDisplay();
+    if (progressionDetailEl) progressionDetailEl.style.display = 'block';
   }
   
   console.log('[ChordTraining] 训练模式已切换:', mode);
@@ -2983,6 +2990,29 @@ function updateChordProgressionDisplay() {
     const progress = ((currentChordIndex) / currentProgression.length) * 100;
     progressionBar.style.width = `${progress}%`;
     progressionProgress.textContent = `${currentChordIndex + 1}/${currentProgression.length}`;
+  }
+}
+
+/**
+ * 更新和弦进行详情显示
+ * @param {number} index - 和弦进行索引
+ */
+function updateProgressionDetail(index) {
+  const progressionChordsEl = document.getElementById('progressionChords');
+  const progressionDescEl = document.getElementById('progressionDesc');
+  const progressionDetailEl = document.getElementById('progressionDetail');
+  
+  if (!progressionChordsEl || !progressionDescEl) return;
+  
+  const progression = window.ChordLibrary.COMMON_PROGRESSIONS[index];
+  if (progression) {
+    progressionChordsEl.textContent = progression.chords.join(' → ');
+    progressionDescEl.textContent = progression.desc;
+    if (progressionDetailEl) progressionDetailEl.style.display = 'block';
+  } else {
+    progressionChordsEl.textContent = '点击选择和弦或选择预设进行';
+    progressionDescEl.textContent = '';
+    if (progressionDetailEl) progressionDetailEl.style.display = 'none';
   }
 }
 
