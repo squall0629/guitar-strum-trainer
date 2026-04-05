@@ -304,7 +304,10 @@ function showPracticeReport() {
     reportWorstEl.textContent = '--';
   }
   
-  renderTrendCharts();
+  // 渲染趋势图（如果函数存在）
+  if (typeof renderTrendCharts === 'function') {
+    renderTrendCharts();
+  }
   
   practiceReportModal.style.display = 'block';
 }
@@ -1126,13 +1129,13 @@ async function startListening() {
     
     microphone = audioContext.createMediaStreamSource(stream);
     
-    // 增加麦克风增益：创建增益节点并设置为 10.0 倍（大幅提高灵敏度）
+    // 增加麦克风增益：创建增益节点并设置为 15.0 倍（大幅提高灵敏度，适应录音回放）
     const micGain = audioContext.createGain();
-    micGain.gain.value = 10.0;  // 10 倍增益，提高灵敏度
+    micGain.gain.value = 15.0;  // 15 倍增益，适应录音回放
     microphone.connect(micGain);
     micGain.connect(analyser);
     
-    console.log('[DEBUG startListening] 音频上下文和节点已创建，麦克风增益：10.0x');
+    console.log('[DEBUG startListening] 音频上下文和节点已创建，麦克风增益：15.0x');
     
     isListening = true;
     detectedStrums = [];
@@ -1399,8 +1402,8 @@ function detectFluxPeak(currentFlux, threshold) {
   const isRising = currentFlux > prevFlux && prevFlux > prevPrevFlux;
   const isAboveThreshold = currentFlux > threshold;
   
-  // 额外检查：峰值应该显著高于前几帧（降低要求：10% 增长即可）
-  const isSignificantPeak = currentFlux > prevFlux * 1.1;  // 至少 10% 增长
+  // 额外检查：峰值应该显著高于前几帧（降低要求：5% 增长即可，适应录音回放）
+  const isSignificantPeak = currentFlux > prevFlux * 1.05;  // 至少 5% 增长
   
   console.log('[DEBUG detectFluxPeak] flux:', currentFlux.toFixed(2), 'threshold:', threshold.toFixed(2), 'isRising:', isRising, 'isAboveThreshold:', isAboveThreshold, 'isSignificantPeak:', isSignificantPeak, 'result:', isRising && isAboveThreshold && isSignificantPeak);
   
@@ -1444,8 +1447,8 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   // 检测峰值
   const fluxPeak = detectFluxPeak(currentFlux, fluxThreshold);
   
-  // RMS 辅助检测（传统方法）- 降低阈值以适应低输入信号
-  const rmsThreshold = strumThreshold * 5;  // 从 15 降低到 5，大幅提高灵敏度
+  // RMS 辅助检测（传统方法）- 降低阈值以适应录音回放
+  const rmsThreshold = strumThreshold * 2;  // 从 5 降低到 2，适应录音回放的低信号
   const rmsOnset = rms > rmsThreshold;
   
   console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
