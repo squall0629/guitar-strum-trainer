@@ -75,13 +75,19 @@ const RHYTHM_PATTERNS = [
 
 // 获取当前激活的节奏型（支持预设和自定义）
 function getActiveRhythm(index) {
+  console.log('[DEBUG getActiveRhythm] Called with index:', index, 'RHYTHM_PATTERNS.length:', RHYTHM_PATTERNS.length, 'customRhythms.length:', customRhythms.length);
   if (index >= 0 && index < RHYTHM_PATTERNS.length) {
+    console.log('[DEBUG getActiveRhythm] Returning preset pattern:', RHYTHM_PATTERNS[index].name);
     return RHYTHM_PATTERNS[index];
   }
   const customIndex = index - RHYTHM_PATTERNS.length;
+  console.log('[DEBUG getActiveRhythm] customIndex:', customIndex);
   if (customIndex >= 0 && customIndex < customRhythms.length) {
     const rhythm = customRhythms[customIndex];
-    if (!rhythm.notes || rhythm.notes.length === 0) return null;
+    if (!rhythm.notes || rhythm.notes.length === 0) {
+      console.log('[DEBUG getActiveRhythm] Custom rhythm has no notes, returning null');
+      return null;
+    }
     
     const tempPattern = rhythm.notes.map(note => {
       return NOTE_DURATIONS[note.duration]?.ms || 250;
@@ -118,6 +124,7 @@ function getActiveRhythm(index) {
       customIndex: customIndex
     };
   }
+  console.log('[DEBUG getActiveRhythm] No matching pattern found, returning null. index:', index);
   return null;
 }
 
@@ -1489,6 +1496,11 @@ function detectStrum(freqData, timeData) {
     };
     
     detectedStrums.push(strum);
+    console.log('[DEBUG detectStrum] Strum detected!', {
+      strumCount: detectedStrums.length,
+      strum: { time: strum.time, amplitude: strum.amplitude, tone: strum.tone, interval: strum.interval },
+      detectedStrums: detectedStrums.map(s => ({ tone: s.tone, interval: s.interval, amplitude: s.amplitude }))
+    });
     
     // ========== 和弦识别（新增） ==========
     if (chordRecognitionEnabled && chordDetector) {
@@ -1570,10 +1582,20 @@ function provideFeedback(strum) {
 }
 
 // 计算评分
+let _debugUpdateScoresCounter = 0;
 function updateScores() {
+  _debugUpdateScoresCounter++;
+  const shouldLog = _debugUpdateScoresCounter % 60 === 1; // Log every ~1 second at 60fps
+  if (shouldLog) {
+    console.log('[DEBUG updateScores] Called. currentRhythm:', currentRhythm, 'detectedStrums.length:', detectedStrums.length);
+  }
   const pattern = getActiveRhythm(currentRhythm);
+  if (shouldLog) {
+    console.log('[DEBUG updateScores] getActiveRhythm returned:', pattern ? pattern.name : 'null');
+  }
   
   if (!pattern) {
+    if (shouldLog) console.log('[DEBUG updateScores] No pattern found, showing --');
     rhythmScoreEl.textContent = '--';
     toneScoreEl.textContent = '--';
     dynamicsScoreEl.textContent = '--';
@@ -1584,15 +1606,18 @@ function updateScores() {
   // 音色评分 - 不依赖 pattern，只要有扫弦数据即可计算
   if (detectedStrums.length > 0) {
     const toneScore = calculateToneScore(detectedStrums);
+    if (shouldLog) console.log('[DEBUG updateScores] calculateToneScore returned:', toneScore, 'from strums:', detectedStrums.map(s => s.tone));
     toneScoreEl.textContent = toneScore;
     updateScoreRing(toneRingEl, toneScoreEl, toneScore);
   } else {
+    if (shouldLog) console.log('[DEBUG updateScores] No detected strums, showing -- for tone');
     toneScoreEl.textContent = '--';
     updateScoreRing(toneRingEl, toneScoreEl, '--');
   }
   
   // 节奏和强弱评分需要至少 2 次扫弦
   if (detectedStrums.length < 2) {
+    if (shouldLog) console.log('[DEBUG updateScores] Less than 2 strums, showing -- for rhythm/dynamics/total');
     rhythmScoreEl.textContent = '--';
     dynamicsScoreEl.textContent = '--';
     totalScoreEl.textContent = '--';
@@ -1627,6 +1652,8 @@ function updateScores() {
       accuracy * 0.3
     );
   }
+  
+  if (shouldLog) console.log('[DEBUG updateScores] Final scores - rhythm:', rhythmScore, 'tone:', toneScore, 'dynamics:', dynamicsScore, 'total:', totalScore);
   
   // 更新显示
   rhythmScoreEl.textContent = rhythmScore;
@@ -1687,9 +1714,13 @@ function calculateRhythmScore(strums, pattern) {
 
 // 改进的音色评分算法
 function calculateToneScore(strums) {
-  if (strums.length === 0) return 0;
+  if (strums.length === 0) {
+    console.log('[DEBUG calculateToneScore] No strums, returning 0');
+    return 0;
+  }
   
   let totalScore = 0;
+  const scores = [];
   
   for (const strum of strums) {
     const tone = strum.tone;
@@ -1701,20 +1732,23 @@ function calculateToneScore(strums) {
     const idealCenter = (idealMin + idealMax) / 2;
     const range = (idealMax - idealMin) / 2;
     
+    let score;
     if (tone >= idealMin && tone <= idealMax) {
       // 在理想范围内，根据距离中心的远近评分
       const distanceFromCenter = Math.abs(tone - idealCenter);
-      const score = 100 - (distanceFromCenter / range) * 20; // 范围内最低 80 分
-      totalScore += score;
+      score = 100 - (distanceFromCenter / range) * 20; // 范围内最低 80 分
     } else {
       // 在理想范围外，线性衰减
       const distanceOutside = tone < idealMin ? idealMin - tone : tone - idealMax;
-      const score = Math.max(0, 80 - (distanceOutside / 50) * 80);
-      totalScore += score;
+      score = Math.max(0, 80 - (distanceOutside / 50) * 80);
     }
+    scores.push(score);
+    totalScore += score;
   }
   
-  return Math.round(totalScore / strums.length);
+  const result = Math.round(totalScore / strums.length);
+  console.log('[DEBUG calculateToneScore] strums:', strums.length, 'tones:', strums.map(s => s.tone), 'individualScores:', scores.map(s => Math.round(s)), 'result:', result);
+  return result;
 }
 
 // 改进的强弱评分算法
