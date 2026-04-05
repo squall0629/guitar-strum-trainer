@@ -160,10 +160,10 @@ let strumThreshold = 0.05; // 根据灵敏度动态计算
 
 // 全局函数：更新阈值计算
 function updateThreshold() {
-  // 灵敏度 1-100 映射到阈值 0.15-0.01 (更宽松的范围，更容易触发)
+  // 灵敏度 1-100 映射到阈值 0.30-0.01 (更大的范围，效果更明显)
   // 灵敏度越高，阈值越低（更容易触发）
-  strumThreshold = 0.15 - (sensitivityLevel - 1) * (0.14 / 99);
-  strumThreshold = Math.max(0.01, Math.min(0.15, strumThreshold));
+  strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.29 / 99);
+  strumThreshold = Math.max(0.01, Math.min(0.30, strumThreshold));
   
   const thresholdDisplay = document.getElementById('thresholdDisplay');
   if (thresholdDisplay) {
@@ -1299,8 +1299,9 @@ function analyzeAudio() {
   // 更新音量电平（使用 RMS，和波形图一致）
   if (volumeMeterFill) {
     // RMS 范围 0-1，映射到 0-100%
-    // 乘以 2 是为了让正常说话/演奏时指示条在中间位置
-    const volumePercent = Math.min(100, rms * 2 * 100);
+    // 根据灵敏度调整显示增益（灵敏度越高，显示越明显）
+    const sensitivityGain = 1 + (sensitivityLevel / 100);  // 1.0-2.0 倍增益
+    const volumePercent = Math.min(100, rms * sensitivityGain * 100);
     volumeMeterFill.style.width = volumePercent + '%';
   }
   
@@ -1517,8 +1518,9 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   // 检测峰值
   const fluxPeak = detectFluxPeak(currentFlux, fluxThreshold);
   
-  // RMS 辅助检测（传统方法）- 降低阈值以适应录音回放
-  const rmsThreshold = strumThreshold * 2;  // 从 5 降低到 2，适应录音回放的低信号
+  // RMS 辅助检测（传统方法）- 根据灵敏度动态调整
+  // 灵敏度越高，阈值越低（更容易触发）
+  const rmsThreshold = strumThreshold * 1.5;  // 使用动态阈值
   const rmsOnset = rms > rmsThreshold;
   
   console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
