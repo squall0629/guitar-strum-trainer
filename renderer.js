@@ -1134,8 +1134,10 @@ async function startListening() {
     
     isListening = true;
     detectedStrums = [];
-    lastStrumTime = 0;
+    lastStrumTime = 0;  // 重置为 0，表示还没有扫弦
     expectedStrumIndex = 0;
+    
+    console.log('[DEBUG startListening] 状态已重置 - lastStrumTime:', lastStrumTime, 'detectedStrums.length:', detectedStrums.length);
     
     // 重置 Spectral Flux Onset Detection 状态
     previousSpectrum = null;
@@ -1440,8 +1442,8 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   // 检测峰值
   const fluxPeak = detectFluxPeak(currentFlux, fluxThreshold);
   
-  // RMS 辅助检测（传统方法）
-  const rmsThreshold = strumThreshold * 100;  // 调整 RMS 阈值范围
+  // RMS 辅助检测（传统方法）- 降低阈值以适应低输入信号
+  const rmsThreshold = strumThreshold * 15;  // 从 100 降低到 15，适应低输入
   const rmsOnset = rms > rmsThreshold;
   
   console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
@@ -1498,6 +1500,18 @@ function detectStrum(freqData, timeData) {
     highFreqEnergy += freqData[i];
   }
   highFreqEnergy /= (freqData.length - highFreqStart);
+  
+  // 计算整体频谱能量（用于诊断麦克风输入）
+  let totalSpectrumEnergy = 0;
+  for (let i = 0; i < freqData.length; i++) {
+    totalSpectrumEnergy += freqData[i];
+  }
+  totalSpectrumEnergy /= freqData.length;
+  
+  // 每 60 帧输出一次麦克风输入诊断（约 1 秒）
+  if (Date.now() % 60 === 0) {
+    console.log('[DEBUG 麦克风诊断] rms:', rms.toFixed(4), 'totalSpectrumEnergy:', totalSpectrumEnergy.toFixed(1), 'highFreqEnergy:', highFreqEnergy.toFixed(1), 'timeData[0]:', timeData[0]);
+  }
   
   console.log('[DEBUG detectStrum] rms:', rms.toFixed(3), 'highFreqEnergy:', highFreqEnergy.toFixed(1));
   
