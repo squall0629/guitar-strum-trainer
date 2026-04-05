@@ -21,5 +21,8 @@
     "chordictionary": "^0.1.0-beta.4",
     "soundfont-player": "^0.12.0",
     "tonal": "^6.4.3"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.40.0"
   }
 }
