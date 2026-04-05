@@ -156,19 +156,21 @@ function setIsPlayingDemo(val) {
 
 // 设置灵敏度
 let sensitivityLevel = 50; // 1-100
-let strumThreshold = 0.15; // 根据灵敏度动态计算
+let strumThreshold = 0.05; // 根据灵敏度动态计算
 
 // 全局函数：更新阈值计算
 function updateThreshold() {
-  // 灵敏度 1-100 映射到阈值 0.50-0.08 (更宽松的范围，更容易触发)
+  // 灵敏度 1-100 映射到阈值 0.15-0.01 (更宽松的范围，更容易触发)
   // 灵敏度越高，阈值越低（更容易触发）
-  strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.28 / 99);
-  strumThreshold = Math.max(0.02, Math.min(0.30, strumThreshold));
+  strumThreshold = 0.15 - (sensitivityLevel - 1) * (0.14 / 99);
+  strumThreshold = Math.max(0.01, Math.min(0.15, strumThreshold));
   
   const thresholdDisplay = document.getElementById('thresholdDisplay');
   if (thresholdDisplay) {
     thresholdDisplay.textContent = strumThreshold.toFixed(2);
   }
+  
+  console.log('[DEBUG 灵敏度] 灵敏度:', sensitivityLevel, '→ 阈值:', strumThreshold.toFixed(3));
 }
 
 // 全局状态
@@ -1124,13 +1126,13 @@ async function startListening() {
     
     microphone = audioContext.createMediaStreamSource(stream);
     
-    // 增加麦克风增益：创建增益节点并设置为 2.0 倍
+    // 增加麦克风增益：创建增益节点并设置为 10.0 倍（大幅提高灵敏度）
     const micGain = audioContext.createGain();
-    micGain.gain.value = 2.0;  // 2 倍增益
+    micGain.gain.value = 10.0;  // 10 倍增益，提高灵敏度
     microphone.connect(micGain);
     micGain.connect(analyser);
     
-    console.log('[DEBUG startListening] 音频上下文和节点已创建');
+    console.log('[DEBUG startListening] 音频上下文和节点已创建，麦克风增益：10.0x');
     
     isListening = true;
     detectedStrums = [];
@@ -1443,7 +1445,7 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   const fluxPeak = detectFluxPeak(currentFlux, fluxThreshold);
   
   // RMS 辅助检测（传统方法）- 降低阈值以适应低输入信号
-  const rmsThreshold = strumThreshold * 15;  // 从 100 降低到 15，适应低输入
+  const rmsThreshold = strumThreshold * 5;  // 从 15 降低到 5，大幅提高灵敏度
   const rmsOnset = rms > rmsThreshold;
   
   console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
