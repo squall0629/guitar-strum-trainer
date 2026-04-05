@@ -173,6 +173,64 @@ function updateThreshold() {
   console.log('[DEBUG 灵敏度] 灵敏度:', sensitivityLevel, '→ 阈值:', strumThreshold.toFixed(3));
 }
 
+// 计算稳定性评分（基于历史数据）
+function calculateStabilityScore(history) {
+  if (history.length < 2) return 0;  // 至少 2 个小节才能计算
+  
+  // 1. 计算平均分
+  const avg = history.reduce((a, b) => a + b, 0) / history.length;
+  
+  // 2. 计算标准差（波动程度）
+  const variance = history.reduce((sum, score) => {
+    return sum + Math.pow(score - avg, 2);
+  }, 0) / history.length;
+  
+  const stdDev = Math.sqrt(variance);
+  
+  // 3. 计算变异系数 CV
+  const cv = stdDev / avg;
+  
+  // 4. 根据 CV 评分（CV 越小越稳定）
+  let score;
+  if (cv < 0.10) {
+    score = 90 + (0.10 - cv) * 100;  // 90-100 分（非常稳定）
+  } else if (cv < 0.20) {
+    score = 70 + (0.20 - cv) * 200;  // 70-90 分（较稳定）
+  } else if (cv < 0.30) {
+    score = 50 + (0.30 - cv) * 200;  // 50-70 分（波动大）
+  } else {
+    score = Math.max(0, 50 - (cv - 0.30) * 100);  // 0-50 分（很不稳定）
+  }
+  
+  return Math.round(score);
+}
+
+// 更新历史稳定性评分
+function updateStabilityScores() {
+  const rhythmStabilityEl = document.getElementById('rhythmStabilityScore');
+  const toneStabilityEl = document.getElementById('toneStabilityScore');
+  const dynamicsStabilityEl = document.getElementById('dynamicsStabilityScore');
+  const overallStabilityEl = document.getElementById('overallStabilityScore');
+  
+  // 计算各维度稳定性
+  const rhythmStability = calculateStabilityScore(measureHistory.rhythm);
+  const toneStability = calculateStabilityScore(measureHistory.tone);
+  const dynamicsStability = calculateStabilityScore(measureHistory.dynamics);
+  
+  // 综合稳定性（三个维度的平均）
+  const overallStability = Math.round((rhythmStability + toneStability + dynamicsStability) / 3);
+  
+  // 更新显示
+  if (rhythmStabilityEl) rhythmStabilityEl.textContent = rhythmStability > 0 ? rhythmStability : '--';
+  if (toneStabilityEl) toneStabilityEl.textContent = toneStability > 0 ? toneStability : '--';
+  if (dynamicsStabilityEl) dynamicsStabilityEl.textContent = dynamicsStability > 0 ? dynamicsStability : '--';
+  if (overallStabilityEl) overallStabilityEl.textContent = overallStability > 0 ? overallStability : '--';
+  
+  if (measureHistory.rhythm.length >= 2) {
+    console.log('[DEBUG 历史稳定性] 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability, '综合:', overallStability);
+  }
+}
+
 // 计算小节时长（毫秒）
 function getMeasureDuration() {
   const pattern = getActiveRhythm(currentRhythm);
@@ -214,11 +272,24 @@ function checkMeasureUpdate() {
     // 保存评分
     lastMeasureScores = { rhythm: rhythmScore, tone: toneScore, dynamics: dynamicsScore, total: totalScore };
     
+    // 添加到历史记录
+    measureHistory.rhythm.push(rhythmScore);
+    measureHistory.tone.push(toneScore);
+    measureHistory.dynamics.push(dynamicsScore);
+    
+    // 保持最近 10 个小节
+    if (measureHistory.rhythm.length > MAX_HISTORY) measureHistory.rhythm.shift();
+    if (measureHistory.tone.length > MAX_HISTORY) measureHistory.tone.shift();
+    if (measureHistory.dynamics.length > MAX_HISTORY) measureHistory.dynamics.shift();
+    
     // 更新显示
     rhythmScoreEl.textContent = rhythmScore;
     toneScoreEl.textContent = toneScore;
     dynamicsScoreEl.textContent = dynamicsScore;
     totalScoreEl.textContent = totalScore;
+    
+    // 更新历史稳定性评分
+    updateStabilityScores();
     
     console.log('[DEBUG 小节评分] 小节时长:', measureDuration, 'ms, 扫弦数:', currentMeasureStrums.length, '得分:', totalScore);
     
@@ -238,6 +309,14 @@ let isListening = false;
 let currentMeasureStartTime = 0;  // 当前小节开始时间
 let currentMeasureStrums = [];    // 当前小节的扫弦数据
 let lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };  // 上次小节评分
+
+// 历史稳定性评分相关
+let measureHistory = {
+  rhythm: [],    // 节奏评分历史
+  tone: [],      // 音色评分历史
+  dynamics: []   // 强弱评分历史
+};
+const MAX_HISTORY = 10;  // 保留最近 10 个小节
 let currentRhythm = 0;
 let detectedStrums = [];
 let lastStrumTime = 0;
@@ -423,6 +502,12 @@ function init() {
   toneRingEl = document.getElementById('toneRing');
   dynamicsRingEl = document.getElementById('dynamicsRing');
   totalRingEl = document.getElementById('totalRing');
+  
+  // 历史稳定性评分 DOM 元素
+  const rhythmStabilityEl = document.getElementById('rhythmStabilityScore');
+  const toneStabilityEl = document.getElementById('toneStabilityScore');
+  const dynamicsStabilityEl = document.getElementById('dynamicsStabilityScore');
+  const overallStabilityEl = document.getElementById('overallStabilityScore');
   
   metronomeDot = document.getElementById('metronomeDot');
   btnAddRhythm = document.getElementById('btnAddRhythm');
