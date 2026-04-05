@@ -358,6 +358,8 @@ const RECORDER_BUFFER_SIZE = 300;  // 波形数据点数
 
 // 时域频谱图
 let spectrumCanvas, spectrumCtx;
+let spectrumHistory = [];  // 频谱历史缓冲区（用于 STFT 热力图）
+const SPECTRUM_HISTORY_SIZE = 60;  // 保留 60 帧历史
 
 // 和弦训练 DOM 元素
 let modeButtons, modePreset, modeCustom, modeFree;
@@ -1563,46 +1565,52 @@ function drawRecorderWaveform(timeData, rms) {
   recorderCtx.stroke();
 }
 
-// 绘制时域频谱图
+// 绘制时域频谱图（STFT 短时傅里叶变换 + 彩虹色热力图）
 function drawSpectrumWaveform(freqData) {
   if (!spectrumCanvas || !spectrumCtx) return;
+  
+  // 添加当前频谱到历史缓冲区
+  spectrumHistory.push(new Uint8Array(freqData));
+  if (spectrumHistory.length > SPECTRUM_HISTORY_SIZE) {
+    spectrumHistory.shift();
+  }
   
   // 清空画布
   spectrumCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   spectrumCtx.fillRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
   
-  // 绘制频谱条（从左到右，低频到高频）
-  const barWidth = spectrumCanvas.width / freqData.length;
+  // 绘制 STFT 热力图（彩虹色）
+  const historyLength = spectrumHistory.length;
+  const cellWidth = spectrumCanvas.width / historyLength;
+  const freqBins = Math.floor(freqData.length / 4);  // 只取前 1/4 频段（0-5.5kHz）
+  const cellHeight = spectrumCanvas.height / freqBins;
   
-  for (let i = 0; i < freqData.length; i++) {
-    const value = freqData[i];
-    const barHeight = (value / 255) * spectrumCanvas.height;
+  for (let t = 0; t < historyLength; t++) {
+    const spectrum = spectrumHistory[t];
+    const x = t * cellWidth;
     
-    // 渐变色（低频紫色 → 高频蓝色）
-    const hue = 270 + (i / freqData.length) * 30;  // 270°(紫) → 300°(蓝紫)
-    const color = `hsla(${hue}, 80%, 60%, 0.8)`;
-    
-    spectrumCtx.fillStyle = color;
-    spectrumCtx.fillRect(i * barWidth, spectrumCanvas.height - barHeight, barWidth - 1, barHeight);
-  }
-  
-  // 绘制顶部轮廓线
-  spectrumCtx.strokeStyle = '#b866ff';
-  spectrumCtx.lineWidth = 1;
-  spectrumCtx.beginPath();
-  
-  for (let i = 0; i < freqData.length; i++) {
-    const value = freqData[i];
-    const y = spectrumCanvas.height - (value / 255) * spectrumCanvas.height;
-    
-    if (i === 0) {
-      spectrumCtx.moveTo(0, y);
-    } else {
-      spectrumCtx.lineTo(i * barWidth, y);
+    for (let f = 0; f < freqBins; f++) {
+      const value = spectrum[f];
+      const y = spectrumCanvas.height - (f + 1) * cellHeight;
+      
+      // 彩虹色映射（根据能量强度）
+      // 低能量：红色 → 中能量：黄色/绿色 → 高能量：蓝色/紫色
+      const normalizedValue = value / 255;
+      const hue = (1 - normalizedValue) * 240;  // 0(红) → 240(蓝)
+      const saturation = 80 + normalizedValue * 20;  // 80-100%
+      const lightness = 40 + normalizedValue * 30;  // 40-70%
+      const alpha = 0.3 + normalizedValue * 0.7;  // 0.3-1.0
+      
+      spectrumCtx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+      spectrumCtx.fillRect(x, y, cellWidth + 1, cellHeight + 1);
     }
   }
   
-  spectrumCtx.stroke();
+  // 绘制频率刻度标签
+  spectrumCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  spectrumCtx.font = '10px Arial';
+  spectrumCtx.fillText('5kHz', 5, spectrumCanvas.height - 5);
+  spectrumCtx.fillText('0Hz', 5, spectrumCanvas.height - 10);
 }
 
 // ========== Spectral Flux Onset Detection 算法实现 ==========
