@@ -1,4 +1,4 @@
-// 吉他扫弦练习助手 - 核心音频分析引擎 v2.1
+// 吉他扫弦练习助手 - 核心音频分析引擎 v2.0
 // 新增和弦识别与转换训练功能
 
 // ========== 和弦识别模块 ==========
@@ -150,7 +150,7 @@ function getIsPlayingDemo() {
 
 // 设置 isPlayingDemo 状态并追踪
 function setIsPlayingDemo(val) {
-  console.log('[GuitarStrumTrainer] isPlayingDemo changed:', val, 'from:', new Error().stack.split('\n')[2]);
+  if (DEBUG) console.log('[GuitarStrumTrainer] isPlayingDemo changed:', val, 'from:', new Error().stack.split('\n')[2]);
   _isPlayingDemo = val;
 }
 
@@ -467,7 +467,7 @@ function showPracticeReport() {
 }
 
 function init() {
-  console.log(`[GuitarStrumTrainer] ${APP_VERSION} 开始初始化...`);
+  if (DEBUG) console.log(`[GuitarStrumTrainer] ${APP_VERSION} 开始初始化...`);
   
   // 获取所有 DOM 元素
   btnStart = document.getElementById('btnStart');
@@ -573,7 +573,7 @@ if (DEBUG)       console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.w
   practiceModeComprehensive = document.getElementById('practiceModeComprehensive');
   practiceModeDescription = document.getElementById('practiceModeDescription');
   
-  console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
+  if (DEBUG) console.log('[GuitarStrumTrainer] DOM 元素获取完成', {
     btnStart: !!btnStart,
     btnStop: !!btnStop,
     demoButtons: demoButtons?.length || 0,
@@ -611,7 +611,7 @@ if (DEBUG)       console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.w
   // 初始化练习报告模态框
   setupPracticeReport();
   
-  console.log('[GuitarStrumTrainer] 初始化完成');
+  if (DEBUG) console.log('[GuitarStrumTrainer] 初始化完成');
 }
 
 // 设置节奏型选择
@@ -672,20 +672,20 @@ function setupDemoButtons() {
       // 防止快速重复点击（100ms 内只响应一次）
       const now = Date.now();
       if (now - lastDemoClickTime < 100) {
-        console.log('[GuitarStrumTrainer] Demo click too fast, ignoring');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Demo click too fast, ignoring');
         return;
       }
       lastDemoClickTime = now;
       
       const rhythmIndex = parseInt(btn.dataset.rhythm);
       
-      console.log('[GuitarStrumTrainer] Demo button clicked:', { rhythmIndex, isPlayingDemo: getIsPlayingDemo() });
+      if (DEBUG) console.log('[GuitarStrumTrainer] Demo button clicked:', { rhythmIndex, isPlayingDemo: getIsPlayingDemo() });
       
       if (getIsPlayingDemo()) {
-        console.log('[GuitarStrumTrainer] Stopping demo...');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Stopping demo...');
         stopDemo();
       } else {
-        console.log('[GuitarStrumTrainer] Starting demo...');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Starting demo...');
         playDemo(rhythmIndex, btn);
       }
     });
@@ -705,20 +705,20 @@ function setupDemoButtons() {
       // 防止快速重复点击（100ms 内只响应一次）
       const now = Date.now();
       if (now - lastDemoClickTime < 100) {
-        console.log('[GuitarStrumTrainer] Custom demo click too fast, ignoring');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Custom demo click too fast, ignoring');
         return;
       }
       lastDemoClickTime = now;
       
       const customIndex = parseInt(newBtn.dataset.custom);
       
-      console.log('[GuitarStrumTrainer] Custom demo button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
+      if (DEBUG) console.log('[GuitarStrumTrainer] Custom demo button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
       
       if (getIsPlayingDemo()) {
-        console.log('[GuitarStrumTrainer] Stopping custom demo...');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Stopping custom demo...');
         stopDemo();
       } else {
-        console.log('[GuitarStrumTrainer] Starting custom demo...');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Starting custom demo...');
         // 直接调用 playCustomRhythmFromList，传递当前点击的按钮
         playCustomRhythmFromList(customIndex, newBtn);
       }
@@ -799,7 +799,7 @@ function stopMetronome() {
 
 // 播放节奏型演示 - 循环播放版本
 async function playDemo(rhythmIndex, btnElement) {
-  console.log('[GuitarStrumTrainer] playDemo starting, setting isPlayingDemo=true');
+  if (DEBUG) console.log('[GuitarStrumTrainer] playDemo starting, setting isPlayingDemo=true');
   setIsPlayingDemo(true);
   demoLoopCount = 0;
   currentDemoRhythmIndex = rhythmIndex;
@@ -821,19 +821,19 @@ async function playDemo(rhythmIndex, btnElement) {
   let noteIndex = 0;
   
   async function playNextNote() {
-    console.log('[GuitarStrumTrainer] playNextNote check:', { isPlayingDemo: getIsPlayingDemo(), noteIndex });
+    if (DEBUG) console.log('[GuitarStrumTrainer] playNextNote check:', { isPlayingDemo: getIsPlayingDemo(), noteIndex });
     if (!getIsPlayingDemo()) {
-      console.log('[GuitarStrumTrainer] playNextNote: isPlayingDemo=false, stopping');
+      if (DEBUG) console.log('[GuitarStrumTrainer] playNextNote: isPlayingDemo=false, stopping');
       return;
     }
     
-    console.log('[GuitarStrumTrainer] playNextNote:', { noteIndex, patternLength: pattern.pattern.length });
+    if (DEBUG) console.log('[GuitarStrumTrainer] playNextNote:', { noteIndex, patternLength: pattern.pattern.length });
     
     // 检测一轮结束，开始新一轮
     if (noteIndex > 0 && noteIndex % pattern.pattern.length === 0) {
       demoLoopCount++;
       feedbackMessage.textContent = `演示播放中 - 第 ${demoLoopCount + 1} 轮`;
-      console.log('[GuitarStrumTrainer] Starting loop', demoLoopCount + 1);
+      if (DEBUG) console.log('[GuitarStrumTrainer] Starting loop', demoLoopCount + 1);
     }
     
     const direction = pattern.demo[noteIndex % pattern.demo.length];
@@ -862,7 +862,7 @@ async function playDemo(rhythmIndex, btnElement) {
     const patternDuration = pattern.pattern[noteIndex % pattern.pattern.length];
     const intervalMs = patternDuration * (baseBPM / currentBPM);
     
-    console.log('[GuitarStrumTrainer] Scheduling next note:', {
+    if (DEBUG) console.log('[GuitarStrumTrainer] Scheduling next note:', {
       noteIndex,
       patternDuration,
       baseBPM,
@@ -882,8 +882,8 @@ async function playDemo(rhythmIndex, btnElement) {
 
 // 停止演示
 function stopDemo() {
-  console.log('[GuitarStrumTrainer] stopDemo called from:', new Error().stack.split('\n')[2]);
-  console.log('[GuitarStrumTrainer] stopDemo: isPlayingDemo was', getIsPlayingDemo());
+  if (DEBUG) console.log('[GuitarStrumTrainer] stopDemo called from:', new Error().stack.split('\n')[2]);
+  if (DEBUG) console.log('[GuitarStrumTrainer] stopDemo: isPlayingDemo was', getIsPlayingDemo());
   setIsPlayingDemo(false);
   if (demoTimeout) clearTimeout(demoTimeout);
   if (window.customRhythmCleanup) {
@@ -893,7 +893,7 @@ function stopDemo() {
   demoLoopCount = 0;
   currentDemoRhythmIndex = -1;
   
-  console.log('[GuitarStrumTrainer] stopDemo: clearing timeout and resetting state');
+  if (DEBUG) console.log('[GuitarStrumTrainer] stopDemo: clearing timeout and resetting state');
   currentPlayingDemoBtn = null;
   
   // 重置所有演示按钮（包括自定义节奏型按钮）
@@ -1055,7 +1055,7 @@ async function loadGuitarSoundfont() {
   if (soundfontLoading || soundfontLoaded) return;
   
   soundfontLoading = true;
-  console.log('[GuitarStrumTrainer] 开始加载吉他音源 (FluidR3 GM - 钢弦吉他)...');
+  if (DEBUG) console.log('[GuitarStrumTrainer] 开始加载吉他音源 (FluidR3 GM - 钢弦吉他)...');
   
   try {
     // 检查 Soundfont 全局对象是否存在
@@ -1075,7 +1075,7 @@ async function loadGuitarSoundfont() {
     });
     
     soundfontLoaded = true;
-    console.log('[GuitarStrumTrainer] ✓ 吉他音源加载完成 (FluidR3_GM)');
+    if (DEBUG) console.log('[GuitarStrumTrainer] ✓ 吉他音源加载完成 (FluidR3_GM)');
     
   } catch (error) {
     console.error('[GuitarStrumTrainer] 音源加载失败:', error);
@@ -1093,10 +1093,10 @@ async function loadGuitarSoundfont() {
 // 5. 16 分音符也区分上下扫（下扫更轻，上扫稍强）
 // 6. 添加轻微力度变化，让每次扫弦都有细微差别
 async function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
-  console.log('[GuitarStrumTrainer] playStrumSound:', { direction, hasSoundfont: !!guitarSoundfont });
+  if (DEBUG) console.log('[GuitarStrumTrainer] playStrumSound:', { direction, hasSoundfont: !!guitarSoundfont });
   
   if (!guitarSoundfont) {
-    console.log('[GuitarStrumTrainer] playStrumSound: using synth fallback');
+    if (DEBUG) console.log('[GuitarStrumTrainer] playStrumSound: using synth fallback');
     await playStrumSoundSynth(direction, duration);
     return;
   }
@@ -1166,18 +1166,18 @@ async function playStrumSound(direction, duration = 0.15, noteVelocities = null)
 
 // 备选合成音色 (当音源加载失败时使用) - 增强音量版
 async function playStrumSoundSynth(direction, duration = 0.15) {
-  console.log('[GuitarStrumTrainer] playStrumSoundSynth:', { direction, duration });
+  if (DEBUG) console.log('[GuitarStrumTrainer] playStrumSoundSynth:', { direction, duration });
   
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
-    console.log('[GuitarStrumTrainer] Created new AudioContext');
+    if (DEBUG) console.log('[GuitarStrumTrainer] Created new AudioContext');
   }
   
   // 移动端修复：确保 AudioContext 已恢复
   if (audioContextForMetronome.state === 'suspended') {
-    console.log('[GuitarStrumTrainer] Resuming AudioContext...');
+    if (DEBUG) console.log('[GuitarStrumTrainer] Resuming AudioContext...');
     await audioContextForMetronome.resume();
-    console.log('[GuitarStrumTrainer] AudioContext resumed, state:', audioContextForMetronome.state);
+    if (DEBUG) console.log('[GuitarStrumTrainer] AudioContext resumed, state:', audioContextForMetronome.state);
   }
   
   const ctx = audioContextForMetronome;
@@ -1248,16 +1248,16 @@ function setupButtons() {
   }
   
   btnStart.addEventListener('click', () => {
-    console.log('[GuitarStrumTrainer] 开始练习按钮被点击');
+    if (DEBUG) console.log('[GuitarStrumTrainer] 开始练习按钮被点击');
     startListening();
   });
   
   btnStop.addEventListener('click', () => {
-    console.log('[GuitarStrumTrainer] 停止按钮被点击');
+    if (DEBUG) console.log('[GuitarStrumTrainer] 停止按钮被点击');
     stopListening();
   });
   
-  console.log('[GuitarStrumTrainer] 按钮事件绑定成功');
+  if (DEBUG) console.log('[GuitarStrumTrainer] 按钮事件绑定成功');
 }
 
 // 设置画布
@@ -2456,10 +2456,10 @@ function renderStatsChart() {
 
 // 启动 - 确保 DOM 加载完成后再初始化
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[GuitarStrumTrainer] DOMContentLoaded 触发');
+  if (DEBUG) console.log('[GuitarStrumTrainer] DOMContentLoaded 触发');
   try {
     init();
-    console.log('[GuitarStrumTrainer] 初始化成功');
+    if (DEBUG) console.log('[GuitarStrumTrainer] 初始化成功');
   } catch (error) {
     console.error('[GuitarStrumTrainer] 初始化失败:', error);
   }
@@ -2624,20 +2624,20 @@ function renderCustomRhythmsList() {
       // 防止快速重复点击（100ms 内只响应一次）
       const now = Date.now();
       if (now - lastDemoClickTime < 100) {
-        console.log('[GuitarStrumTrainer] Custom list click too fast, ignoring');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Custom list click too fast, ignoring');
         return;
       }
       lastDemoClickTime = now;
       
       const customIndex = parseInt(btn.dataset.customIndex);
       
-      console.log('[GuitarStrumTrainer] Custom list play button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
+      if (DEBUG) console.log('[GuitarStrumTrainer] Custom list play button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
       
       if (getIsPlayingDemo()) {
-        console.log('[GuitarStrumTrainer] Stopping custom list demo...');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Stopping custom list demo...');
         stopDemo();
       } else {
-        console.log('[GuitarStrumTrainer] Starting custom list demo...');
+        if (DEBUG) console.log('[GuitarStrumTrainer] Starting custom list demo...');
         playCustomRhythmFromList(customIndex, btn);
       }
     });
@@ -2705,7 +2705,7 @@ function syncCustomRhythmsToSelector() {
   // 重新绑定所有演示按钮事件（包括新增的自定义按钮）
   setupDemoButtons();
   
-  console.log('[GuitarStrumTrainer] 自定义节奏型已同步到主列表:', customRhythms.length);
+  if (DEBUG) console.log('[GuitarStrumTrainer] 自定义节奏型已同步到主列表:', customRhythms.length);
 }
 
 // 选择自定义节奏型
@@ -2731,7 +2731,7 @@ function selectCustomRhythm(index) {
   const tempDemo = rhythm.notes.map(note => note.direction);
   feedbackMessage.textContent = `已选择：${rhythm.name} - ${tempDemo.join(' ')}`;
   
-  console.log('[GuitarStrumTrainer] 已选择自定义节奏型:', rhythm.name);
+  if (DEBUG) console.log('[GuitarStrumTrainer] 已选择自定义节奏型:', rhythm.name);
 }
 
 // 设置自定义节奏型按钮
@@ -2836,7 +2836,7 @@ function playCustomRhythmFromList(index, btn) {
 
 // 播放自定义节奏型（保留旧函数名兼容，优先使用主选择器中的按钮）
 function playCustomRhythm(index) {
-  console.log('[GuitarStrumTrainer] playCustomRhythm called with index:', index);
+  if (DEBUG) console.log('[GuitarStrumTrainer] playCustomRhythm called with index:', index);
   // 优先查找主选择器中的按钮（.btn-demo[data-custom]）
   let btn = document.querySelector(`.btn-demo[data-custom="${index}"]`);
   // 如果找不到，再查找自定义列表中的按钮
@@ -2844,7 +2844,7 @@ function playCustomRhythm(index) {
     btn = document.querySelector(`.btn-custom-play[data-custom-index="${index}"]`);
   }
   if (btn) {
-    console.log('[GuitarStrumTrainer] playCustomRhythm found button, calling playCustomRhythmFromList');
+    if (DEBUG) console.log('[GuitarStrumTrainer] playCustomRhythm found button, calling playCustomRhythmFromList');
     playCustomRhythmFromList(index, btn);
   } else {
     console.warn('[GuitarStrumTrainer] playCustomRhythm: button not found for index', index);
@@ -2950,7 +2950,7 @@ function saveRhythmEditor() {
   // 重新绑定演示按钮事件
   setupDemoButtons();
   
-  console.log('[GuitarStrumTrainer] 节奏型已保存:', name);
+  if (DEBUG) console.log('[GuitarStrumTrainer] 节奏型已保存:', name);
 }
 
 // 关闭节奏型编辑器
@@ -2975,7 +2975,7 @@ function saveUserSettings() {
   
   try {
     localStorage.setItem('guitarStrumUserSettings', JSON.stringify(settings));
-    console.log('[GuitarStrumTrainer] 用户设置已保存');
+    if (DEBUG) console.log('[GuitarStrumTrainer] 用户设置已保存');
   } catch (e) {
     console.warn('无法保存用户设置:', e);
   }
@@ -3030,7 +3030,7 @@ function loadUserSettings() {
       customRhythms = settings.customRhythms;
     }
     
-    console.log('[GuitarStrumTrainer] 用户设置已加载');
+    if (DEBUG) console.log('[GuitarStrumTrainer] 用户设置已加载');
   } catch (e) {
     console.warn('无法加载用户设置:', e);
   }
@@ -3056,7 +3056,7 @@ function exportUserSettings() {
   link.click();
   
   URL.revokeObjectURL(url);
-  console.log('[GuitarStrumTrainer] 设置已导出');
+  if (DEBUG) console.log('[GuitarStrumTrainer] 设置已导出');
 }
 
 // 导入用户设置
@@ -3253,7 +3253,7 @@ function initChordTraining(mode, progression) {
     
     updateNextChordDisplay(nextChord);
     
-    console.log('[ChordTraining] 初始化完成:', mode, progression);
+    if (DEBUG) console.log('[ChordTraining] 初始化完成:', mode, progression);
   }
 }
 
@@ -3269,7 +3269,7 @@ function nextChordInProgression() {
   
   updateNextChordDisplay(nextChord);
   
-  console.log('[ChordTraining] 切换到和弦:', expectedChord);
+  if (DEBUG) console.log('[ChordTraining] 切换到和弦:', expectedChord);
 }
 
 /**
@@ -3297,7 +3297,7 @@ function resetChordTraining() {
   if (currentChordDisplayEl) currentChordDisplayEl.textContent = '--';
   if (nextChordDisplayEl) nextChordDisplayEl.textContent = '--';
   
-  console.log('[ChordTraining] 已重置');
+  if (DEBUG) console.log('[ChordTraining] 已重置');
 }
 
 // 自动保存设置（定期）
@@ -3327,7 +3327,7 @@ function setupPracticeMode() {
 function setPracticeMode(mode) {
   practiceMode = mode;
   updatePracticeModeUI();
-  console.log('[PracticeMode] 练习模式已切换:', mode);
+  if (DEBUG) console.log('[PracticeMode] 练习模式已切换:', mode);
 }
 
 /**
@@ -3366,7 +3366,7 @@ function updatePracticeModeUI() {
  * 设置和弦训练功能
  */
 function setupChordTraining() {
-  console.log('[ChordTraining] 初始化和弦训练功能...');
+  if (DEBUG) console.log('[ChordTraining] 初始化和弦训练功能...');
   
   // 模式切换
   if (modePreset) {
@@ -3387,7 +3387,7 @@ function setupChordTraining() {
         currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[index].chords;
         updateChordProgressionDisplay();
         updateProgressionDetail(index);
-        console.log('[ChordTraining] 预设进行已选择:', currentProgression);
+        if (DEBUG) console.log('[ChordTraining] 预设进行已选择:', currentProgression);
       }
     });
     // 初始化默认预设
@@ -3421,7 +3421,7 @@ function setupChordTraining() {
   // 初始化和弦检测器（需要 audioContext 和 analyser）
   // 在 startListening 时初始化
   
-  console.log('[ChordTraining] 和弦训练功能初始化完成');
+  if (DEBUG) console.log('[ChordTraining] 和弦训练功能初始化完成');
 }
 
 /**
@@ -3458,7 +3458,7 @@ function setTrainingMode(mode) {
     if (progressionDetailEl) progressionDetailEl.style.display = 'block';
   }
   
-  console.log('[ChordTraining] 训练模式已切换:', mode);
+  if (DEBUG) console.log('[ChordTraining] 训练模式已切换:', mode);
 }
 
 /**
@@ -3527,7 +3527,7 @@ function saveCustomProgression() {
   localStorage.setItem('guitar-custom-progressions', JSON.stringify(saved));
   
   alert(`"${name}" 已保存！`);
-  console.log('[ChordTraining] 自定义进行已保存:', name);
+  if (DEBUG) console.log('[ChordTraining] 自定义进行已保存:', name);
 }
 
 /**
@@ -3779,7 +3779,7 @@ function initChordDetector() {
     transitionDetector = new window.TransitionDetector();
     // 根据练习模式决定是否启用和弦识别
     chordRecognitionEnabled = practiceMode === 'comprehensive';
-    console.log('[ChordTraining] 和弦检测器已初始化, chordRecognitionEnabled:', chordRecognitionEnabled);
+    if (DEBUG) console.log('[ChordTraining] 和弦检测器已初始化, chordRecognitionEnabled:', chordRecognitionEnabled);
   }
 }
 
