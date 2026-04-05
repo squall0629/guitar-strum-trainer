@@ -1545,6 +1545,9 @@ if (DEBUG)   console.log('[DEBUG analyzeAudio] 开始分析帧...');
     volumeMeterFill.style.width = volumePercent + '%';
   }
   
+  // 绘制录音波形图
+  drawRecorderWaveform(timeDataCache, rms);
+  
   // 绘制时域频谱图 - 节流到 15 FPS
   drawSpectrumWaveform(freqDataCache);
   
