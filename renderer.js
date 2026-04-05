@@ -4107,4 +4107,3 @@ window.guitarTrainer = {
   setTrainingMode: setTrainingMode
 };
 }
-
