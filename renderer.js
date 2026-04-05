@@ -1515,6 +1515,9 @@ function detectStrum(freqData, timeData) {
     
     // 实时反馈
     provideFeedback(strum);
+    
+    // 立即更新评分
+    updateScores();
   }
 }
 
