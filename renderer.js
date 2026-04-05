@@ -339,8 +339,9 @@ function init() {
   recorderCanvas = document.getElementById('recorderWaveform');
   recorderCtx = recorderCanvas ? recorderCanvas.getContext('2d') : null;
   if (recorderCanvas) {
-    recorderCanvas.width = recorderCanvas.offsetWidth;
-    recorderCanvas.height = recorderCanvas.offsetHeight;
+    // 设置 canvas 实际像素尺寸
+    recorderCanvas.width = recorderCanvas.offsetWidth || 600;
+    recorderCanvas.height = recorderCanvas.offsetHeight || 80;
   }
   
   metronomeToggle = document.getElementById('metronomeToggle');
