@@ -175,7 +175,7 @@ function updateThreshold() {
 
 // 计算稳定性评分（基于历史数据）
 function calculateStabilityScore(history) {
-  if (history.length < 2) return 0;  // 至少 2 个小节才能计算
+  if (history.length < MAX_HISTORY) return 0;  // 至少 MAX_HISTORY(10) 个小节才能计算
   
   // 1. 计算平均分
   const avg = history.reduce((a, b) => a + b, 0) / history.length;
@@ -229,7 +229,7 @@ function updateStabilityScores() {
   if (dynamicsStabilityEl) dynamicsStabilityEl.textContent = dynamicsStability > 0 ? dynamicsStability : '--';
   if (overallStabilityEl) overallStabilityEl.textContent = overallStability > 0 ? overallStability : '--';
   
-  if (measureHistory.rhythm.length >= 2) {
+  if (measureHistory.rhythm.length >= MAX_HISTORY) {
     console.log('[DEBUG 历史稳定性] 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability, '综合:', overallStability);
   }
 }
