@@ -1720,39 +1720,49 @@ function updateScores() {
   updateScoreRing(totalRingEl, totalScoreEl, totalScore);
 }
 
-// 改进的节奏评分算法
+// 改进的节奏评分算法 - 基于稳定度（而非精准度）
 function calculateRhythmScore(strums, pattern) {
   if (strums.length < 2) return 0;
   
-  let totalScore = 0;
-  let validStrums = 0;
-  
-  // 计算基于当前 BPM 的理论时值（节奏型定义基于 120BPM）
-  const bpmRatio = 120 / currentBPM;  // BPM 越低，时值越长
-  
+  // 收集所有扫弦间隔
+  const intervals = [];
   for (let i = 1; i < strums.length; i++) {
-    // 根据 BPM 动态调整预期时值
-    const baseExpectedInterval = pattern.pattern[(i - 1) % pattern.pattern.length];
-    const expectedInterval = baseExpectedInterval * bpmRatio;  // 根据 BPM 缩放
-    const actualInterval = strums[i].interval;
-    
-    // 计算偏差百分比
-    const deviation = Math.abs(actualInterval - expectedInterval);
-    const deviationPercent = deviation / expectedInterval;
-    
-    // 使用高斯衰减函数，提供更平滑的评分
-    // σ = 0.25 表示 25% 偏差时得分约 60 分
-    const sigma = 0.25;
-    const score = 100 * Math.exp(-(deviationPercent * deviationPercent) / (2 * sigma * sigma));
-    
-    totalScore += Math.max(0, Math.min(100, score));
-    validStrums++;
-    
-    console.log('[DEBUG 节奏评分] 预期:', expectedInterval.toFixed(1), 'ms, 实际:', actualInterval.toFixed(1), 'ms, 偏差:', (deviationPercent * 100).toFixed(1) + '%, 得分:', Math.round(score));
+    intervals.push(strums[i].interval);
   }
   
-  const baseScore = validStrums > 0 ? totalScore / validStrums : 0;
-  return Math.round(Math.max(0, Math.min(100, baseScore)));
+  // 计算平均间隔
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  
+  // 计算标准差
+  const variance = intervals.reduce((sum, interval) => {
+    return sum + Math.pow(interval - avgInterval, 2);
+  }, 0) / intervals.length;
+  
+  const stdDev = Math.sqrt(variance);
+  
+  // 计算变异系数（Coefficient of Variation, CV）
+  // CV = 标准差 / 平均值，表示相对波动程度
+  const cv = stdDev / avgInterval;
+  
+  // 根据变异系数评分（CV 越小越稳定）
+  // CV < 0.10 (10%)  → 非常稳定，90-100 分
+  // CV < 0.20 (20%)  → 较稳定，70-90 分
+  // CV < 0.30 (30%)  → 一般，60-70 分
+  // CV >= 0.30       → 波动大，0-60 分
+  let score;
+  if (cv < 0.10) {
+    score = 90 + (0.10 - cv) * 100;  // 90-100 分
+  } else if (cv < 0.20) {
+    score = 70 + (0.20 - cv) * 200;  // 70-90 分
+  } else if (cv < 0.30) {
+    score = 60 + (0.30 - cv) * 100;  // 60-70 分
+  } else {
+    score = Math.max(0, 60 - (cv - 0.30) * 100);  // 0-60 分
+  }
+  
+  console.log('[DEBUG 节奏稳定度] 平均间隔:', avgInterval.toFixed(1), 'ms, 标准差:', stdDev.toFixed(1), 'ms, 变异系数:', (cv * 100).toFixed(1) + '%, 得分:', Math.round(score));
+  
+  return Math.round(Math.max(0, Math.min(100, score)));
 }
 
 // 改进的音色评分算法
