@@ -524,8 +524,8 @@ function init() {
       const feedbackMessage = document.getElementById('feedbackMessage');
       if (feedbackMessage && !isListeningState()) feedbackMessage.textContent = `灵敏度：${level} - 开始练习后生效`;
     },
-    onStart: () => startListening(),
-    onStop: () => stopListening()
+    onStart: () => audioStartListening(),
+    onStop: () => audioStopListening()
   });
   
   // 初始化和弦训练
