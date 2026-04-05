@@ -8,8 +8,8 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true
     },
     title: '吉他扫弦练习助手',
     icon: path.join(__dirname, 'icon.png')

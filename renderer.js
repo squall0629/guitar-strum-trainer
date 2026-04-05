@@ -75,17 +75,17 @@ const RHYTHM_PATTERNS = [
 
 // 获取当前激活的节奏型（支持预设和自定义）
 function getActiveRhythm(index) {
-  console.log('[DEBUG getActiveRhythm] Called with index:', index, 'RHYTHM_PATTERNS.length:', RHYTHM_PATTERNS.length, 'customRhythms.length:', customRhythms.length);
+if (DEBUG)   console.log('[DEBUG getActiveRhythm] Called with index:', index, 'RHYTHM_PATTERNS.length:', RHYTHM_PATTERNS.length, 'customRhythms.length:', customRhythms.length);
   if (index >= 0 && index < RHYTHM_PATTERNS.length) {
-    console.log('[DEBUG getActiveRhythm] Returning preset pattern:', RHYTHM_PATTERNS[index].name);
+if (DEBUG)     console.log('[DEBUG getActiveRhythm] Returning preset pattern:', RHYTHM_PATTERNS[index].name);
     return RHYTHM_PATTERNS[index];
   }
   const customIndex = index - RHYTHM_PATTERNS.length;
-  console.log('[DEBUG getActiveRhythm] customIndex:', customIndex);
+if (DEBUG)   console.log('[DEBUG getActiveRhythm] customIndex:', customIndex);
   if (customIndex >= 0 && customIndex < customRhythms.length) {
     const rhythm = customRhythms[customIndex];
     if (!rhythm.notes || rhythm.notes.length === 0) {
-      console.log('[DEBUG getActiveRhythm] Custom rhythm has no notes, returning null');
+if (DEBUG)       console.log('[DEBUG getActiveRhythm] Custom rhythm has no notes, returning null');
       return null;
     }
     
@@ -124,7 +124,7 @@ function getActiveRhythm(index) {
       customIndex: customIndex
     };
   }
-  console.log('[DEBUG getActiveRhythm] No matching pattern found, returning null. index:', index);
+if (DEBUG)   console.log('[DEBUG getActiveRhythm] No matching pattern found, returning null. index:', index);
   return null;
 }
 
@@ -170,7 +170,7 @@ function updateThreshold() {
     thresholdDisplay.textContent = strumThreshold.toFixed(2);
   }
   
-  console.log('[DEBUG 灵敏度] 灵敏度:', sensitivityLevel, '→ 阈值:', strumThreshold.toFixed(3));
+if (DEBUG)   console.log('[DEBUG 灵敏度] 灵敏度:', sensitivityLevel, '→ 阈值:', strumThreshold.toFixed(3));
 }
 
 // 计算稳定性评分（基于历史数据）
@@ -217,8 +217,8 @@ function updateStabilityScores() {
   const toneStability = calculateStabilityScore(measureHistory.tone);
   const dynamicsStability = calculateStabilityScore(measureHistory.dynamics);
   
-  console.log('[DEBUG 稳定性评分] 历史数据 - 节奏:', measureHistory.rhythm, '音色:', measureHistory.tone, '强弱:', measureHistory.dynamics);
-  console.log('[DEBUG 稳定性评分] 计算结果 - 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability);
+if (DEBUG)   console.log('[DEBUG 稳定性评分] 历史数据 - 节奏:', measureHistory.rhythm, '音色:', measureHistory.tone, '强弱:', measureHistory.dynamics);
+if (DEBUG)   console.log('[DEBUG 稳定性评分] 计算结果 - 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability);
   
   // 综合稳定性（三个维度的平均）
   const overallStability = Math.round((rhythmStability + toneStability + dynamicsStability) / 3);
@@ -230,7 +230,7 @@ function updateStabilityScores() {
   if (overallStabilityEl) overallStabilityEl.textContent = overallStability > 0 ? overallStability : '--';
   
   if (measureHistory.rhythm.length >= MAX_HISTORY) {
-    console.log('[DEBUG 历史稳定性] 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability, '综合:', overallStability);
+if (DEBUG)     console.log('[DEBUG 历史稳定性] 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability, '综合:', overallStability);
   }
 }
 
@@ -294,7 +294,7 @@ function checkMeasureUpdate() {
     // 更新历史稳定性评分
     updateStabilityScores();
     
-    console.log('[DEBUG 小节评分] 小节时长:', measureDuration, 'ms, 扫弦数:', currentMeasureStrums.length, '得分:', totalScore);
+if (DEBUG)     console.log('[DEBUG 小节评分] 小节时长:', measureDuration, 'ms, 扫弦数:', currentMeasureStrums.length, '得分:', totalScore);
     
     // 开始新小节
     currentMeasureStartTime = now;
@@ -358,6 +358,7 @@ let transitionTimeTrendChartInstance = null;
 let recorderCanvas, recorderCtx;
 let recorderWaveformData = [];  // 波形数据缓冲区
 const RECORDER_BUFFER_SIZE = 300;  // 波形数据点数
+let _diagnosticFrameCounter = 0;  // 诊断日志帧计数器
 
 // 时域频谱图
 let spectrumCanvas, spectrumCtx;
@@ -379,7 +380,8 @@ let chordTrainingPanel;
 let practiceModeRhythm, practiceModeComprehensive, practiceModeDescription;
 
 // 版本号
-const APP_VERSION = 'v1.8';
+const DEBUG = false;  // 生产环境关闭调试日志
+const APP_VERSION = 'v2.0';
 
 // 初始化
 function setupPracticeReport() {
@@ -486,7 +488,7 @@ function init() {
     setTimeout(() => {
       canvas.width = canvas.offsetWidth || 600;
       canvas.height = canvas.offsetHeight || 120;
-      console.log('[DEBUG Canvas] waveform canvas:', canvas.width, 'x', canvas.height);
+if (DEBUG)       console.log('[DEBUG Canvas] waveform canvas:', canvas.width, 'x', canvas.height);
     }, 100);
   }
   
@@ -498,7 +500,7 @@ function init() {
     setTimeout(() => {
       recorderCanvas.width = recorderCanvas.offsetWidth || 600;
       recorderCanvas.height = recorderCanvas.offsetHeight || 120;
-      console.log('[DEBUG Canvas] recorder canvas:', recorderCanvas.width, 'x', recorderCanvas.height);
+if (DEBUG)       console.log('[DEBUG Canvas] recorder canvas:', recorderCanvas.width, 'x', recorderCanvas.height);
     }, 100);
   }
   
@@ -509,7 +511,7 @@ function init() {
     setTimeout(() => {
       spectrumCanvas.width = spectrumCanvas.offsetWidth || 600;
       spectrumCanvas.height = spectrumCanvas.offsetHeight || 120;
-      console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.width, 'x', spectrumCanvas.height);
+if (DEBUG)       console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.width, 'x', spectrumCanvas.height);
     }, 100);
   }
   
@@ -1282,7 +1284,7 @@ function updateStatus(status) {
 
 // 开始监听
 async function startListening() {
-  console.log('[DEBUG startListening] 开始监听函数被调用');
+if (DEBUG)   console.log('[DEBUG startListening] 开始监听函数被调用');
   try {
     // 检查浏览器支持
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1297,7 +1299,7 @@ async function startListening() {
     }
     
     // 请求麦克风权限
-    console.log('[DEBUG startListening] 请求麦克风权限...');
+if (DEBUG)     console.log('[DEBUG startListening] 请求麦克风权限...');
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: false,
@@ -1307,10 +1309,10 @@ async function startListening() {
       } 
     });
     
-    console.log('[DEBUG startListening] 麦克风权限已获取');
+if (DEBUG)     console.log('[DEBUG startListening] 麦克风权限已获取');
     
     // 创建音频上下文
-    console.log('[DEBUG startListening] 创建音频上下文...');
+if (DEBUG)     console.log('[DEBUG startListening] 创建音频上下文...');
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 2048;
@@ -1324,7 +1326,7 @@ async function startListening() {
     microphone.connect(micGain);
     micGain.connect(analyser);
     
-    console.log('[DEBUG startListening] 音频上下文和节点已创建，麦克风增益：15.0x');
+if (DEBUG)     console.log('[DEBUG startListening] 音频上下文和节点已创建，麦克风增益：15.0x');
     
     isListening = true;
     detectedStrums = [];
@@ -1347,7 +1349,7 @@ async function startListening() {
     if (dynamicsStabilityEl) dynamicsStabilityEl.textContent = '--';
     if (overallStabilityEl) overallStabilityEl.textContent = '--';
     
-    console.log('[DEBUG startListening] 状态已重置 - lastStrumTime:', lastStrumTime, 'detectedStrums.length:', detectedStrums.length);
+if (DEBUG)     console.log('[DEBUG startListening] 状态已重置 - lastStrumTime:', lastStrumTime, 'detectedStrums.length:', detectedStrums.length);
     
     // 重置 Spectral Flux Onset Detection 状态
     previousSpectrum = null;
@@ -1387,9 +1389,9 @@ async function startListening() {
     }
     
     // 开始分析循环
-    console.log('[DEBUG startListening] 开始调用 analyzeAudio()');
+if (DEBUG)     console.log('[DEBUG startListening] 开始调用 analyzeAudio()');
     analyzeAudio();
-    console.log('[DEBUG startListening] analyzeAudio() 已启动');
+if (DEBUG)     console.log('[DEBUG startListening] analyzeAudio() 已启动');
     
   } catch (err) {
     console.error('[GuitarStrumTrainer] 音频初始化失败:', err.name, err.message);
@@ -1462,11 +1464,11 @@ function stopListening() {
 // 音频分析主循环
 function analyzeAudio() {
   if (!isListening) {
-    console.log('[DEBUG analyzeAudio] isListening=false，停止分析');
+if (DEBUG)     console.log('[DEBUG analyzeAudio] isListening=false，停止分析');
     return;
   }
   
-  console.log('[DEBUG analyzeAudio] 开始分析帧...');
+if (DEBUG)   console.log('[DEBUG analyzeAudio] 开始分析帧...');
   
   const bufferLength = analyser.frequencyBinCount;
   
@@ -1503,10 +1505,10 @@ function analyzeAudio() {
   drawSpectrumWaveform(freqDataCache);
   
   // 检测和弦识别
-  processChordRecognition();
+  // processChordRecognition();  // 已禁用，和弦识别在 detectStrum 中执行
   
   // 检测扫弦
-  detectStrum(freqDataCache, timeDataCache);
+  detectStrum(freqDataCache, timeDataCache, rms);
   
   // 更新评分
   updateScores();
@@ -1519,11 +1521,11 @@ let _drawCount = 0;
 function drawWaveform(timeData, rms) {
   _drawCount++;
   if (!canvas || !canvasCtx || !timeData) {
-    if (_drawCount === 1) console.log('[DEBUG drawWaveform] canvas or timeData missing');
+if (DEBUG)     if (_drawCount === 1) console.log('[DEBUG drawWaveform] canvas or timeData missing');
     return;
   }
   if (canvas.width === 0 || canvas.height === 0) {
-    if (_drawCount <= 5) console.log('[DEBUG drawWaveform] canvas size is 0:', canvas.width, 'x', canvas.height, 'frame:', _drawCount);
+if (DEBUG)     if (_drawCount <= 5) console.log('[DEBUG drawWaveform] canvas size is 0:', canvas.width, 'x', canvas.height, 'frame:', _drawCount);
     return;
   }
   
@@ -1552,7 +1554,7 @@ function drawWaveform(timeData, rms) {
   
   canvasCtx.stroke();
   
-  if (_drawCount <= 3) console.log('[DEBUG drawWaveform] drawn successfully, frame:', _drawCount);
+if (DEBUG)   if (_drawCount <= 3) console.log('[DEBUG drawWaveform] drawn successfully, frame:', _drawCount);
   
   // 绘制 Windows 录音机风格波形（使用相同的 RMS）
   drawRecorderWaveform(timeData, rms);
@@ -1563,11 +1565,11 @@ let _recorderDrawCount = 0;
 function drawRecorderWaveform(timeData, rms) {
   _recorderDrawCount++;
   if (!recorderCanvas || !recorderCtx) {
-    if (_recorderDrawCount === 1) console.log('[DEBUG drawRecorderWaveform] recorderCanvas missing');
+if (DEBUG)     if (_recorderDrawCount === 1) console.log('[DEBUG drawRecorderWaveform] recorderCanvas missing');
     return;
   }
   if (recorderCanvas.width === 0 || recorderCanvas.height === 0) {
-    if (_recorderDrawCount <= 5) console.log('[DEBUG drawRecorderWaveform] canvas size is 0:', recorderCanvas.width, 'x', recorderCanvas.height, 'frame:', _recorderDrawCount);
+if (DEBUG)     if (_recorderDrawCount <= 5) console.log('[DEBUG drawRecorderWaveform] canvas size is 0:', recorderCanvas.width, 'x', recorderCanvas.height, 'frame:', _recorderDrawCount);
     return;
   }
   
@@ -1611,7 +1613,7 @@ function drawRecorderWaveform(timeData, rms) {
   // 绘制轮廓线
   recorderCtx.stroke();
   
-  if (_recorderDrawCount <= 3) console.log('[DEBUG drawRecorderWaveform] drawn successfully, frame:', _recorderDrawCount);
+if (DEBUG)   if (_recorderDrawCount <= 3) console.log('[DEBUG drawRecorderWaveform] drawn successfully, frame:', _recorderDrawCount);
 }
 
 // 绘制时域频谱图（STFT 短时傅里叶变换 + 彩虹色热力图）
@@ -1619,15 +1621,15 @@ let _spectrumDrawCount = 0;
 function drawSpectrumWaveform(freqData) {
   _spectrumDrawCount++;
   if (!spectrumCanvas || !spectrumCtx) {
-    if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWaveform] spectrumCanvas missing');
+if (DEBUG)     if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWaveform] spectrumCanvas missing');
     return;
   }
   if (spectrumCanvas.width === 0 || spectrumCanvas.height === 0) {
-    if (_spectrumDrawCount <= 5) console.log('[DEBUG drawSpectrumWaveform] canvas size is 0:', spectrumCanvas.width, 'x', spectrumCanvas.height, 'frame:', _spectrumDrawCount);
+if (DEBUG)     if (_spectrumDrawCount <= 5) console.log('[DEBUG drawSpectrumWaveform] canvas size is 0:', spectrumCanvas.width, 'x', spectrumCanvas.height, 'frame:', _spectrumDrawCount);
     return;
   }
   if (!freqData) {
-    if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWaveform] freqData missing');
+if (DEBUG)     if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWaveform] freqData missing');
     return;
   }
   
@@ -1674,7 +1676,7 @@ function drawSpectrumWaveform(freqData) {
   spectrumCtx.fillText('5kHz', 5, spectrumCanvas.height - 5);
   spectrumCtx.fillText('0Hz', 5, spectrumCanvas.height - 10);
   
-  if (_spectrumDrawCount <= 3) console.log('[DEBUG drawSpectrumWaveform] drawn successfully, frame:', _spectrumDrawCount);
+if (DEBUG)   if (_spectrumDrawCount <= 3) console.log('[DEBUG drawSpectrumWaveform] drawn successfully, frame:', _spectrumDrawCount);
 }
 
 // ========== Spectral Flux Onset Detection 算法实现 ==========
@@ -1757,7 +1759,7 @@ function detectFluxPeak(currentFlux, threshold) {
   // 额外检查：峰值应该显著高于前几帧（降低要求：5% 增长即可，适应录音回放）
   const isSignificantPeak = currentFlux > prevFlux * 1.05;  // 至少 5% 增长
   
-  console.log('[DEBUG detectFluxPeak] flux:', currentFlux.toFixed(2), 'threshold:', threshold.toFixed(2), 'isRising:', isRising, 'isAboveThreshold:', isAboveThreshold, 'isSignificantPeak:', isSignificantPeak, 'result:', isRising && isAboveThreshold && isSignificantPeak);
+if (DEBUG)   console.log('[DEBUG detectFluxPeak] flux:', currentFlux.toFixed(2), 'threshold:', threshold.toFixed(2), 'isRising:', isRising, 'isAboveThreshold:', isAboveThreshold, 'isSignificantPeak:', isSignificantPeak, 'result:', isRising && isAboveThreshold && isSignificantPeak);
   
   if (isRising && isAboveThreshold && isSignificantPeak) {
     fluxPeakCooldown = FLUX_COOLDOWN_FRAMES;  // 进入冷却期
@@ -1804,7 +1806,7 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   const rmsThreshold = strumThreshold * 1.5;  // 使用动态阈值
   const rmsOnset = rms > rmsThreshold;
   
-  console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
+if (DEBUG)   console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
   
   // 混合策略：
   // 1. Flux 峰值 + RMS 超过 50% 阈值 = 强检测到
@@ -1815,7 +1817,7 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   const minStrumInterval = Math.round(baseMinInterval * (120 / currentBPM));  // 根据 BPM 缩放
   const timeSinceLastStrum = now - lastStrumTime;
   
-  console.log('[DEBUG 扫弦间隔] BPM:', currentBPM, 'minStrumInterval:', minStrumInterval, 'ms, timeSinceLastStrum:', timeSinceLastStrum);
+if (DEBUG)   console.log('[DEBUG 扫弦间隔] BPM:', currentBPM, 'minStrumInterval:', minStrumInterval, 'ms, timeSinceLastStrum:', timeSinceLastStrum);
   
   let onsetDetected = false;
   let confidence = 0;
@@ -1833,7 +1835,7 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
     }
   }
   
-  console.log('[DEBUG detectOnsetWithFlux] timeSinceLastStrum:', timeSinceLastStrum, 'onsetDetected:', onsetDetected, 'confidence:', confidence);
+if (DEBUG)   console.log('[DEBUG detectOnsetWithFlux] timeSinceLastStrum:', timeSinceLastStrum, 'onsetDetected:', onsetDetected, 'confidence:', confidence);
   
   return {
     onset: onsetDetected,
@@ -1844,16 +1846,9 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
 }
 
 // 扫弦检测 - 基于 Spectral Flux 的改进版本
-function detectStrum(freqData, timeData) {
+function detectStrum(freqData, timeData, rms) {
   const now = Date.now();
   
-  // 计算音量 (RMS)
-  let sum = 0;
-  for (let i = 0; i < timeData.length; i++) {
-    const normalized = (timeData[i] - 128) / 128;
-    sum += normalized * normalized;
-  }
-  const rms = Math.sqrt(sum / timeData.length);
   
   // 计算高频能量 (音色指标)
   const highFreqStart = Math.floor(freqData.length * 0.6);
@@ -1871,16 +1866,16 @@ function detectStrum(freqData, timeData) {
   totalSpectrumEnergy /= freqData.length;
   
   // 每 60 帧输出一次麦克风输入诊断（约 1 秒）
-  if (Date.now() % 60 === 0) {
-    console.log('[DEBUG 麦克风诊断] rms:', rms.toFixed(4), 'totalSpectrumEnergy:', totalSpectrumEnergy.toFixed(1), 'highFreqEnergy:', highFreqEnergy.toFixed(1), 'timeData[0]:', timeData[0]);
+  if (++_diagnosticFrameCounter % 60 === 0) {
+if (DEBUG)     console.log('[DEBUG 麦克风诊断] rms:', rms.toFixed(4), 'totalSpectrumEnergy:', totalSpectrumEnergy.toFixed(1), 'highFreqEnergy:', highFreqEnergy.toFixed(1), 'timeData[0]:', timeData[0]);
   }
   
-  console.log('[DEBUG detectStrum] rms:', rms.toFixed(3), 'highFreqEnergy:', highFreqEnergy.toFixed(1));
+if (DEBUG)   console.log('[DEBUG detectStrum] rms:', rms.toFixed(3), 'highFreqEnergy:', highFreqEnergy.toFixed(1));
   
   // 使用 Spectral Flux Onset Detection
   const onsetResult = detectOnsetWithFlux(freqData, timeData, rms);
   
-  console.log('[DEBUG detectStrum] onsetResult:', onsetResult);
+if (DEBUG)   console.log('[DEBUG detectStrum] onsetResult:', onsetResult);
   
   // 检测到扫弦
   if (onsetResult.onset) {
@@ -1899,7 +1894,7 @@ function detectStrum(freqData, timeData) {
     // 添加到当前小节
     currentMeasureStrums.push(strum);
     
-    console.log('[DEBUG detectStrum] Strum detected!', {
+if (DEBUG)     console.log('[DEBUG detectStrum] Strum detected!', {
       strumCount: detectedStrums.length,
       strum: { time: strum.time, amplitude: strum.amplitude, tone: strum.tone, interval: strum.interval },
       detectedStrums: detectedStrums.map(s => ({ tone: s.tone, interval: s.interval, amplitude: s.amplitude }))
@@ -2005,7 +2000,7 @@ function calculateRhythmScore(strums, pattern) {
   const expectedPattern = pattern.pattern.map(x => x * bpmRatio);
   const patternLength = expectedPattern.length;
   
-  console.log('[DEBUG 节奏型] BPM:', currentBPM, 'pattern:', pattern.name, 'expectedPattern:', expectedPattern.map(x => Math.round(x)));
+if (DEBUG)   console.log('[DEBUG 节奏型] BPM:', currentBPM, 'pattern:', pattern.name, 'expectedPattern:', expectedPattern.map(x => Math.round(x)));
   
   // 2. 按节奏型位置分组
   const groups = Array.from({ length: patternLength }, () => []);
@@ -2051,8 +2046,8 @@ function calculateRhythmScore(strums, pattern) {
     score = Math.max(0, 60 - (avgCV - 0.30) * 100);  // 0-60 分
   }
   
-  console.log('[DEBUG 节奏稳定度] 分组统计:', groupStats.map((s, i) => `位置${i}: avg=${Math.round(s.avg)}ms, cv=${(s.cv * 100).toFixed(1)}%`).join(' | '));
-  console.log('[DEBUG 节奏稳定度] 平均 CV:', (avgCV * 100).toFixed(1) + '%, 得分:', Math.round(score));
+if (DEBUG)   console.log('[DEBUG 节奏稳定度] 分组统计:', groupStats.map((s, i) => `位置${i}: avg=${Math.round(s.avg)}ms, cv=${(s.cv * 100).toFixed(1)}%`).join(' | '));
+if (DEBUG)   console.log('[DEBUG 节奏稳定度] 平均 CV:', (avgCV * 100).toFixed(1) + '%, 得分:', Math.round(score));
   
   return Math.round(Math.max(0, Math.min(100, score)));
 }
@@ -2060,7 +2055,7 @@ function calculateRhythmScore(strums, pattern) {
 // 改进的音色评分算法
 function calculateToneScore(strums) {
   if (strums.length === 0) {
-    console.log('[DEBUG calculateToneScore] No strums, returning 0');
+if (DEBUG)     console.log('[DEBUG calculateToneScore] No strums, returning 0');
     return 0;
   }
   
@@ -2092,7 +2087,7 @@ function calculateToneScore(strums) {
   }
   
   const result = Math.round(totalScore / strums.length);
-  console.log('[DEBUG calculateToneScore] strums:', strums.length, 'tones:', strums.map(s => s.tone), 'individualScores:', scores.map(s => Math.round(s)), 'result:', result);
+if (DEBUG)   console.log('[DEBUG calculateToneScore] strums:', strums.length, 'tones:', strums.map(s => s.tone), 'individualScores:', scores.map(s => Math.round(s)), 'result:', result);
   return result;
 }
 
@@ -3203,7 +3198,7 @@ function updateNextChordDisplay(chordName, countdown) {
   
   // 绘制下一个和弦的指法图
   if (nextChordDiagramEl && chordName) {
-    const chord = window.ChordLibrary.findChord(chordName);
+    const chord = window.ChordLibrary.getChordData(chordName);
     if (chord) {
       drawChordDiagramOnCanvas(nextChordDiagramEl, chord);
     }
