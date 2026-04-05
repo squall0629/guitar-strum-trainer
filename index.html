@@ -1030,9 +1030,9 @@
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       }
 
-      /* Chord diagram canvas responsive */
-      canvas#currentChordDiagram,
-      canvas#nextChordDiagram {
+      /* Chord diagram responsive */
+      #currentChordDiagram,
+      #nextChordDiagram {
         max-width: 100%;
         height: auto;
       }
@@ -1094,8 +1094,8 @@
       }
 
       /* Chord diagrams: larger on phone */
-      canvas#currentChordDiagram,
-      canvas#nextChordDiagram {
+      #currentChordDiagram,
+      #nextChordDiagram {
         width: 150px !important;
         height: 170px !important;
       }
@@ -1251,7 +1251,7 @@
         <div style="text-align: center;">
           <div style="color: #888; margin-bottom: 10px;">当前和弦</div>
           <div id="currentChordDisplay" style="font-size: 3em; font-weight: bold; color: #00d9ff; margin-bottom: 10px;">--</div>
-          <canvas id="currentChordDiagram" width="120" height="140" style="background: rgba(0,0,0,0.2); border-radius: 8px;"></canvas>
+          <div id="currentChordDiagram" style="width:120px;height:140px;background:rgba(0,0,0,0.2);border-radius:8px;"></div>
           <div id="chordRecognitionResult" style="margin-top: 10px; padding: 8px; background: rgba(0,217,255,0.1); border-radius: 8px; font-size: 0.9em;">
             识别：<span id="recognizedChord">--</span>
             <span id="chordConfidence" style="color: #888; margin-left: 10px;">(--%)</span>
@@ -1265,7 +1265,7 @@
         <div style="text-align: center;">
           <div style="color: #888; margin-bottom: 10px;">下一个和弦</div>
           <div id="nextChordDisplay" style="font-size: 3em; font-weight: bold; color: #ffa502; margin-bottom: 10px;">--</div>
-          <canvas id="nextChordDiagram" width="120" height="140" style="background: rgba(0,0,0,0.2); border-radius: 8px;"></canvas>
+          <div id="nextChordDiagram" style="width:120px;height:140px;background:rgba(0,0,0,0.2);border-radius:8px;"></div>
           <div id="chordTimer" style="margin-top: 10px; padding: 8px; background: rgba(255,165,2,0.1); border-radius: 8px; font-size: 0.9em;">
             转换时间：<span id="transitionTime">--</span> ms
           </div>
@@ -1465,10 +1465,6 @@
           </div>
         </div>
       </div>
-        
-        <div class="visualizer" style="height: 120px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; overflow: hidden; position: relative;">
-          <canvas id="waveform" style="width: 100%; height: 100%; display: block;"></canvas>
-        </div>
         
         <!-- Windows 录音机风格波形图 -->
         <div class="visualizer" style="margin-top: 15px; height: 120px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; overflow: hidden; position: relative;">

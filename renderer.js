@@ -297,6 +297,12 @@ function checkMeasureUpdate() {
     dynamicsScoreEl.textContent = dynamicsScore;
     totalScoreEl.textContent = totalScore;
     
+    // 更新评分环颜色
+    updateScoreRing(rhythmRingEl, rhythmScoreEl, rhythmScore);
+    updateScoreRing(toneRingEl, toneScoreEl, toneScore);
+    updateScoreRing(dynamicsRingEl, dynamicsScoreEl, dynamicsScore);
+    updateScoreRing(totalRingEl, totalScoreEl, totalScore);
+    
     // 更新历史稳定性评分
     updateStabilityScores();
     
@@ -339,6 +345,25 @@ let strumHistory = [];
 // 预分配的音频缓冲区（避免每帧分配）
 let freqDataCache = null;
 let timeDataCache = null;
+
+// ========== 性能优化：帧率控制变量 ==========
+let lastAnalyzeTime = 0;
+const ANALYZE_INTERVAL = 33; // 30 FPS (~33ms)
+let lastRecorderDrawTime = 0;
+const RECORDER_DRAW_INTERVAL = 100; // 10 FPS (~100ms)
+let lastSpectrumDrawTime = 0;
+const SPECTRUM_DRAW_INTERVAL = 67; // 15 FPS (~67ms)
+let lastRMSForWaveform = 0;
+let lastWaveformDrawTime = 0;
+const WAVEFORM_REDRAW_INTERVAL = 50; // 20 FPS max for main waveform
+let lastStrumEventTime = 0; // Track last strum for waveform redraw trigger
+
+// ========== 离屏 Canvas 缓冲 ==========
+let spectrumOffscreenCanvas = null;
+let spectrumOffscreenCtx = null;
+let spectrumBackgroundDirty = true;
+let lastSpectrumCanvasWidth = 0;
+let lastSpectrumCanvasHeight = 0;
 
 // ========== Spectral Flux Onset Detection 全局变量 ==========
 let previousSpectrum = null;  // 上一帧频谱
@@ -1441,6 +1466,12 @@ function stopListening() {
     stopDemo();
   }
   
+  // 性能优化：清理自动保存定时器，防止内存泄漏
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+    autoSaveIntervalId = null;
+  }
+  
   if (microphone) {
     microphone.mediaStream.getTracks().forEach(track => track.stop());
     microphone.disconnect();
@@ -1474,6 +1505,11 @@ function stopListening() {
       ? `练习结束 (节拍器：${currentBPM} BPM)，点击"开始练习"继续`
       : '练习结束，点击"开始练习"继续';
   }
+  
+  // 重启自动保存定时器（下次开始监听时可用）
+  autoSaveIntervalId = setInterval(() => {
+    saveUserSettings();
+  }, 5000);
 }
 
 // 音频分析主循环
@@ -1482,6 +1518,15 @@ function analyzeAudio() {
 if (DEBUG)     console.log('[DEBUG analyzeAudio] isListening=false，停止分析');
     return;
   }
+  
+  // 性能优化：节流到 30 FPS
+  const now = performance.now();
+  const delta = now - lastAnalyzeTime;
+  if (delta < ANALYZE_INTERVAL) {
+    requestAnimationFrame(analyzeAudio);
+    return;
+  }
+  lastAnalyzeTime = now;
   
 if (DEBUG)   console.log('[DEBUG analyzeAudio] 开始分析帧...');
   
@@ -1513,10 +1558,7 @@ if (DEBUG)   console.log('[DEBUG analyzeAudio] 开始分析帧...');
     volumeMeterFill.style.width = volumePercent + '%';
   }
   
-  // 绘制波形（使用相同的 timeDataCache）
-  drawWaveform(timeDataCache, rms);
-  
-  // 绘制时域频谱图
+  // 绘制时域频谱图 - 节流到 15 FPS
   drawSpectrumWaveform(freqDataCache);
   
   // 检测和弦识别
@@ -1531,51 +1573,9 @@ if (DEBUG)   console.log('[DEBUG analyzeAudio] 开始分析帧...');
   requestAnimationFrame(analyzeAudio);
 }
 
-// 绘制波形
-let _drawCount = 0;
-function drawWaveform(timeData, rms) {
-  _drawCount++;
-  if (!canvas || !canvasCtx || !timeData) {
-if (DEBUG)     if (_drawCount === 1) console.log('[DEBUG drawWaveform] canvas or timeData missing');
-    return;
-  }
-  if (canvas.width === 0 || canvas.height === 0) {
-if (DEBUG)     if (_drawCount <= 5) console.log('[DEBUG drawWaveform] canvas size is 0:', canvas.width, 'x', canvas.height, 'frame:', _drawCount);
-    return;
-  }
-  
-  canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-  canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  canvasCtx.lineWidth = 2;
-  canvasCtx.strokeStyle = '#b866ff';  // 紫色
-  canvasCtx.beginPath();
-  
-  const sliceWidth = canvas.width / timeData.length;
-  let x = 0;
-  
-  for (let i = 0; i < timeData.length; i++) {
-    const v = timeData[i] / 128.0;
-    const y = (v * canvas.height) / 2;
-    
-    if (i === 0) {
-      canvasCtx.moveTo(x, y);
-    } else {
-      canvasCtx.lineTo(x, y);
-    }
-    
-    x += sliceWidth;
-  }
-  
-  canvasCtx.stroke();
-  
-if (DEBUG)   if (_drawCount <= 3) console.log('[DEBUG drawWaveform] drawn successfully, frame:', _drawCount);
-  
-  // 绘制 Windows 录音机风格波形（使用相同的 RMS）
-  drawRecorderWaveform(timeData, rms);
-}
 
-// 绘制 Windows 录音机风格波形（使用传入的 RMS 值）
+
+// 绘制 Windows 录音机风格波形（使用传入的 RMS 值）- 节流到 10 FPS
 let _recorderDrawCount = 0;
 function drawRecorderWaveform(timeData, rms) {
   _recorderDrawCount++;
@@ -1587,6 +1587,13 @@ if (DEBUG)     if (_recorderDrawCount === 1) console.log('[DEBUG drawRecorderWav
 if (DEBUG)     if (_recorderDrawCount <= 5) console.log('[DEBUG drawRecorderWaveform] canvas size is 0:', recorderCanvas.width, 'x', recorderCanvas.height, 'frame:', _recorderDrawCount);
     return;
   }
+  
+  // 性能优化：节流到 10 FPS
+  const now = performance.now();
+  if (now - lastRecorderDrawTime < RECORDER_DRAW_INTERVAL) {
+    return;
+  }
+  lastRecorderDrawTime = now;
   
   // 直接使用传入的 RMS 值（和音量指示条一致）
   // 添加到波形缓冲区
@@ -1631,7 +1638,7 @@ if (DEBUG)     if (_recorderDrawCount <= 5) console.log('[DEBUG drawRecorderWave
 if (DEBUG)   if (_recorderDrawCount <= 3) console.log('[DEBUG drawRecorderWaveform] drawn successfully, frame:', _recorderDrawCount);
 }
 
-// 绘制时域频谱图（STFT 短时傅里叶变换 + 彩虹色热力图）
+// 绘制时域频谱图（STFT 短时傅里叶变换 + 彩虹色热力图）- 节流到 15 FPS + 离屏缓冲优化
 let _spectrumDrawCount = 0;
 function drawSpectrumWaveform(freqData) {
   _spectrumDrawCount++;
@@ -1648,48 +1655,90 @@ if (DEBUG)     if (_spectrumDrawCount === 1) console.log('[DEBUG drawSpectrumWav
     return;
   }
   
+  // 性能优化：节流到 15 FPS
+  const now = performance.now();
+  if (now - lastSpectrumDrawTime < SPECTRUM_DRAW_INTERVAL) {
+    return;
+  }
+  lastSpectrumDrawTime = now;
+  
+  // 检测 canvas 尺寸变化，重建离屏缓冲
+  if (spectrumCanvas.width !== lastSpectrumCanvasWidth || spectrumCanvas.height !== lastSpectrumCanvasHeight) {
+    spectrumOffscreenCanvas = null;
+    spectrumOffscreenCtx = null;
+    spectrumBackgroundDirty = true;
+    lastSpectrumCanvasWidth = spectrumCanvas.width;
+    lastSpectrumCanvasHeight = spectrumCanvas.height;
+  }
+  
+  // 创建离屏 Canvas（只创建一次）
+  if (!spectrumOffscreenCanvas) {
+    spectrumOffscreenCanvas = document.createElement('canvas');
+    spectrumOffscreenCanvas.width = spectrumCanvas.width;
+    spectrumOffscreenCanvas.height = spectrumCanvas.height;
+    spectrumOffscreenCtx = spectrumOffscreenCanvas.getContext('2d');
+    spectrumBackgroundDirty = true;
+  }
+  
   // 添加当前频谱到历史缓冲区
   spectrumHistory.push(new Uint8Array(freqData));
   if (spectrumHistory.length > SPECTRUM_HISTORY_SIZE) {
     spectrumHistory.shift();
   }
   
-  // 清空画布
-  spectrumCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-  spectrumCtx.fillRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
-  
-  // 绘制 STFT 热力图（彩虹色）
   const historyLength = spectrumHistory.length;
-  const cellWidth = spectrumCanvas.width / SPECTRUM_HISTORY_SIZE;  // 固定单元格宽度，基于总历史长度
-  const freqBins = Math.floor(freqData.length / 4);  // 只取前 1/4 频段（0-5.5kHz）
+  const cellWidth = spectrumCanvas.width / SPECTRUM_HISTORY_SIZE;
+  
+  // 性能优化：只处理 80Hz-1000Hz 关键频段（吉他核心频段）
+  // FFT size = 2048, sampleRate 通常 44100/48000
+  // bin 频率 = sampleRate / fftSize ≈ 44100/2048 ≈ 21.5Hz/bin
+  // 80Hz ≈ bin 4, 1000Hz ≈ bin 47
+  const sampleRate = audioContext ? audioContext.sampleRate : 44100;
+  const binFrequency = sampleRate / 2048;
+  const startBin = Math.max(0, Math.floor(80 / binFrequency));
+  const endBin = Math.min(Math.floor(freqData.length / 4), Math.ceil(1000 / binFrequency));
+  const freqBins = endBin - startBin;
+  
+  if (freqBins <= 0) return;
+  
   const cellHeight = spectrumCanvas.height / freqBins;
   
+  // 绘制热力图到离屏 Canvas
   for (let t = 0; t < historyLength; t++) {
     const spectrum = spectrumHistory[t];
     const x = t * cellWidth;
     
-    for (let f = 0; f < freqBins; f++) {
+    for (let f = startBin; f < endBin; f++) {
       const value = spectrum[f];
-      const y = spectrumCanvas.height - (f + 1) * cellHeight;
+      const freqIndex = f - startBin;
+      const y = spectrumCanvas.height - (freqIndex + 1) * cellHeight;
       
       // 彩虹色映射（根据能量强度）
-      // 低能量：红色 → 中能量：黄色/绿色 → 高能量：蓝色/紫色
       const normalizedValue = value / 255;
-      const hue = (1 - normalizedValue) * 240;  // 0(红) → 240(蓝)
-      const saturation = 80 + normalizedValue * 20;  // 80-100%
-      const lightness = 40 + normalizedValue * 30;  // 40-70%
-      const alpha = 0.3 + normalizedValue * 0.7;  // 0.3-1.0
+      const hue = (1 - normalizedValue) * 240;
+      const saturation = 80 + normalizedValue * 20;
+      const lightness = 40 + normalizedValue * 30;
+      const alpha = 0.3 + normalizedValue * 0.7;
       
-      spectrumCtx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
-      spectrumCtx.fillRect(x, y, cellWidth + 1, cellHeight + 1);
+      spectrumOffscreenCtx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+      spectrumOffscreenCtx.fillRect(x, y, cellWidth + 1, cellHeight + 1);
     }
   }
   
-  // 绘制频率刻度标签
-  spectrumCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-  spectrumCtx.font = '10px Arial';
-  spectrumCtx.fillText('5kHz', 5, spectrumCanvas.height - 5);
-  spectrumCtx.fillText('0Hz', 5, spectrumCanvas.height - 10);
+  // 将离屏 Canvas 内容绘制到主 Canvas
+  spectrumCtx.clearRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
+  spectrumCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  spectrumCtx.fillRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
+  spectrumCtx.drawImage(spectrumOffscreenCanvas, 0, 0);
+  
+  // 绘制频率刻度标签（只在背景脏时重绘）
+  if (spectrumBackgroundDirty) {
+    spectrumCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    spectrumCtx.font = '10px Arial';
+    spectrumCtx.fillText('1kHz', 5, 12);
+    spectrumCtx.fillText('80Hz', 5, spectrumCanvas.height - 5);
+    spectrumBackgroundDirty = false;
+  }
   
 if (DEBUG)   if (_spectrumDrawCount <= 3) console.log('[DEBUG drawSpectrumWaveform] drawn successfully, frame:', _spectrumDrawCount);
 }
@@ -1699,6 +1748,7 @@ if (DEBUG)   if (_spectrumDrawCount <= 3) console.log('[DEBUG drawSpectrumWavefo
 /**
  * 计算 Spectral Flux - 频谱能量变化率
  * 只累加正差异（能量上升部分），对 onset 更敏感
+ * 性能优化：只处理 80Hz-1000Hz 吉他核心频段
  * @param {Uint8Array} currentSpectrum - 当前帧频谱
  * @param {Uint8Array} previousSpectrum - 上一帧频谱
  * @returns {number} Spectral Flux 值
@@ -1709,9 +1759,11 @@ function computeSpectralFlux(currentSpectrum, previousSpectrum) {
   }
   
   let flux = 0;
-  // 只关注中高频区域 (20%-90%)，吉他扫弦的主要能量范围
-  const startBin = Math.floor(currentSpectrum.length * 0.2);
-  const endBin = Math.floor(currentSpectrum.length * 0.9);
+  // 性能优化：只关注 80Hz-1000Hz 吉他核心频段
+  const sampleRate = audioContext ? audioContext.sampleRate : 44100;
+  const binFrequency = sampleRate / 2048;
+  const startBin = Math.max(0, Math.floor(80 / binFrequency));
+  const endBin = Math.min(currentSpectrum.length, Math.ceil(1000 / binFrequency));
   
   for (let i = startBin; i < endBin; i++) {
     const diff = currentSpectrum[i] - previousSpectrum[i];
@@ -1903,6 +1955,9 @@ if (DEBUG)   console.log('[DEBUG detectStrum] onsetResult:', onsetResult);
       fluxThreshold: onsetResult.threshold,
       confidence: onsetResult.confidence
     };
+    
+    // 通知波形图重绘
+    lastStrumEventTime = now;
     
     detectedStrums.push(strum);
     
@@ -3196,12 +3251,9 @@ function updateChordDisplay(chordResult, expectedChord, nextChord) {
     currentChordDisplayEl.textContent = chordResult.chord;
   }
   
-  // 绘制和弦指法图（使用 canvas）
+  // 绘制和弦指法图（使用 SVG）
   if (currentChordDiagramEl && chordResult.chord) {
-    const chordData = window.ChordLibrary.getChordData(chordResult.chord);
-    if (chordData) {
-      drawChordDiagramOnCanvas(currentChordDiagramEl, chordData);
-    }
+    drawChordDiagram(currentChordDiagramEl, chordResult.chord);
   }
   
   // 检查是否准确
@@ -3213,20 +3265,15 @@ function updateChordDisplay(chordResult, expectedChord, nextChord) {
 }
 
 /**
- * 在 canvas 上绘制和弦指法图
- * @param {HTMLCanvasElement} canvas - canvas 元素
+ * 在容器上绘制和弦指法图（SVG）
+ * @param {HTMLElement} container - 容器元素（div）
  * @param {object} chordData - 和弦数据（包含 fingering.strings 和 fingering.frets）
  */
-function drawChordDiagramOnCanvas(canvas, chordData) {
-  if (!chordData || !chordData.fingering) {
-    // 清空 canvas
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    return;
-  }
+function drawChordDiagramOnContainer(container, chordData) {
+  if (!container || !chordData || !chordData.name) return;
   
   // 使用已有的 drawChordDiagram 函数
-  drawChordDiagram(canvas, chordData);
+  drawChordDiagram(container, chordData.name);
 }
 
 /**
@@ -3251,12 +3298,9 @@ function updateNextChordDisplay(chordName, countdown) {
     }
   }
   
-  // 绘制下一个和弦的指法图
+  // 绘制下一个和弦的指法图（使用 SVG）
   if (nextChordDiagramEl && chordName) {
-    const chord = window.ChordLibrary.getChordData(chordName);
-    if (chord) {
-      drawChordDiagramOnCanvas(nextChordDiagramEl, chord);
-    }
+    drawChordDiagram(nextChordDiagramEl, chordName);
   }
 }
 
@@ -3611,7 +3655,7 @@ function updateChordProgressionDisplay() {
   currentChordDisplay.textContent = expectedChord;
   nextChordDisplay.textContent = nextChord;
   
-  // 绘制指法图（使用 chordictionary SVG）
+  // 绘制指法图（SVG）
   if (currentChordCanvas) drawChordDiagram(currentChordCanvas, expectedChord);
   if (nextChordCanvas) drawChordDiagram(nextChordCanvas, nextChord);
   
@@ -3647,29 +3691,22 @@ function updateProgressionDetail(index) {
 }
 
 /**
- * 绘制和弦指法图
- * @param {HTMLCanvasElement} canvas - Canvas 元素
- * @param {object} chordData - 和弦数据
- */
-/**
- * 绘制和弦指法图 - 使用 chordictionary SVG
- * @param {HTMLCanvasElement} canvas - Canvas 元素（用于承载 SVG）
+ * 绘制和弦指法图 - 纯 SVG 渲染（适配 Retina 屏幕）
+ * @param {HTMLElement} container - SVG 容器元素（div）
  * @param {string} chordName - 和弦名称 (如 'C', 'Am')
  */
-function drawChordDiagram(canvas, chordName) {
-  if (!canvas) return;
+function drawChordDiagram(container, chordName) {
+  if (!container) return;
   
-  const width = canvas.width;
-  const height = canvas.height;
+  // 获取容器尺寸（支持 devicePixelRatio 适配）
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+  const width = Math.floor(rect.width * dpr);
+  const height = Math.floor(rect.height * dpr);
   
   if (!chordName) {
-    // 清空并显示提示
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#666';
-    ctx.font = '14px Microsoft YaHei';
-    ctx.textAlign = 'center';
-    ctx.fillText('未选择和弦', width / 2, height / 2);
+    // 显示空状态
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;">未选择和弦</div>';
     return;
   }
   
@@ -3677,30 +3714,20 @@ function drawChordDiagram(canvas, chordName) {
     // 使用 chordictionary 生成 SVG
     const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
     
-    // 将 SVG 转换为图片并绘制到 Canvas
-    const img = new Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    const blobUrl = URL.createObjectURL(svgBlob);
+    // 直接插入 SVG（避免 Canvas 位图渲染导致的模糊）
+    container.innerHTML = svgString;
     
-    img.onload = () => {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-      // 延迟释放 Blob URL，确保浏览器完成绘制
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-    };
-    
-    img.onerror = () => {
-      console.warn('[ChordDiagram] SVG 加载失败，使用备用方案');
-      // SVG 加载失败，使用备用 Canvas 绘制
-      drawChordDiagramFallback(canvas, chordName);
-      URL.revokeObjectURL(blobUrl);
-    };
-    
-    img.src = blobUrl;
+    // 确保 SVG 适配容器
+    const svg = container.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.style.display = 'block';
+    }
   } catch (e) {
     console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
-    drawChordDiagramFallback(canvas, chordName);
+    drawChordDiagramFallbackSVG(container, chordName);
   }
 }
 
@@ -3709,49 +3736,49 @@ function drawChordDiagram(canvas, chordName) {
  * @param {HTMLCanvasElement} canvas - Canvas 元素
  * @param {string} chordName - 和弦名称
  */
-function drawChordDiagramFallback(canvas, chordName) {
-  const ctx = canvas.getContext('2d');
-  const width = canvas.width;
-  const height = canvas.height;
-  
-  ctx.clearRect(0, 0, width, height);
+/**
+ * 备用和弦指法图绘制（SVG 版本）
+ * @param {HTMLElement} container - SVG 容器元素（div）
+ * @param {string} chordName - 和弦名称
+ */
+function drawChordDiagramFallbackSVG(container, chordName) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+  const width = Math.floor(rect.width * dpr);
+  const height = Math.floor(rect.height * dpr);
   
   const chordData = window.ChordLibrary.getChordData(chordName);
   
   if (!chordData) {
-    ctx.fillStyle = '#666';
-    ctx.font = '14px Microsoft YaHei';
-    ctx.textAlign = 'center';
-    ctx.fillText('无指法数据', width / 2, height / 2);
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;">无指法数据</div>';
     return;
   }
   
   const fingering = chordData.fingering || [0, 0, 0, 0, 0, 0];
-  const padding = 15;
+  const padding = 15 * dpr;
   const diagramWidth = width - padding * 2;
-  const diagramHeight = height - padding * 2 - 20;
+  const diagramHeight = height - padding * 2 - 20 * dpr;
   const stringSpacing = diagramWidth / 5;
   const fretSpacing = diagramHeight / 3;
   
-  // 绘制品格
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1;
+  // 生成 SVG
+  let svg = `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+  
+  // 绘制品格（水平线）
+  svg += `<g stroke="#fff" stroke-width="${1 * dpr}">`;
   for (let i = 0; i <= 3; i++) {
     const y = padding + i * fretSpacing;
-    ctx.beginPath();
-    ctx.moveTo(padding, y);
-    ctx.lineTo(width - padding, y);
-    ctx.stroke();
+    svg += `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}"/>`;
   }
+  svg += `</g>`;
   
-  // 绘制琴弦
+  // 绘制琴弦（垂直线）
+  svg += `<g stroke="#fff" stroke-width="${1 * dpr}">`;
   for (let i = 0; i < 6; i++) {
     const x = padding + i * stringSpacing;
-    ctx.beginPath();
-    ctx.moveTo(x, padding);
-    ctx.lineTo(x, padding + 3 * fretSpacing);
-    ctx.stroke();
+    svg += `<line x1="${x}" y1="${padding}" x2="${x}" y2="${padding + 3 * fretSpacing}"/>`;
   }
+  svg += `</g>`;
   
   // 绘制按弦位置
   for (let i = 0; i < 6; i++) {
@@ -3759,25 +3786,20 @@ function drawChordDiagramFallback(canvas, chordName) {
     const x = padding + i * stringSpacing;
     
     if (fret === 0) {
-      // 空弦
-      ctx.beginPath();
-      ctx.arc(x, padding - 8, 5, 0, Math.PI * 2);
-      ctx.stroke();
+      // 空弦（空心圆）
+      svg += `<circle cx="${x}" cy="${padding - 8 * dpr}" r="${5 * dpr}" fill="none" stroke="#fff" stroke-width="${1.5 * dpr}"/>`;
     } else if (fret > 0) {
-      // 按弦
+      // 按弦（实心圆）
       const y = padding + (fret - 0.5) * fretSpacing;
-      ctx.beginPath();
-      ctx.arc(x, y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = '#00d9ff';
-      ctx.fill();
+      svg += `<circle cx="${x}" cy="${y}" r="${8 * dpr}" fill="#00d9ff"/>`;
     }
   }
   
   // 和弦名称
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 12px Microsoft YaHei';
-  ctx.textAlign = 'center';
-  ctx.fillText(chordName, width / 2, height - 5);
+  svg += `<text x="${width / 2}" y="${height - 5 * dpr}" fill="#fff" font-size="${12 * dpr}" font-weight="bold" text-anchor="middle" font-family="Microsoft YaHei">${chordName}</text>`;
+  
+  svg += `</svg>`;
+  container.innerHTML = svg;
 }
 
 /**
