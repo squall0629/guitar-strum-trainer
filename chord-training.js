@@ -260,7 +260,11 @@ function setupChordTraining() {
   };
 }
 
-function setTrainingMode(mode) {
+export function getTrainingMode() {
+  return currentTrainingMode;
+}
+
+export function setTrainingMode(mode) {
   currentTrainingMode = mode;
   const modeButtons = document.querySelectorAll('.mode-btn');
   modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
@@ -274,14 +278,6 @@ function setTrainingMode(mode) {
     currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
     updateChordProgressionDisplay();
   }
-}
-
-export function getTrainingMode() {
-  return currentTrainingMode;
-}
-
-export function setTrainingMode(mode) {
-  setTrainingMode(mode);
 }
 
 function addChordToProgression(chordName) {

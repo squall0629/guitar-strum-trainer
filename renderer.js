@@ -4,7 +4,7 @@
 // ========== 模块导入 ==========
 import { saveUserSettings, loadUserSettings, saveHistory, loadHistoryFromStorage, exportUserSettings, importUserSettings } from './storage.js';
 import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, updateStabilityScores } from './scoring.js';
-import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition, updateTransitionTime } from './ui-renderer.js';
+import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition as updateChordRecognitionUI, updateTransitionTime as updateTransitionTimeUI } from './ui-renderer.js';
 
 import {
   initAudioEngine,
@@ -58,7 +58,6 @@ import {
   getPracticeTransitionTimes,
   updateChordProgressionDisplay,
   updateChordDisplay,
-  updateChordRecognition,
   updateTransitionTime as updateTransitionTimeDisplay,
   resetChordTraining,
   getCurrentProgression,
