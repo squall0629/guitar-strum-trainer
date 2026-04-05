@@ -3706,7 +3706,7 @@ function drawChordDiagram(container, chordName) {
       svg.setAttribute('width', '100%');
       svg.setAttribute('height', '100%');
       svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-      svg.style.display = 'block';
+      // 不设置 display，让 CSS 控制居中
     }
   } catch (e) {
     console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
