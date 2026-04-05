@@ -1727,43 +1727,32 @@ function calculateRhythmScore(strums, pattern) {
   let totalScore = 0;
   let validStrums = 0;
   
-  // 计算预期的累计时间
-  let expectedCumulativeTime = 0;
-  let actualCumulativeTime = 0;
+  // 计算基于当前 BPM 的理论时值（节奏型定义基于 120BPM）
+  const bpmRatio = 120 / currentBPM;  // BPM 越低，时值越长
   
   for (let i = 1; i < strums.length; i++) {
-    const expectedInterval = pattern.pattern[(i - 1) % pattern.pattern.length];
+    // 根据 BPM 动态调整预期时值
+    const baseExpectedInterval = pattern.pattern[(i - 1) % pattern.pattern.length];
+    const expectedInterval = baseExpectedInterval * bpmRatio;  // 根据 BPM 缩放
     const actualInterval = strums[i].interval;
-    
-    // 基于 BPM 的动态容差 (BPM 越低容差越大)
-    const bpmFactor = 120 / currentBPM;
-    const baseTolerance = expectedInterval * 0.25;
-    const dynamicTolerance = baseTolerance * Math.sqrt(bpmFactor);
     
     // 计算偏差百分比
     const deviation = Math.abs(actualInterval - expectedInterval);
     const deviationPercent = deviation / expectedInterval;
     
     // 使用高斯衰减函数，提供更平滑的评分
-    // σ = 0.15 表示 15% 偏差时得分约 60 分
+    // σ = 0.25 表示 25% 偏差时得分约 60 分
     const sigma = 0.25;
     const score = 100 * Math.exp(-(deviationPercent * deviationPercent) / (2 * sigma * sigma));
     
     totalScore += Math.max(0, Math.min(100, score));
     validStrums++;
     
-    // 累计时间跟踪 (检测整体节奏漂移)
-    expectedCumulativeTime += expectedInterval;
-    actualCumulativeTime += actualInterval;
+    console.log('[DEBUG 节奏评分] 预期:', expectedInterval.toFixed(1), 'ms, 实际:', actualInterval.toFixed(1), 'ms, 偏差:', (deviationPercent * 100).toFixed(1) + '%, 得分:', Math.round(score));
   }
   
-  // 累计漂移惩罚
-  const cumulativeDrift = Math.abs(actualCumulativeTime - expectedCumulativeTime);
-  const maxExpectedTime = expectedCumulativeTime;
-  const driftPenalty = Math.min(20, (cumulativeDrift / maxExpectedTime) * 100);
-  
   const baseScore = validStrums > 0 ? totalScore / validStrums : 0;
-  return Math.round(Math.max(0, Math.min(100, baseScore - driftPenalty)));
+  return Math.round(Math.max(0, Math.min(100, baseScore)));
 }
 
 // 改进的音色评分算法
