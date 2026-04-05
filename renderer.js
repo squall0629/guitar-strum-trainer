@@ -1088,19 +1088,22 @@ function updateStatus(status) {
 
 // 开始监听
 async function startListening() {
+  console.log('[DEBUG startListening] 开始监听函数被调用');
   try {
     // 检查浏览器支持
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error('[DEBUG startListening] 浏览器不支持麦克风访问');
       throw new Error('浏览器不支持麦克风访问');
     }
     
     // 检查是否是 HTTPS 或 localhost
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      console.error('[DEBUG startListening] 不是 HTTPS 或 localhost', location.protocol, location.hostname);
       throw new Error('麦克风访问需要 HTTPS 连接');
     }
     
     // 请求麦克风权限
-    console.log('[GuitarStrumTrainer] 请求麦克风权限...');
+    console.log('[DEBUG startListening] 请求麦克风权限...');
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
         echoCancellation: false,
@@ -1110,9 +1113,10 @@ async function startListening() {
       } 
     });
     
-    console.log('[GuitarStrumTrainer] 麦克风权限已获取');
+    console.log('[DEBUG startListening] 麦克风权限已获取');
     
     // 创建音频上下文
+    console.log('[DEBUG startListening] 创建音频上下文...');
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 2048;
@@ -1125,6 +1129,8 @@ async function startListening() {
     micGain.gain.value = 2.0;  // 2 倍增益
     microphone.connect(micGain);
     micGain.connect(analyser);
+    
+    console.log('[DEBUG startListening] 音频上下文和节点已创建');
     
     isListening = true;
     detectedStrums = [];
@@ -1169,7 +1175,9 @@ async function startListening() {
     }
     
     // 开始分析循环
+    console.log('[DEBUG startListening] 开始调用 analyzeAudio()');
     analyzeAudio();
+    console.log('[DEBUG startListening] analyzeAudio() 已启动');
     
   } catch (err) {
     console.error('[GuitarStrumTrainer] 音频初始化失败:', err.name, err.message);
@@ -1241,7 +1249,12 @@ function stopListening() {
 
 // 音频分析主循环
 function analyzeAudio() {
-  if (!isListening) return;
+  if (!isListening) {
+    console.log('[DEBUG analyzeAudio] isListening=false，停止分析');
+    return;
+  }
+  
+  console.log('[DEBUG analyzeAudio] 开始分析帧...');
   
   const bufferLength = analyser.frequencyBinCount;
   
