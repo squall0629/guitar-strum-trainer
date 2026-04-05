@@ -1425,6 +1425,12 @@
           <canvas id="waveform"></canvas>
         </div>
         
+        <!-- Windows 录音机风格波形图 -->
+        <div class="visualizer" style="margin-top: 15px; height: 80px; background: rgba(0,0,0,0.5); border-radius: 10px; overflow: hidden; position: relative;">
+          <canvas id="recorderWaveform"></canvas>
+          <div style="position: absolute; top: 5px; left: 10px; color: #888; font-size: 0.75em; pointer-events: none;">📊 录音波形</div>
+        </div>
+        
         <div class="feedback">
           <div class="title">💡 实时反馈</div>
           <div class="message" id="feedbackMessage">选择节奏型，点击"开始练习"开始</div>

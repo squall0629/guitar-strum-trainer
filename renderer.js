@@ -212,6 +212,11 @@ let practiceReportModal;
 let accuracyTrendChartInstance = null;
 let transitionTimeTrendChartInstance = null;
 
+// Windows 录音机波形图
+let recorderCanvas, recorderCtx;
+let recorderWaveformData = [];  // 波形数据缓冲区
+const RECORDER_BUFFER_SIZE = 300;  // 波形数据点数
+
 // 和弦训练 DOM 元素
 let modeButtons, modePreset, modeCustom, modeFree;
 let presetSelector, progressionSelect;
@@ -329,6 +334,14 @@ function init() {
   historyList = document.getElementById('historyList');
   canvas = document.getElementById('waveform');
   canvasCtx = canvas ? canvas.getContext('2d') : null;
+  
+  // Windows 录音机波形图
+  recorderCanvas = document.getElementById('recorderWaveform');
+  recorderCtx = recorderCanvas ? recorderCanvas.getContext('2d') : null;
+  if (recorderCanvas) {
+    recorderCanvas.width = recorderCanvas.offsetWidth;
+    recorderCanvas.height = recorderCanvas.offsetHeight;
+  }
   
   metronomeToggle = document.getElementById('metronomeToggle');
   bpmSlider = document.getElementById('bpmSlider');
@@ -1323,6 +1336,60 @@ function drawWaveform(timeData) {
   }
   
   canvasCtx.stroke();
+  
+  // 绘制 Windows 录音机风格波形
+  drawRecorderWaveform(timeData);
+}
+
+// 绘制 Windows 录音机风格波形
+function drawRecorderWaveform(timeData) {
+  if (!recorderCanvas || !recorderCtx) return;
+  
+  // 计算当前帧的 RMS 作为波形高度
+  let sum = 0;
+  for (let i = 0; i < timeData.length; i++) {
+    const normalized = (timeData[i] - 128) / 128;
+    sum += normalized * normalized;
+  }
+  const rms = Math.sqrt(sum / timeData.length);
+  
+  // 添加到波形缓冲区
+  recorderWaveformData.push(rms);
+  if (recorderWaveformData.length > RECORDER_BUFFER_SIZE) {
+    recorderWaveformData.shift();
+  }
+  
+  // 清空画布
+  recorderCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  recorderCtx.fillRect(0, 0, recorderCanvas.width, recorderCanvas.height);
+  
+  // 绘制波形（从右向左滚动）
+  const gradient = recorderCtx.createLinearGradient(0, 0, recorderCanvas.width, 0);
+  gradient.addColorStop(0, 'rgba(184, 102, 255, 0.2)');
+  gradient.addColorStop(0.5, 'rgba(184, 102, 255, 0.6)');
+  gradient.addColorStop(1, 'rgba(184, 102, 255, 1.0)');
+  
+  recorderCtx.fillStyle = gradient;
+  recorderCtx.strokeStyle = '#b866ff';
+  recorderCtx.lineWidth = 1;
+  
+  const barWidth = recorderCanvas.width / RECORDER_BUFFER_SIZE;
+  const centerY = recorderCanvas.height / 2;
+  
+  recorderCtx.beginPath();
+  
+  for (let i = 0; i < recorderWaveformData.length; i++) {
+    const amplitude = recorderWaveformData[i] * centerY * 3;  // 放大波形
+    const x = i * barWidth;
+    const y = centerY - amplitude;
+    const height = amplitude * 2;
+    
+    // 绘制垂直条
+    recorderCtx.fillRect(x, y, barWidth - 1, height);
+  }
+  
+  // 绘制轮廓线
+  recorderCtx.stroke();
 }
 
 // ========== Spectral Flux Onset Detection 算法实现 ==========
