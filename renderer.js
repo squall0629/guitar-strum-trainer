@@ -2072,8 +2072,8 @@ function calculateToneScore(strums) {
     
     // 使用范围评分而非单点评分
     // 理想范围: 60-200 (更宽容)
-    const idealMin = 20;
-    const idealMax = 80;
+    const idealMin = 0.5;
+    const idealMax = 5;
     const idealCenter = (idealMin + idealMax) / 2;
     const range = (idealMax - idealMin) / 2;
     
@@ -2085,7 +2085,7 @@ function calculateToneScore(strums) {
     } else {
       // 在理想范围外，线性衰减
       const distanceOutside = tone < idealMin ? idealMin - tone : tone - idealMax;
-      score = Math.max(0, 60 - (distanceOutside / 100) * 60);
+      score = Math.max(0, 60 - (distanceOutside / 5) * 60);
     }
     scores.push(score);
     totalScore += score;
