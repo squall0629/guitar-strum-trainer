@@ -2,10 +2,11 @@
   "name": "guitar-strum-trainer",
   "version": "2.0.0",
   "description": "吉他扫弦练习助手 - 实时分析扫弦节奏、音色、强弱并打分 (v2.0 新增和弦转换训练)",
-  "type": "module",
+  "main": "main.js",
   "scripts": {
     "start": "serve .",
-    "dev": "serve ."
+    "dev": "serve .",
+    "electron": "electron ."
   },
   "keywords": [
     "guitar",
@@ -23,6 +24,7 @@
     "tonal": "^6.4.3"
   },
   "devDependencies": {
+    "electron": "^35.1.0",
     "puppeteer": "^24.40.0"
   }
 }
