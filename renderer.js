@@ -479,8 +479,9 @@ function init() {
   canvas = document.getElementById('waveform');
   canvasCtx = canvas ? canvas.getContext('2d') : null;
   if (canvas) {
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    canvas.width = canvas.offsetWidth || 600;
+    canvas.height = canvas.offsetHeight || 120;
+    console.log('[DEBUG Canvas] waveform canvas:', canvas.width, 'x', canvas.height);
   }
   
   // Windows 录音机波形图
@@ -490,6 +491,7 @@ function init() {
     // 设置 canvas 实际像素尺寸（和上方波形一致）
     recorderCanvas.width = recorderCanvas.offsetWidth || 600;
     recorderCanvas.height = recorderCanvas.offsetHeight || 120;
+    console.log('[DEBUG Canvas] recorder canvas:', recorderCanvas.width, 'x', recorderCanvas.height);
   }
   
   // 时域频谱图
@@ -498,6 +500,7 @@ function init() {
   if (spectrumCanvas) {
     spectrumCanvas.width = spectrumCanvas.offsetWidth || 600;
     spectrumCanvas.height = spectrumCanvas.offsetHeight || 120;
+    console.log('[DEBUG Canvas] spectrum canvas:', spectrumCanvas.width, 'x', spectrumCanvas.height);
   }
   
   metronomeToggle = document.getElementById('metronomeToggle');
@@ -1489,7 +1492,11 @@ function analyzeAudio() {
 
 // 绘制波形
 function drawWaveform(timeData, rms) {
-  if (!canvas || !canvasCtx) return;
+  if (!canvas || !canvasCtx || !timeData) return;
+  if (canvas.width === 0 || canvas.height === 0) {
+    console.log('[DEBUG drawWaveform] canvas size is 0:', canvas.width, 'x', canvas.height);
+    return;
+  }
   
   canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1523,6 +1530,7 @@ function drawWaveform(timeData, rms) {
 // 绘制 Windows 录音机风格波形（使用传入的 RMS 值）
 function drawRecorderWaveform(timeData, rms) {
   if (!recorderCanvas || !recorderCtx) return;
+  if (recorderCanvas.width === 0 || recorderCanvas.height === 0) return;
   
   // 直接使用传入的 RMS 值（和音量指示条一致）
   // 添加到波形缓冲区
@@ -1568,6 +1576,8 @@ function drawRecorderWaveform(timeData, rms) {
 // 绘制时域频谱图（STFT 短时傅里叶变换 + 彩虹色热力图）
 function drawSpectrumWaveform(freqData) {
   if (!spectrumCanvas || !spectrumCtx) return;
+  if (spectrumCanvas.width === 0 || spectrumCanvas.height === 0) return;
+  if (!freqData) return;
   
   // 添加当前频谱到历史缓冲区
   spectrumHistory.push(new Uint8Array(freqData));
