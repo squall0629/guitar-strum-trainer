@@ -1727,47 +1727,63 @@ function updateScores() {
   updateScoreRing(totalRingEl, totalScoreEl, totalScore);
 }
 
-// 改进的节奏评分算法 - 基于稳定度（而非精准度）
+// 改进的节奏评分算法 - 基于稳定度（考虑节奏型）
 function calculateRhythmScore(strums, pattern) {
   if (strums.length < 2) return 0;
   
-  // 收集所有扫弦间隔
-  const intervals = [];
+  // 1. 根据 BPM 缩放理论时值（节奏型定义基于 120BPM）
+  const bpmRatio = 120 / currentBPM;
+  const expectedPattern = pattern.pattern.map(x => x * bpmRatio);
+  const patternLength = expectedPattern.length;
+  
+  console.log('[DEBUG 节奏型] BPM:', currentBPM, 'pattern:', pattern.name, 'expectedPattern:', expectedPattern.map(x => Math.round(x)));
+  
+  // 2. 按节奏型位置分组
+  const groups = Array.from({ length: patternLength }, () => []);
   for (let i = 1; i < strums.length; i++) {
-    intervals.push(strums[i].interval);
+    const groupIndex = (i - 1) % patternLength;
+    groups[groupIndex].push(strums[i].interval);
   }
   
-  // 计算平均间隔
-  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  // 3. 每组单独计算 CV
+  const cvs = [];
+  const groupStats = [];
+  for (let i = 0; i < patternLength; i++) {
+    if (groups[i].length < 2) {
+      cvs.push(0);
+      groupStats.push({ avg: 0, stdDev: 0, cv: 0, count: groups[i].length });
+      continue;
+    }
+    
+    const avg = groups[i].reduce((a, b) => a + b, 0) / groups[i].length;
+    const variance = groups[i].reduce((sum, interval) => sum + Math.pow(interval - avg, 2), 0) / groups[i].length;
+    const stdDev = Math.sqrt(variance);
+    const cv = avg > 0 ? stdDev / avg : 0;
+    
+    cvs.push(cv);
+    groupStats.push({ avg, stdDev, cv, count: groups[i].length });
+  }
   
-  // 计算标准差
-  const variance = intervals.reduce((sum, interval) => {
-    return sum + Math.pow(interval - avgInterval, 2);
-  }, 0) / intervals.length;
+  // 4. 计算平均 CV（排除样本不足的组）
+  const validCvs = cvs.filter((cv, i) => groupStats[i].count >= 2);
+  if (validCvs.length === 0) return 0;
   
-  const stdDev = Math.sqrt(variance);
+  const avgCV = validCvs.reduce((a, b) => a + b, 0) / validCvs.length;
   
-  // 计算变异系数（Coefficient of Variation, CV）
-  // CV = 标准差 / 平均值，表示相对波动程度
-  const cv = stdDev / avgInterval;
-  
-  // 根据变异系数评分（CV 越小越稳定）
-  // CV < 0.10 (10%)  → 非常稳定，90-100 分
-  // CV < 0.20 (20%)  → 较稳定，70-90 分
-  // CV < 0.30 (30%)  → 一般，60-70 分
-  // CV >= 0.30       → 波动大，0-60 分
+  // 5. 根据平均 CV 评分
   let score;
-  if (cv < 0.10) {
-    score = 90 + (0.10 - cv) * 100;  // 90-100 分
-  } else if (cv < 0.20) {
-    score = 70 + (0.20 - cv) * 200;  // 70-90 分
-  } else if (cv < 0.30) {
-    score = 60 + (0.30 - cv) * 100;  // 60-70 分
+  if (avgCV < 0.10) {
+    score = 90 + (0.10 - avgCV) * 100;  // 90-100 分
+  } else if (avgCV < 0.20) {
+    score = 70 + (0.20 - avgCV) * 200;  // 70-90 分
+  } else if (avgCV < 0.30) {
+    score = 60 + (0.30 - avgCV) * 100;  // 60-70 分
   } else {
-    score = Math.max(0, 60 - (cv - 0.30) * 100);  // 0-60 分
+    score = Math.max(0, 60 - (avgCV - 0.30) * 100);  // 0-60 分
   }
   
-  console.log('[DEBUG 节奏稳定度] 平均间隔:', avgInterval.toFixed(1), 'ms, 标准差:', stdDev.toFixed(1), 'ms, 变异系数:', (cv * 100).toFixed(1) + '%, 得分:', Math.round(score));
+  console.log('[DEBUG 节奏稳定度] 分组统计:', groupStats.map((s, i) => `位置${i}: avg=${Math.round(s.avg)}ms, cv=${(s.cv * 100).toFixed(1)}%`).join(' | '));
+  console.log('[DEBUG 节奏稳定度] 平均 CV:', (avgCV * 100).toFixed(1) + '%, 得分:', Math.round(score));
   
   return Math.round(Math.max(0, Math.min(100, score)));
 }
