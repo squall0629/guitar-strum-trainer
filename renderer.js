@@ -273,7 +273,7 @@ function showPracticeReport() {
   const bestTransition = practiceTransitionTimes.length > 0 ? Math.min(...practiceTransitionTimes) : null;
   const worstTransition = practiceTransitionTimes.length > 0 ? Math.max(...practiceTransitionTimes) : null;
   
-  const fluencyScore = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
+  const fluencyScore = (typeof calculateFluencyScore === 'function') ? calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration) : 75;
   const totalScore = parseInt(totalScoreEl.textContent) || 0;
   
   const reportTransitionsEl = document.getElementById('reportTransitions');
@@ -1454,7 +1454,7 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   // 1. Flux 峰值 + RMS 超过 50% 阈值 = 强检测到
   // 2. Flux 峰值 + RMS 超过 30% 阈值 = 中等检测到
   // 3. 仅 RMS 超过阈值 = 弱检测到（传统模式）
-  const minStrumInterval = 80;  // 最小扫弦间隔 (ms)
+  const minStrumInterval = 200;  // 最小扫弦间隔 (ms) - 增加到 200ms 防止录音回放误检
   const timeSinceLastStrum = now - lastStrumTime;
   
   let onsetDetected = false;
