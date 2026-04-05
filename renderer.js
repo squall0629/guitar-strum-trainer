@@ -319,7 +319,7 @@ let measureHistory = {
   tone: [],      // 音色评分历史
   dynamics: []   // 强弱评分历史
 };
-const MAX_HISTORY = 10;  // 保留最近 10 个小节
+const MAX_HISTORY = 4;  // 保留最近 4 个小节
 let currentRhythm = 0;
 let detectedStrums = [];
 let lastStrumTime = 0;
