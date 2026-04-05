@@ -1670,23 +1670,29 @@ function updateScores() {
   // 强弱评分 - 改进版
   const dynamicsScore = calculateDynamicsScore(detectedStrums, pattern);
   
+  // 确保分数是有效数字（防止 NaN）
+  const safeRhythmScore = rhythmScore || 0;
+  const safeToneScore = toneScore || 0;
+  const safeDynamicsScore = dynamicsScore || 0;
+  
   // 根据练习模式调整总分计算权重
   let totalScore;
   if (practiceMode === 'rhythm') {
     // 纯节奏模式：总分只基于节奏、音色、强弱
     totalScore = Math.round(
-      rhythmScore * 0.5 + 
-      toneScore * 0.3 + 
-      dynamicsScore * 0.2
+      safeRhythmScore * 0.5 + 
+      safeToneScore * 0.3 + 
+      safeDynamicsScore * 0.2
     );
   } else {
     // 综合模式：加入和弦评分
     const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
+    const safeAccuracy = accuracy || 0;
     totalScore = Math.round(
-      rhythmScore * 0.35 + 
-      toneScore * 0.2 + 
-      dynamicsScore * 0.15 +
-      accuracy * 0.3
+      safeRhythmScore * 0.35 + 
+      safeToneScore * 0.2 + 
+      safeDynamicsScore * 0.15 +
+      safeAccuracy * 0.3
     );
   }
   
