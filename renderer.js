@@ -1571,7 +1571,9 @@ function provideFeedback(strum) {
 
 // 计算评分
 function updateScores() {
-  if (detectedStrums.length < 2) {
+  const pattern = getActiveRhythm(currentRhythm);
+  
+  if (!pattern) {
     rhythmScoreEl.textContent = '--';
     toneScoreEl.textContent = '--';
     dynamicsScoreEl.textContent = '--';
@@ -1579,13 +1581,29 @@ function updateScores() {
     return;
   }
   
-  const pattern = getActiveRhythm(currentRhythm);
+  // 音色评分 - 不依赖 pattern，只要有扫弦数据即可计算
+  if (detectedStrums.length > 0) {
+    const toneScore = calculateToneScore(detectedStrums);
+    toneScoreEl.textContent = toneScore;
+    updateScoreRing(toneRingEl, toneScoreEl, toneScore);
+  } else {
+    toneScoreEl.textContent = '--';
+    updateScoreRing(toneRingEl, toneScoreEl, '--');
+  }
+  
+  // 节奏和强弱评分需要至少 2 次扫弦
+  if (detectedStrums.length < 2) {
+    rhythmScoreEl.textContent = '--';
+    dynamicsScoreEl.textContent = '--';
+    totalScoreEl.textContent = '--';
+    updateScoreRing(rhythmRingEl, rhythmScoreEl, '--');
+    updateScoreRing(dynamicsRingEl, dynamicsScoreEl, '--');
+    updateScoreRing(totalRingEl, totalScoreEl, '--');
+    return;
+  }
   
   // 节奏评分 - 改进版
   const rhythmScore = calculateRhythmScore(detectedStrums, pattern);
-  
-  // 音色评分 - 改进版
-  const toneScore = calculateToneScore(detectedStrums);
   
   // 强弱评分 - 改进版
   const dynamicsScore = calculateDynamicsScore(detectedStrums, pattern);
@@ -1612,13 +1630,11 @@ function updateScores() {
   
   // 更新显示
   rhythmScoreEl.textContent = rhythmScore;
-  toneScoreEl.textContent = toneScore;
   dynamicsScoreEl.textContent = dynamicsScore;
   totalScoreEl.textContent = totalScore;
   
   // 更新圆环
   updateScoreRing(rhythmRingEl, rhythmScoreEl, rhythmScore);
-  updateScoreRing(toneRingEl, toneScoreEl, toneScore);
   updateScoreRing(dynamicsRingEl, dynamicsScoreEl, dynamicsScore);
   updateScoreRing(totalRingEl, totalScoreEl, totalScore);
 }
@@ -1741,9 +1757,10 @@ function calculateAccentAwareDynamics(strums, pattern) {
     const avgAmp = strums.slice(0, count).reduce((a, b) => a + b.amplitude, 0) / count;
     const isActuallyStrong = actualAmp > avgAmp;
     
-    // 如果预期和实际一致，得分高
+    // 如果预期和实际一致，根据偏差程度评分
     if (expectedStrong === isActuallyStrong) {
-      totalScore += 90 + (Math.random() * 10); // 90-100 分
+      const deviation = Math.abs(actualAmp - avgAmp) / avgAmp;
+      totalScore += Math.max(80, 100 - deviation * 50);
     } else {
       // 不一致时，根据偏差程度扣分
       const deviation = Math.abs(actualAmp - avgAmp) / avgAmp;
@@ -1796,6 +1813,12 @@ function updateScoreStyle(element, score) {
 function updateScoreRing(ringEl, valueEl, score) {
   if (!ringEl || !valueEl) return;
   
+  if (typeof score !== 'number' || isNaN(score)) {
+    ringEl.setAttribute('stroke-dashoffset', 0);
+    ringEl.setAttribute('stroke', '#555');
+    return;
+  }
+  
   const circumference = parseFloat(ringEl.getAttribute('stroke-dasharray'));
   const offset = circumference - (score / 100) * circumference;
   ringEl.setAttribute('stroke-dashoffset', offset);
@@ -1810,16 +1833,15 @@ function updateScoreRing(ringEl, valueEl, score) {
   }
   ringEl.setAttribute('stroke', color);
   
-  if (typeof score === 'number') {
-    valueEl.textContent = score;
-    valueEl.style.color = color;
-  }
+  valueEl.textContent = score;
+  valueEl.style.color = color;
 }
 
 // 保存历史记录
 function saveHistory() {
   const pattern = getActiveRhythm(currentRhythm);
-  const totalScore = parseInt(totalScoreEl.textContent) || 0;
+  const totalScore = parseInt(totalScoreEl.textContent);
+  const safeTotalScore = isNaN(totalScore) ? 0 : totalScore;
   
   const transitionStats = transitionDetector ? transitionDetector.getStats() : null;
   const transitionCount = transitionStats ? transitionStats.transitionCount : 0;
@@ -1837,7 +1859,7 @@ function saveHistory() {
     time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
     rhythm: pattern.name,
     rhythmIndex: currentRhythm,
-    score: totalScore,
+    score: safeTotalScore,
     rhythmScore: parseInt(rhythmScoreEl.textContent) || 0,
     toneScore: parseInt(toneScoreEl.textContent) || 0,
     dynamicsScore: parseInt(dynamicsScoreEl.textContent) || 0,
