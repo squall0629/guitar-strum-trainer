@@ -217,6 +217,9 @@ function updateStabilityScores() {
   const toneStability = calculateStabilityScore(measureHistory.tone);
   const dynamicsStability = calculateStabilityScore(measureHistory.dynamics);
   
+  console.log('[DEBUG 稳定性评分] 历史数据 - 节奏:', measureHistory.rhythm, '音色:', measureHistory.tone, '强弱:', measureHistory.dynamics);
+  console.log('[DEBUG 稳定性评分] 计算结果 - 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability);
+  
   // 综合稳定性（三个维度的平均）
   const overallStability = Math.round((rhythmStability + toneStability + dynamicsStability) / 3);
   
@@ -1329,6 +1332,20 @@ async function startListening() {
     lastStrumTime = 0;  // 重置为 0，表示还没有扫弦
     currentMeasureStartTime = Date.now();  // 开始新小节
     expectedStrumIndex = 0;
+    
+    // 重置历史评分记录
+    measureHistory = { rhythm: [], tone: [], dynamics: [] };
+    lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };
+    
+    // 重置稳定性评分显示
+    const rhythmStabilityEl = document.getElementById('rhythmStabilityScore');
+    const toneStabilityEl = document.getElementById('toneStabilityScore');
+    const dynamicsStabilityEl = document.getElementById('dynamicsStabilityScore');
+    const overallStabilityEl = document.getElementById('overallStabilityScore');
+    if (rhythmStabilityEl) rhythmStabilityEl.textContent = '--';
+    if (toneStabilityEl) toneStabilityEl.textContent = '--';
+    if (dynamicsStabilityEl) dynamicsStabilityEl.textContent = '--';
+    if (overallStabilityEl) overallStabilityEl.textContent = '--';
     
     console.log('[DEBUG startListening] 状态已重置 - lastStrumTime:', lastStrumTime, 'detectedStrums.length:', detectedStrums.length);
     
