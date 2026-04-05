@@ -359,7 +359,7 @@ const RECORDER_BUFFER_SIZE = 300;  // 波形数据点数
 // 时域频谱图
 let spectrumCanvas, spectrumCtx;
 let spectrumHistory = [];  // 频谱历史缓冲区（用于 STFT 热力图）
-const SPECTRUM_HISTORY_SIZE = 60;  // 保留 60 帧历史
+const SPECTRUM_HISTORY_SIZE = 120;  // 保留 120 帧历史（约 2 秒，60 FPS）
 
 // 和弦训练 DOM 元素
 let modeButtons, modePreset, modeCustom, modeFree;
@@ -1581,7 +1581,7 @@ function drawSpectrumWaveform(freqData) {
   
   // 绘制 STFT 热力图（彩虹色）
   const historyLength = spectrumHistory.length;
-  const cellWidth = spectrumCanvas.width / historyLength;
+  const cellWidth = spectrumCanvas.width / SPECTRUM_HISTORY_SIZE;  // 固定单元格宽度，基于总历史长度
   const freqBins = Math.floor(freqData.length / 4);  // 只取前 1/4 频段（0-5.5kHz）
   const cellHeight = spectrumCanvas.height / freqBins;
   
