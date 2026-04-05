@@ -1069,9 +1069,9 @@
         gap: 15px !important;
       }
 
-      /* Mode buttons full width on mobile */
+      /* Mode buttons full width on mobile - ONLY in phone media query */
       .panel > div[style*="display: flex"][style*="gap: 15px"] {
-        flex-direction: column !important;
+        /* Removed - this was affecting desktop layout */
       }
 
       /* Report modal close button larger touch target */
@@ -1082,10 +1082,7 @@
       }
 
       /* ===== Mode buttons: vertical stack on phone ===== */
-      .panel > div[style*="display: flex"][style*="gap: 15px"],
-      .panel > div[style*="display: flex; gap: 15px"] {
-        flex-direction: column !important;
-      }
+      /* Only apply to phone media query (<=480px), not tablet */
 
       .mode-btn {
         width: 100% !important;
