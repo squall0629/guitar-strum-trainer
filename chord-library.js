@@ -19,6 +19,7 @@ var BASIC_CHORDS = [
   { name: 'E', difficulty: 2, label: 'E 大调' },
   { name: 'A', difficulty: 2, label: 'A 大调' },
   { name: 'F', difficulty: 3, label: 'F 大调 (简化)' },
+  { name: 'Fm', difficulty: 3, label: 'F 小调' },
   { name: 'Dm', difficulty: 2, label: 'D 小调' },
   { name: 'Cmaj7', difficulty: 2, label: 'C 大七' },
   { name: 'G/B', difficulty: 2, label: 'G 转位 (低音 B)' },
@@ -38,6 +39,7 @@ var CHORD_FINGERINGS = {
   'E':  [0, 2, 2, 1, 0, 0],
   'A':  [null, 0, 2, 2, 2, null],
   'F':  [1, 3, 3, 2, 1, 1],
+  'Fm': [1, 3, 3, 1, 1, 1],  // F 小调
   'Dm': [null, null, 0, 2, 3, 1],
   'Cmaj7': [null, 3, 2, 0, 0, null],
   'G/B': [null, 2, 0, 0, 0, 3],  // G 和弦第一转位，低音 B
@@ -57,6 +59,7 @@ var CHORD_NOTES = {
   'E': ['E2', 'B2', 'E3', 'G#3', 'B3', 'E4'],
   'A': ['A2', 'E3', 'A3', 'C#4', 'E4'],
   'F': ['F2', 'C3', 'F3', 'A3', 'C4', 'F4'],
+  'Fm': ['F2', 'Ab3', 'C4', 'F4'],  // F 小调
   'Dm': ['D3', 'A3', 'D4', 'F4', 'A4'],
   'Cmaj7': ['C3', 'E3', 'G3', 'B3', 'E4'],
   'G/B': ['B2', 'D3', 'G3', 'B3', 'D4'],  // G 和弦第一转位，B 为低音
@@ -65,7 +68,7 @@ var CHORD_NOTES = {
 };
 
 /**
- * 常用和弦进行预设（去重后保留 13 个独特进行）
+ * 常用和弦进行预设（共 17 个独特进行，含周杰伦经典）
  */
 var COMMON_PROGRESSIONS = [
   // 经典低音下行
@@ -74,6 +77,11 @@ var COMMON_PROGRESSIONS = [
   { name: '流行 1645 (1-6-4-5)', chords: ['C', 'Am', 'F', 'G'], desc: '华语流行最经典进行，明亮温暖' },
   { name: '流行 4536 (4-5-3-6)', chords: ['F', 'G', 'Em', 'Am'], desc: '日系流行经典，情感丰富' },
   { name: '卡农进行 (1-5-6-3-4-1-4-5)', chords: ['C', 'G', 'Am', 'Em', 'F', 'C', 'F', 'G'], desc: '帕赫贝尔卡农，8 和弦循环' },
+  // 周杰伦经典
+  { name: '周杰伦 4536251 (4-5-3-6-2-5-1)', chords: ['F', 'G', 'Em', 'Am', 'Dm', 'G', 'C'], desc: '《青花瓷》《彩虹》完整版，周杰伦抒情招牌' },
+  { name: '周杰伦 6451 (6-4-5-1)', chords: ['Am', 'F', 'G', 'C'], desc: '《七里香》副歌，经典收尾进行' },
+  { name: '周杰伦 1645 变体 (1-6-4-4m)', chords: ['C', 'Am', 'F', 'Fm'], desc: '《龙卷风》大→小转换，遗憾惋惜感' },
+  { name: '和声小调 TSD (6-2-3-6)', chords: ['Am', 'Dm', 'E', 'Am'], desc: '《夜的第七章》快歌，Hip-Hop 风格' },
   // 爵士/蓝调
   { name: '12 小节蓝调 (1-4-5)', chords: ['C', 'F', 'G'], desc: '蓝调摇滚基础，简单有力' },
   { name: '251 进行 (2-5-1)', chords: ['Dm', 'G', 'Cmaj7'], desc: '爵士乐核心 ii-V-I 进行' },
