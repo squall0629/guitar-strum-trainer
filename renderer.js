@@ -1671,9 +1671,11 @@ function updateScores() {
   const dynamicsScore = calculateDynamicsScore(detectedStrums, pattern);
   
   // 确保分数是有效数字（防止 NaN）
-  const safeRhythmScore = rhythmScore || 0;
-  const safeToneScore = toneScore || 0;
-  const safeDynamicsScore = dynamicsScore || 0;
+  const safeRhythmScore = (typeof rhythmScore === 'number' && !isNaN(rhythmScore)) ? rhythmScore : 0;
+  const safeToneScore = (typeof toneScore === 'number' && !isNaN(toneScore)) ? toneScore : 0;
+  const safeDynamicsScore = (typeof dynamicsScore === 'number' && !isNaN(dynamicsScore)) ? dynamicsScore : 0;
+  
+  console.log('[DEBUG updateScores] safe scores - rhythm:', safeRhythmScore, 'tone:', safeToneScore, 'dynamics:', safeDynamicsScore, 'practiceMode:', practiceMode);
   
   // 根据练习模式调整总分计算权重
   let totalScore;
@@ -1687,13 +1689,20 @@ function updateScores() {
   } else {
     // 综合模式：加入和弦评分
     const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
-    const safeAccuracy = accuracy || 0;
+    const safeAccuracy = (typeof accuracy === 'number' && !isNaN(accuracy)) ? accuracy : 0;
+    console.log('[DEBUG updateScores] chord accuracy - correct:', practiceChordCorrect, 'total:', practiceChordTotal, 'accuracy:', safeAccuracy);
     totalScore = Math.round(
       safeRhythmScore * 0.35 + 
       safeToneScore * 0.2 + 
       safeDynamicsScore * 0.15 +
       safeAccuracy * 0.3
     );
+  }
+  
+  // 最终安全检查
+  if (typeof totalScore !== 'number' || isNaN(totalScore)) {
+    console.error('[DEBUG updateScores] totalScore is NaN! Using fallback 0');
+    totalScore = 0;
   }
   
   if (shouldLog) console.log('[DEBUG updateScores] Final scores - rhythm:', rhythmScore, 'tone:', toneScore, 'dynamics:', dynamicsScore, 'total:', totalScore);
