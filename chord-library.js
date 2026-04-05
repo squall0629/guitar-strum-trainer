@@ -231,6 +231,7 @@ var getProgressionNames = function() {
 window.ChordLibrary = {
   BASIC_CHORDS: BASIC_CHORDS,
   COMMON_PROGRESSIONS: COMMON_PROGRESSIONS,
+  findChord: getChordData,
   getChordData: getChordData,
   getChordSVG: getChordSVG,
   getChordNotes: getChordNotes,

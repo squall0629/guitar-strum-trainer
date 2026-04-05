@@ -179,6 +179,7 @@ function calculateStabilityScore(history) {
   
   // 1. 计算平均分
   const avg = history.reduce((a, b) => a + b, 0) / history.length;
+  if (avg === 0) return 0;
   
   // 2. 计算标准差（波动程度）
   const variance = history.reduce((sum, score) => {
@@ -662,23 +663,28 @@ function setupMetronome() {
 // 演示按钮点击保护时间戳（防止快速重复点击）
 let lastDemoClickTime = 0;
 
-// 设置演示按钮
+// 设置演示按钮（使用事件委托，避免 cloneNode 导致监听器累积）
+let demoButtonsSetup = false;
 function setupDemoButtons() {
-  demoButtons.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();  // 防止默认行为
-      
-      // 防止快速重复点击（100ms 内只响应一次）
-      const now = Date.now();
-      if (now - lastDemoClickTime < 100) {
-        if (DEBUG) console.log('[GuitarStrumTrainer] Demo click too fast, ignoring');
-        return;
-      }
-      lastDemoClickTime = now;
-      
+  if (demoButtonsSetup) return;
+  
+  rhythmSelector.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-demo');
+    if (!btn) return;
+    
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const now = Date.now();
+    if (now - lastDemoClickTime < 100) {
+      if (DEBUG) console.log('[GuitarStrumTrainer] Demo click too fast, ignoring');
+      return;
+    }
+    lastDemoClickTime = now;
+    
+    // 预设节奏型
+    if (btn.dataset.rhythm !== undefined) {
       const rhythmIndex = parseInt(btn.dataset.rhythm);
-      
       if (DEBUG) console.log('[GuitarStrumTrainer] Demo button clicked:', { rhythmIndex, isPlayingDemo: getIsPlayingDemo() });
       
       if (getIsPlayingDemo()) {
@@ -688,30 +694,12 @@ function setupDemoButtons() {
         if (DEBUG) console.log('[GuitarStrumTrainer] Starting demo...');
         playDemo(rhythmIndex, btn);
       }
-    });
-  });
-  
-  // 同时绑定自定义节奏型的演示按钮（主选择器中的 .btn-demo[data-custom]）
-  const customDemoBtns = document.querySelectorAll('.btn-demo[data-custom]');
-  customDemoBtns.forEach(btn => {
-    // 移除旧的事件监听器（避免重复绑定）
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
+      return;
+    }
     
-    newBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();  // 防止默认行为
-      
-      // 防止快速重复点击（100ms 内只响应一次）
-      const now = Date.now();
-      if (now - lastDemoClickTime < 100) {
-        if (DEBUG) console.log('[GuitarStrumTrainer] Custom demo click too fast, ignoring');
-        return;
-      }
-      lastDemoClickTime = now;
-      
-      const customIndex = parseInt(newBtn.dataset.custom);
-      
+    // 自定义节奏型
+    if (btn.dataset.customIndex !== undefined) {
+      const customIndex = parseInt(btn.dataset.customIndex);
       if (DEBUG) console.log('[GuitarStrumTrainer] Custom demo button clicked:', { customIndex, isPlayingDemo: getIsPlayingDemo() });
       
       if (getIsPlayingDemo()) {
@@ -719,11 +707,13 @@ function setupDemoButtons() {
         stopDemo();
       } else {
         if (DEBUG) console.log('[GuitarStrumTrainer] Starting custom demo...');
-        // 直接调用 playCustomRhythmFromList，传递当前点击的按钮
-        playCustomRhythmFromList(customIndex, newBtn);
+        playCustomRhythmFromList(customIndex, btn);
       }
-    });
+      return;
+    }
   });
+  
+  demoButtonsSetup = true;
 }
 
 // 播放节拍器声音 - 保留原有简洁的电子滴答声
@@ -916,7 +906,7 @@ function stopDemo() {
   });
   
   // 同时检查主选择器中的自定义按钮
-  const customDemoBtns = document.querySelectorAll('.btn-demo[data-custom]');
+  const customDemoBtns = document.querySelectorAll('.btn-demo[data-custom-index]');
   customDemoBtns.forEach(btn => {
     if (btn.classList.contains('playing')) {
       btn.classList.remove('playing');
@@ -2297,8 +2287,18 @@ function renderHistory() {
 
 // 窗口大小改变时调整画布
 window.addEventListener('resize', () => {
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
+  if (canvas) {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  if (recorderCanvas) {
+    recorderCanvas.width = recorderCanvas.offsetWidth;
+    recorderCanvas.height = recorderCanvas.offsetHeight;
+  }
+  if (spectrumCanvas) {
+    spectrumCanvas.width = spectrumCanvas.offsetWidth;
+    spectrumCanvas.height = spectrumCanvas.offsetHeight;
+  }
   if (statsChartCanvas) {
     statsChartCanvas.width = statsChartCanvas.offsetWidth;
     statsChartCanvas.height = statsChartCanvas.offsetHeight;
@@ -2693,7 +2693,7 @@ function syncCustomRhythmsToSelector() {
     option.innerHTML = `
       <div class="name">${escapeHtml(rhythm.name)}</div>
       <div class="pattern">${arrowPattern}</div>
-      <button class="btn-demo" data-custom="${index}">🔊 试听演示</button>
+      <button class="btn-demo" data-custom-index="${index}">🔊 试听演示</button>
     `;
     option.addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-demo')) return;
@@ -2837,8 +2837,8 @@ function playCustomRhythmFromList(index, btn) {
 // 播放自定义节奏型（保留旧函数名兼容，优先使用主选择器中的按钮）
 function playCustomRhythm(index) {
   if (DEBUG) console.log('[GuitarStrumTrainer] playCustomRhythm called with index:', index);
-  // 优先查找主选择器中的按钮（.btn-demo[data-custom]）
-  let btn = document.querySelector(`.btn-demo[data-custom="${index}"]`);
+  // 优先查找主选择器中的按钮（.btn-demo[data-custom-index]）
+  let btn = document.querySelector(`.btn-demo[data-custom-index="${index}"]`);
   // 如果找不到，再查找自定义列表中的按钮
   if (!btn) {
     btn = document.querySelector(`.btn-custom-play[data-custom-index="${index}"]`);
@@ -3109,11 +3109,11 @@ function importUserSettings(event) {
   event.target.value = '';
 }
 
-// HTML 转义
+// HTML 转义（使用字符串替换，避免 DOM 创建开销）
+const _escapeHtmlMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const _escapeHtmlRegex = /[&<>"']/g;
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  return String(text).replace(_escapeHtmlRegex, m => _escapeHtmlMap[m]);
 }
 
 // ========== 和弦识别 UI 更新（新增） ==========
