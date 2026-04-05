@@ -173,11 +173,71 @@ function updateThreshold() {
   console.log('[DEBUG 灵敏度] 灵敏度:', sensitivityLevel, '→ 阈值:', strumThreshold.toFixed(3));
 }
 
+// 计算小节时长（毫秒）
+function getMeasureDuration() {
+  const pattern = getActiveRhythm(currentRhythm);
+  if (!pattern) return 4000;  // 默认 4 秒
+  
+  // 计算节奏型的总拍数
+  const totalBeats = pattern.beats || 4;
+  
+  // 计算一拍时长（毫秒）
+  const beatDuration = (60 / currentBPM) * 1000;
+  
+  // 小节时长 = 拍数 × 一拍时长
+  return totalBeats * beatDuration;
+}
+
+// 检查是否需要更新小节评分
+function checkMeasureUpdate() {
+  if (!isListening) return;
+  
+  const now = Date.now();
+  const measureDuration = getMeasureDuration();
+  const timeInMeasure = now - currentMeasureStartTime;
+  
+  // 如果当前小节已结束，计算评分并开始新小节
+  if (timeInMeasure >= measureDuration && currentMeasureStrums.length >= 2) {
+    // 计算小节评分
+    const pattern = getActiveRhythm(currentRhythm);
+    const rhythmScore = calculateRhythmScore(currentMeasureStrums, pattern);
+    const toneScore = calculateToneScore(currentMeasureStrums);
+    const dynamicsScore = calculateDynamicsScore(currentMeasureStrums, pattern);
+    
+    // 计算总分
+    const totalScore = Math.round(
+      rhythmScore * 0.5 + 
+      toneScore * 0.3 + 
+      dynamicsScore * 0.2
+    );
+    
+    // 保存评分
+    lastMeasureScores = { rhythm: rhythmScore, tone: toneScore, dynamics: dynamicsScore, total: totalScore };
+    
+    // 更新显示
+    rhythmScoreEl.textContent = rhythmScore;
+    toneScoreEl.textContent = toneScore;
+    dynamicsScoreEl.textContent = dynamicsScore;
+    totalScoreEl.textContent = totalScore;
+    
+    console.log('[DEBUG 小节评分] 小节时长:', measureDuration, 'ms, 扫弦数:', currentMeasureStrums.length, '得分:', totalScore);
+    
+    // 开始新小节
+    currentMeasureStartTime = now;
+    currentMeasureStrums = [];
+  }
+}
+
 // 全局状态
 let audioContext = null;
 let analyser = null;
 let microphone = null;
 let isListening = false;
+
+// 按小节评分相关
+let currentMeasureStartTime = 0;  // 当前小节开始时间
+let currentMeasureStrums = [];    // 当前小节的扫弦数据
+let lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };  // 上次小节评分
 let currentRhythm = 0;
 let detectedStrums = [];
 let lastStrumTime = 0;
@@ -1153,7 +1213,9 @@ async function startListening() {
     
     isListening = true;
     detectedStrums = [];
+    currentMeasureStrums = [];
     lastStrumTime = 0;  // 重置为 0，表示还没有扫弦
+    currentMeasureStartTime = Date.now();  // 开始新小节
     expectedStrumIndex = 0;
     
     console.log('[DEBUG startListening] 状态已重置 - lastStrumTime:', lastStrumTime, 'detectedStrums.length:', detectedStrums.length);
@@ -1614,6 +1676,10 @@ function detectStrum(freqData, timeData) {
     };
     
     detectedStrums.push(strum);
+    
+    // 添加到当前小节
+    currentMeasureStrums.push(strum);
+    
     console.log('[DEBUG detectStrum] Strum detected!', {
       strumCount: detectedStrums.length,
       strum: { time: strum.time, amplitude: strum.amplitude, tone: strum.tone, interval: strum.interval },
@@ -1699,104 +1765,16 @@ function provideFeedback(strum) {
   expectedStrumIndex = (expectedStrumIndex + 1) % pattern.pattern.length;
 }
 
-// 计算评分
-let _debugUpdateScoresCounter = 0;
+// 计算评分（按小节更新）
 function updateScores() {
-  _debugUpdateScoresCounter++;
-  const shouldLog = _debugUpdateScoresCounter % 60 === 1; // Log every ~1 second at 60fps
-  if (shouldLog) {
-    console.log('[DEBUG updateScores] Called. currentRhythm:', currentRhythm, 'detectedStrums.length:', detectedStrums.length);
-  }
-  const pattern = getActiveRhythm(currentRhythm);
-  if (shouldLog) {
-    console.log('[DEBUG updateScores] getActiveRhythm returned:', pattern ? pattern.name : 'null');
-  }
+  // 显示上次小节的评分（保持显示，不频繁变化）
+  rhythmScoreEl.textContent = lastMeasureScores.rhythm > 0 ? lastMeasureScores.rhythm : '--';
+  toneScoreEl.textContent = lastMeasureScores.tone > 0 ? lastMeasureScores.tone : '--';
+  dynamicsScoreEl.textContent = lastMeasureScores.dynamics > 0 ? lastMeasureScores.dynamics : '--';
+  totalScoreEl.textContent = lastMeasureScores.total > 0 ? lastMeasureScores.total : '--';
   
-  if (!pattern) {
-    if (shouldLog) console.log('[DEBUG updateScores] No pattern found, showing --');
-    rhythmScoreEl.textContent = '--';
-    toneScoreEl.textContent = '--';
-    dynamicsScoreEl.textContent = '--';
-    totalScoreEl.textContent = '--';
-    return;
-  }
-  
-  // 音色评分 - 不依赖 pattern，只要有扫弦数据即可计算
-  if (detectedStrums.length > 0) {
-    const toneScore = calculateToneScore(detectedStrums);
-    if (shouldLog) console.log('[DEBUG updateScores] calculateToneScore returned:', toneScore, 'from strums:', detectedStrums.map(s => s.tone));
-    toneScoreEl.textContent = toneScore;
-    updateScoreRing(toneRingEl, toneScoreEl, toneScore);
-  } else {
-    if (shouldLog) console.log('[DEBUG updateScores] No detected strums, showing -- for tone');
-    toneScoreEl.textContent = '--';
-    updateScoreRing(toneRingEl, toneScoreEl, '--');
-  }
-  
-  // 节奏和强弱评分需要至少 2 次扫弦
-  if (detectedStrums.length < 2) {
-    if (shouldLog) console.log('[DEBUG updateScores] Less than 2 strums, showing -- for rhythm/dynamics/total');
-    rhythmScoreEl.textContent = '--';
-    dynamicsScoreEl.textContent = '--';
-    totalScoreEl.textContent = '--';
-    updateScoreRing(rhythmRingEl, rhythmScoreEl, '--');
-    updateScoreRing(dynamicsRingEl, dynamicsScoreEl, '--');
-    updateScoreRing(totalRingEl, totalScoreEl, '--');
-    return;
-  }
-  
-  // 节奏评分 - 改进版
-  const rhythmScore = calculateRhythmScore(detectedStrums, pattern);
-  
-  // 强弱评分 - 改进版
-  const dynamicsScore = calculateDynamicsScore(detectedStrums, pattern);
-  
-  // 确保分数是有效数字（防止 NaN）
-  const safeRhythmScore = (typeof rhythmScore === 'number' && !isNaN(rhythmScore)) ? rhythmScore : 0;
-  const safeToneScore = (typeof toneScore === 'number' && !isNaN(toneScore)) ? toneScore : 0;
-  const safeDynamicsScore = (typeof dynamicsScore === 'number' && !isNaN(dynamicsScore)) ? dynamicsScore : 0;
-  
-  console.log('[DEBUG updateScores] safe scores - rhythm:', safeRhythmScore, 'tone:', safeToneScore, 'dynamics:', safeDynamicsScore, 'practiceMode:', practiceMode);
-  
-  // 根据练习模式调整总分计算权重
-  let totalScore;
-  if (practiceMode === 'rhythm') {
-    // 纯节奏模式：总分只基于节奏、音色、强弱
-    totalScore = Math.round(
-      safeRhythmScore * 0.5 + 
-      safeToneScore * 0.3 + 
-      safeDynamicsScore * 0.2
-    );
-  } else {
-    // 综合模式：加入和弦评分
-    const accuracy = practiceChordTotal > 0 ? Math.round((practiceChordCorrect / practiceChordTotal) * 100) : 0;
-    const safeAccuracy = (typeof accuracy === 'number' && !isNaN(accuracy)) ? accuracy : 0;
-    console.log('[DEBUG updateScores] chord accuracy - correct:', practiceChordCorrect, 'total:', practiceChordTotal, 'accuracy:', safeAccuracy);
-    totalScore = Math.round(
-      safeRhythmScore * 0.35 + 
-      safeToneScore * 0.2 + 
-      safeDynamicsScore * 0.15 +
-      safeAccuracy * 0.3
-    );
-  }
-  
-  // 最终安全检查
-  if (typeof totalScore !== 'number' || isNaN(totalScore)) {
-    console.error('[DEBUG updateScores] totalScore is NaN! Using fallback 0');
-    totalScore = 0;
-  }
-  
-  if (shouldLog) console.log('[DEBUG updateScores] Final scores - rhythm:', rhythmScore, 'tone:', toneScore, 'dynamics:', dynamicsScore, 'total:', totalScore);
-  
-  // 更新显示
-  rhythmScoreEl.textContent = rhythmScore;
-  dynamicsScoreEl.textContent = dynamicsScore;
-  totalScoreEl.textContent = totalScore;
-  
-  // 更新圆环
-  updateScoreRing(rhythmRingEl, rhythmScoreEl, rhythmScore);
-  updateScoreRing(dynamicsRingEl, dynamicsScoreEl, dynamicsScore);
-  updateScoreRing(totalRingEl, totalScoreEl, totalScore);
+  // 检查是否需要更新小节评分
+  checkMeasureUpdate();
 }
 
 // 改进的节奏评分算法 - 基于稳定度（考虑节奏型）
