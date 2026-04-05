@@ -607,6 +607,7 @@
     
     /* Chord diagram centering */
     #currentChordDiagram,
+    .chord-diagram,
     #nextChordDiagram {
       display: flex;
       align-items: center;
@@ -1046,7 +1047,8 @@
 
       /* Chord diagram responsive */
       #currentChordDiagram,
-      #nextChordDiagram {
+      .chord-diagram,
+    #nextChordDiagram {
         max-width: 100%;
         height: auto;
         display: flex !important;
@@ -1119,7 +1121,8 @@
 
       /* Chord diagrams: larger on phone */
       #currentChordDiagram,
-      #nextChordDiagram {
+      .chord-diagram,
+    #nextChordDiagram {
         width: 150px !important;
         height: 170px !important;
         display: flex !important;
@@ -1285,7 +1288,7 @@
         <div style="text-align: center;">
           <div style="color: #888; margin-bottom: 10px;">当前和弦</div>
           <div id="currentChordDisplay" style="font-size: 3em; font-weight: bold; color: #00d9ff; margin-bottom: 10px;">--</div>
-          <div id="currentChordDiagram" style="width:120px;height:140px;background:rgba(0,0,0,0.2);border-radius:8px;"></div>
+          <div id="currentChordDiagram" class="chord-diagram"></div>
           <div id="chordRecognitionResult" style="margin-top: 10px; padding: 8px; background: rgba(0,217,255,0.1); border-radius: 8px; font-size: 0.9em;">
             识别：<span id="recognizedChord">--</span>
             <span id="chordConfidence" style="color: #888; margin-left: 10px;">(--%)</span>
@@ -1299,7 +1302,7 @@
         <div style="text-align: center;">
           <div style="color: #888; margin-bottom: 10px;">下一个和弦</div>
           <div id="nextChordDisplay" style="font-size: 3em; font-weight: bold; color: #ffa502; margin-bottom: 10px;">--</div>
-          <div id="nextChordDiagram" style="width:120px;height:140px;background:rgba(0,0,0,0.2);border-radius:8px;"></div>
+          <div id="nextChordDiagram" class="chord-diagram"></div>
           <div id="chordTimer" style="margin-top: 10px; padding: 8px; background: rgba(255,165,2,0.1); border-radius: 8px; font-size: 0.9em;">
             转换时间：<span id="transitionTime">--</span> ms
           </div>
