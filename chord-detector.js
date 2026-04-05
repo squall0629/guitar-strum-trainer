@@ -309,7 +309,7 @@ ChordDetector.prototype.detectByStringEnergy = function(stringEnergies) {
     var chordData = window.ChordLibrary.getChordData(chord.name);
     if (!chordData) continue;
     
-    var fingering = chordData.fingers || [];
+  var fingering = chordData.fingering || [];
     var score = 0;
     
     var j;

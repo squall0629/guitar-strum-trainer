@@ -758,7 +758,9 @@ function startMetronome() {
   
   metronomeInterval = setInterval(() => {
     metronomeBeat++;
-    const isAccent = metronomeBeat % getActiveRhythm(currentRhythm).beats === 0;
+    const activeRhythm = getActiveRhythm(currentRhythm);
+    const beats = activeRhythm ? activeRhythm.beats : 4;
+    const isAccent = metronomeBeat % beats === 0;
     playMetronomeSound(isAccent ? 1200 : 800, 0.05);
     triggerMetronomeDot(isAccent);
   }, beatInterval);
@@ -886,8 +888,9 @@ function stopDemo() {
   if (DEBUG) console.log('[GuitarStrumTrainer] stopDemo: clearing timeout and resetting state');
   currentPlayingDemoBtn = null;
   
-  // 重置所有演示按钮（包括自定义节奏型按钮）
-  demoButtons.forEach(btn => {
+  // 重置所有演示按钮（动态查询所有 .btn-demo，包括初始和自定义）
+  const allDemoBtns = document.querySelectorAll('.btn-demo');
+  allDemoBtns.forEach(btn => {
     if (btn && btn.classList) {
       btn.classList.remove('playing');
     }
@@ -896,21 +899,12 @@ function stopDemo() {
     }
   });
   
-  // 重置自定义节奏型按钮（两种选择器都检查）
+  // 重置自定义节奏型列表中的试听按钮
   const customPlayBtns = document.querySelectorAll('#customRhythmsList .btn-custom-play');
   customPlayBtns.forEach(btn => {
     if (btn.classList.contains('playing')) {
       btn.classList.remove('playing');
       btn.textContent = '🔊 试听';
-    }
-  });
-  
-  // 同时检查主选择器中的自定义按钮
-  const customDemoBtns = document.querySelectorAll('.btn-demo[data-custom-index]');
-  customDemoBtns.forEach(btn => {
-    if (btn.classList.contains('playing')) {
-      btn.classList.remove('playing');
-      btn.textContent = '🔊 试听演示';
     }
   });
   
@@ -2555,6 +2549,39 @@ function saveCustomRhythms() {
 }
 
 // 渲染自定义节奏型列表
+// 生成带时值间隔的箭头模式（公共函数）
+function generateArrowPattern(notes) {
+  if (!notes || notes.length === 0) return '';
+  
+  const arrows = notes.map(n => ({
+    arrow: n.direction === 'D' ? '↓' : '↑',
+    duration: n.duration
+  }));
+  
+  let result = arrows[0].arrow;
+  for (let i = 1; i < arrows.length; i++) {
+    const prevDuration = arrows[i - 1].duration;
+    const currDuration = arrows[i].duration;
+    
+    // 根据时值决定间隔：8 分和 16 分之间用宽间隔，两个 16 分之间用窄间隔
+    // 8th=八分音符，16th=十六分音符
+    const isPrevShort = prevDuration === '16th';
+    const isCurrShort = currDuration === '16th';
+    
+    if (isPrevShort && isCurrShort) {
+      // 两个 16 分音符之间：窄间隔（不换行，直接连）
+      result += arrows[i].arrow;
+    } else if (isPrevShort || isCurrShort) {
+      // 8 分和 16 分之间：中等间隔（一个空格）
+      result += ' ' + arrows[i].arrow;
+    } else {
+      // 两个 8 分或更长：宽间隔（两个空格）
+      result += '  ' + arrows[i].arrow;
+    }
+  }
+  return result;
+}
+
 function renderCustomRhythmsList() {
   const container = document.getElementById('customRhythmsList');
   if (!container) return;
@@ -2562,39 +2589,6 @@ function renderCustomRhythmsList() {
   if (customRhythms.length === 0) {
     container.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">暂无自定义节奏型，点击"+"创建</div>';
     return;
-  }
-  
-  // 生成带时值间隔的箭头模式
-  function generateArrowPattern(notes) {
-    if (!notes || notes.length === 0) return '';
-    
-    const arrows = notes.map(n => ({
-      arrow: n.direction === 'D' ? '↓' : '↑',
-      duration: n.duration
-    }));
-    
-    let result = arrows[0].arrow;
-    for (let i = 1; i < arrows.length; i++) {
-      const prevDuration = arrows[i - 1].duration;
-      const currDuration = arrows[i].duration;
-      
-      // 根据时值决定间隔：8 分和 16 分之间用宽间隔，两个 16 分之间用窄间隔
-      // 8th=八分音符，16th=十六分音符
-      const isPrevShort = prevDuration === '16th';
-      const isCurrShort = currDuration === '16th';
-      
-      if (isPrevShort && isCurrShort) {
-        // 两个 16 分音符之间：窄间隔（不换行，直接连）
-        result += arrows[i].arrow;
-      } else if (isPrevShort || isCurrShort) {
-        // 8 分和 16 分之间：中等间隔（一个空格）
-        result += ' ' + arrows[i].arrow;
-      } else {
-        // 两个 8 分或更长：宽间隔（两个空格）
-        result += '  ' + arrows[i].arrow;
-      }
-    }
-    return result;
   }
   
   container.innerHTML = customRhythms.map((rhythm, index) => {
@@ -2655,34 +2649,6 @@ function syncCustomRhythmsToSelector() {
   // 移除现有的自定义节奏型选项
   const existingCustom = rhythmSelector.querySelectorAll('.custom-rhythm-option');
   existingCustom.forEach(el => el.remove());
-  
-  // 生成带时值间隔的箭头模式（与 renderCustomRhythmsList 保持一致）
-  function generateArrowPattern(notes) {
-    if (!notes || notes.length === 0) return '';
-    
-    const arrows = notes.map(n => ({
-      arrow: n.direction === 'D' ? '↓' : '↑',
-      duration: n.duration
-    }));
-    
-    let result = arrows[0].arrow;
-    for (let i = 1; i < arrows.length; i++) {
-      const prevDuration = arrows[i - 1].duration;
-      const currDuration = arrows[i].duration;
-      
-      const isPrevShort = prevDuration === '16th';
-      const isCurrShort = currDuration === '16th';
-      
-      if (isPrevShort && isCurrShort) {
-        result += arrows[i].arrow;
-      } else if (isPrevShort || isCurrShort) {
-        result += ' ' + arrows[i].arrow;
-      } else {
-        result += '  ' + arrows[i].arrow;
-      }
-    }
-    return result;
-  }
   
   // 添加自定义节奏型选项
   customRhythms.forEach((rhythm, index) => {
@@ -2989,6 +2955,11 @@ function loadUserSettings() {
     
     const settings = JSON.parse(stored);
     
+    // 恢复自定义节奏型（必须先加载，因为节奏型选择依赖它）
+    if (settings.customRhythms && Array.isArray(settings.customRhythms) && settings.customRhythms.length > 0) {
+      customRhythms = settings.customRhythms;
+    }
+    
     // 恢复 BPM
     if (settings.bpm) {
       currentBPM = settings.bpm;
@@ -3015,7 +2986,7 @@ function loadUserSettings() {
       updateThreshold();
     }
     
-    // 恢复节奏型选择
+    // 恢复节奏型选择（此时 customRhythms 已加载，maxRhythmIndex 计算正确）
     const maxRhythmIndex = RHYTHM_PATTERNS.length + customRhythms.length;
     if (settings.currentRhythm !== undefined && settings.currentRhythm < maxRhythmIndex) {
       currentRhythm = settings.currentRhythm;
@@ -3023,11 +2994,6 @@ function loadUserSettings() {
       options.forEach((o, i) => {
         o.classList.toggle('active', i === currentRhythm);
       });
-    }
-    
-    // 恢复自定义节奏型（仅当用户设置中有数据时才覆盖）
-    if (settings.customRhythms && Array.isArray(settings.customRhythms) && settings.customRhythms.length > 0) {
-      customRhythms = settings.customRhythms;
     }
     
     if (DEBUG) console.log('[GuitarStrumTrainer] 用户设置已加载');
@@ -3069,16 +3035,71 @@ function importUserSettings(event) {
     try {
       const settings = JSON.parse(e.target.result);
       
-      // 导入自定义节奏型
-      if (settings.customRhythms && Array.isArray(settings.customRhythms)) {
+      // 数据类型和范围验证
+      if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+        throw new Error('设置数据格式无效');
+      }
+      
+      // 验证 customRhythms
+      if (settings.customRhythms !== undefined) {
+        if (!Array.isArray(settings.customRhythms)) {
+          throw new Error('customRhythms 必须是数组');
+        }
+        for (let i = 0; i < settings.customRhythms.length; i++) {
+          const rhythm = settings.customRhythms[i];
+          if (typeof rhythm !== 'object' || rhythm === null) {
+            throw new Error(`customRhythms[${i}] 格式无效`);
+          }
+          if (typeof rhythm.name !== 'string' || rhythm.name.length === 0) {
+            throw new Error(`customRhythms[${i}].name 必须是有效字符串`);
+          }
+          if (rhythm.notes !== undefined) {
+            if (!Array.isArray(rhythm.notes)) {
+              throw new Error(`customRhythms[${i}].notes 必须是数组`);
+            }
+            for (let j = 0; j < rhythm.notes.length; j++) {
+              const note = rhythm.notes[j];
+              if (typeof note !== 'object' || note === null) {
+                throw new Error(`customRhythms[${i}].notes[${j}] 格式无效`);
+              }
+              if (!['D', 'U'].includes(note.direction)) {
+                throw new Error(`customRhythms[${i}].notes[${j}].direction 必须是 'D' 或 'U'`);
+              }
+              if (!['8th', '16th'].includes(note.duration)) {
+                throw new Error(`customRhythms[${i}].notes[${j}].duration 必须是 '8th' 或 '16th'`);
+              }
+            }
+          }
+        }
         customRhythms = settings.customRhythms;
         saveCustomRhythms();
       }
       
-      // 导入其他设置
-      if (settings.bpm) currentBPM = settings.bpm;
-      if (settings.metronomeEnabled !== undefined) metronomeEnabled = settings.metronomeEnabled;
-      if (settings.sensitivityLevel) sensitivityLevel = settings.sensitivityLevel;
+      // 验证并导入 BPM（范围 30-300）
+      if (settings.bpm !== undefined) {
+        const bpm = Number(settings.bpm);
+        if (typeof bpm !== 'number' || isNaN(bpm) || bpm < 30 || bpm > 300) {
+          throw new Error('bpm 必须是 30-300 之间的数字');
+        }
+        currentBPM = bpm;
+      }
+      
+      // 验证并导入 metronomeEnabled
+      if (settings.metronomeEnabled !== undefined) {
+        if (typeof settings.metronomeEnabled !== 'boolean') {
+          throw new Error('metronomeEnabled 必须是布尔值');
+        }
+        metronomeEnabled = settings.metronomeEnabled;
+      }
+      
+      // 验证并导入 sensitivityLevel（范围 1-10）
+      if (settings.sensitivityLevel !== undefined) {
+        const sens = Number(settings.sensitivityLevel);
+        if (typeof sens !== 'number' || isNaN(sens) || sens < 1 || sens > 10) {
+          throw new Error('sensitivityLevel 必须是 1-10 之间的数字');
+        }
+        sensitivityLevel = sens;
+      }
       
       // 更新 UI
       const bpmSlider = document.getElementById('bpmSlider');
@@ -3099,7 +3120,7 @@ function importUserSettings(event) {
       
       alert('设置导入成功！');
     } catch (err) {
-      alert('导入失败：文件格式错误');
+      alert('导入失败：' + (err.message || '文件格式错误'));
       console.error('导入设置失败:', err);
     }
   };
@@ -3145,8 +3166,11 @@ function updateChordDisplay(chordResult, expectedChord, nextChord) {
   }
   
   // 绘制和弦指法图（使用 canvas）
-  if (currentChordDiagramEl && chordResult.svg) {
-    drawChordDiagramOnCanvas(currentChordDiagramEl, chordResult.svg);
+  if (currentChordDiagramEl && chordResult.chord) {
+    const chordData = window.ChordLibrary.getChordData(chordResult.chord);
+    if (chordData) {
+      drawChordDiagramOnCanvas(currentChordDiagramEl, chordData);
+    }
   }
   
   // 检查是否准确
@@ -3799,9 +3823,12 @@ function processChordRecognition() {
     // 更新识别显示
     updateChordRecognition(result);
     
+    // 提前声明 isCorrect，使其在后续反馈逻辑中可用
+    let isCorrect = false;
+    
     // 在训练模式下检查是否匹配期望和弦
     if (currentTrainingMode !== 'free' && expectedChord) {
-      const isCorrect = result.chord === expectedChord;
+      isCorrect = result.chord === expectedChord;
       
       // 记录和弦识别统计
       practiceChordTotal++;
