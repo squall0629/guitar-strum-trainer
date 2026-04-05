@@ -21,7 +21,9 @@ var BASIC_CHORDS = [
   { name: 'F', difficulty: 3, label: 'F 大调 (简化)' },
   { name: 'Dm', difficulty: 2, label: 'D 小调' },
   { name: 'Cmaj7', difficulty: 2, label: 'C 大七' },
-  { name: 'G/B', difficulty: 2, label: 'G 转位 (低音 B)' }
+  { name: 'G/B', difficulty: 2, label: 'G 转位 (低音 B)' },
+  { name: 'Am/G', difficulty: 2, label: 'Am 转位 (低音 G)' },
+  { name: 'C/E', difficulty: 2, label: 'C 转位 (低音 E)' }
 ];
 
 /**
@@ -38,7 +40,9 @@ var CHORD_FINGERINGS = {
   'F':  [1, 3, 3, 2, 1, 1],
   'Dm': [null, null, 0, 2, 3, 1],
   'Cmaj7': [null, 3, 2, 0, 0, null],
-  'G/B': [null, 2, 0, 0, 0, 3]  // G 和弦第一转位，低音 B
+  'G/B': [null, 2, 0, 0, 0, 3],  // G 和弦第一转位，低音 B
+  'Am/G': [3, 0, 2, 2, 1, null],  // Am 和弦，低音 G（3 品）
+  'C/E': [0, 3, 2, 0, 1, null]   // C 和弦第一转位，低音 E
 };
 
 /**
@@ -55,7 +59,9 @@ var CHORD_NOTES = {
   'F': ['F2', 'C3', 'F3', 'A3', 'C4', 'F4'],
   'Dm': ['D3', 'A3', 'D4', 'F4', 'A4'],
   'Cmaj7': ['C3', 'E3', 'G3', 'B3', 'E4'],
-  'G/B': ['B2', 'D3', 'G3', 'B3', 'D4']  // G 和弦第一转位，B 为低音
+  'G/B': ['B2', 'D3', 'G3', 'B3', 'D4'],  // G 和弦第一转位，B 为低音
+  'Am/G': ['G2', 'A3', 'C4', 'E4'],  // Am 和弦，低音 G
+  'C/E': ['E3', 'G3', 'C4', 'E4']   // C 和弦第一转位，E 为低音
 };
 
 /**
@@ -63,7 +69,7 @@ var CHORD_NOTES = {
  */
 var COMMON_PROGRESSIONS = [
   // 经典低音下行
-  { name: '低音下行', chords: ['C', 'G/B', 'Am', 'G'], desc: '经典低音 C→B→A→G 下行，抒情必备' },
+  { name: '低音下行', chords: ['C', 'G/B', 'Am', 'Am/G', 'F', 'C/E', 'Dm', 'G'], desc: '经典低音 C→B→A→G→F→E→D→G 下行，抒情必备' },
   // 流行经典
   { name: '流行 1645', chords: ['C', 'Am', 'F', 'G'], desc: '华语流行最经典进行，明亮温暖' },
   { name: '流行 4536', chords: ['F', 'G', 'Em', 'Am'], desc: '日系流行经典，情感丰富' },
