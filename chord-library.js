@@ -69,24 +69,24 @@ var CHORD_NOTES = {
  */
 var COMMON_PROGRESSIONS = [
   // 经典低音下行
-  { name: '低音下行 (8-7-6-5-4-3-2-5)', chords: ['C', 'G/B', 'Am', 'Am/G', 'F', 'C/E', 'Dm', 'G'], desc: '经典低音 C→B→A→G→F→E→D→G 下行，抒情必备' },
+  { name: '低音下行 - 8-7-6-5-4-3-2-5 - [C-G/B-Am-Am/G-F-C/E-Dm-G]', chords: ['C', 'G/B', 'Am', 'Am/G', 'F', 'C/E', 'Dm', 'G'], desc: '经典低音 C→B→A→G→F→E→D→G 下行，抒情必备' },
   // 流行经典
-  { name: '流行 1645 (1-6-4-5)', chords: ['C', 'Am', 'F', 'G'], desc: '华语流行最经典进行，明亮温暖' },
-  { name: '流行 4536 (4-5-3-6)', chords: ['F', 'G', 'Em', 'Am'], desc: '日系流行经典，情感丰富' },
-  { name: '卡农进行 (1-5-6-3-4-1-4-5)', chords: ['C', 'G', 'Am', 'Em', 'F', 'C', 'F', 'G'], desc: '帕赫贝尔卡农，8 和弦循环' },
+  { name: '流行 1645 - 1-6-4-5 - [C-Am-F-G]', chords: ['C', 'Am', 'F', 'G'], desc: '华语流行最经典进行，明亮温暖' },
+  { name: '流行 4536 - 4-5-3-6 - [F-G-Em-Am]', chords: ['F', 'G', 'Em', 'Am'], desc: '日系流行经典，情感丰富' },
+  { name: '卡农进行 - 1-5-6-3-4-1-4-5 - [C-G-Am-Em-F-C-F-G]', chords: ['C', 'G', 'Am', 'Em', 'F', 'C', 'F', 'G'], desc: '帕赫贝尔卡农，8 和弦循环' },
   // 爵士/蓝调
-  { name: '12 小节蓝调 (1-4-5)', chords: ['C', 'F', 'G'], desc: '蓝调摇滚基础，简单有力' },
-  { name: '251 进行 (2-5-1)', chords: ['Dm', 'G', 'Cmaj7'], desc: '爵士乐核心 ii-V-I 进行' },
+  { name: '12 小节蓝调 - 1-4-5 - [C-F-G]', chords: ['C', 'F', 'G'], desc: '蓝调摇滚基础，简单有力' },
+  { name: '251 进行 - 2-5-1 - [Dm-G-Cmaj7]', chords: ['Dm', 'G', 'Cmaj7'], desc: '爵士乐核心 ii-V-I 进行' },
   // 小调色彩
-  { name: '小调 6415 (6-4-1-5)', chords: ['Am', 'F', 'C', 'G'], desc: '小调起始，忧郁深情' },
+  { name: '小调 6415 - 6-4-1-5 - [Am-F-C-G]', chords: ['Am', 'F', 'C', 'G'], desc: '小调起始，忧郁深情' },
   // 摇滚/流行
-  { name: '流行摇滚 (1-5-2-3)', chords: ['C', 'G', 'D', 'Em'], desc: '能量递增，适合摇滚' },
-  { name: '抒情流行 (1-3-4-5)', chords: ['C', 'Em', 'F', 'G'], desc: '温暖柔和，情绪递进' },
-  { name: '动力进行 (3-1-5-2)', chords: ['Em', 'C', 'G', 'D'], desc: '积极推动，励志向上' },
+  { name: '流行摇滚 - 1-5-2-3 - [C-G-D-Em]', chords: ['C', 'G', 'D', 'Em'], desc: '能量递增，适合摇滚' },
+  { name: '抒情流行 - 1-3-4-5 - [C-Em-F-G]', chords: ['C', 'Em', 'F', 'G'], desc: '温暖柔和，情绪递进' },
+  { name: '动力进行 - 3-1-5-2 - [Em-C-G-D]', chords: ['Em', 'C', 'G', 'D'], desc: '积极推动，励志向上' },
   // 风格化进行
-  { name: 'R&B 进行 (1-6-2-5)', chords: ['Cmaj7', 'Am', 'Dm', 'G'], desc: '七和弦丝滑质感' },
-  { name: '民谣常用 (5-2-3-1)', chords: ['G', 'D', 'Em', 'C'], desc: '开放和弦，民谣指弹' },
-  { name: '初学者练习 (1-5-6-3)', chords: ['C', 'G', 'Am', 'Em'], desc: '4 个基础和弦，新手入门' }
+  { name: 'R&B 进行 - 1-6-2-5 - [Cmaj7-Am-Dm-G]', chords: ['Cmaj7', 'Am', 'Dm', 'G'], desc: '七和弦丝滑质感' },
+  { name: '民谣常用 - 5-2-3-1 - [G-D-Em-C]', chords: ['G', 'D', 'Em', 'C'], desc: '开放和弦，民谣指弹' },
+  { name: '初学者练习 - 1-5-6-3 - [C-G-Am-Em]', chords: ['C', 'G', 'Am', 'Em'], desc: '4 个基础和弦，新手入门' }
 ];
 
 /**
