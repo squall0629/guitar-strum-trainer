@@ -356,6 +356,9 @@ let recorderCanvas, recorderCtx;
 let recorderWaveformData = [];  // 波形数据缓冲区
 const RECORDER_BUFFER_SIZE = 300;  // 波形数据点数
 
+// 时域频谱图
+let spectrumCanvas, spectrumCtx;
+
 // 和弦训练 DOM 元素
 let modeButtons, modePreset, modeCustom, modeFree;
 let presetSelector, progressionSelect;
@@ -485,6 +488,14 @@ function init() {
     // 设置 canvas 实际像素尺寸（和上方波形一致）
     recorderCanvas.width = recorderCanvas.offsetWidth || 600;
     recorderCanvas.height = recorderCanvas.offsetHeight || 120;
+  }
+  
+  // 时域频谱图
+  spectrumCanvas = document.getElementById('spectrumWaveform');
+  spectrumCtx = spectrumCanvas ? spectrumCanvas.getContext('2d') : null;
+  if (spectrumCanvas) {
+    spectrumCanvas.width = spectrumCanvas.offsetWidth || 600;
+    spectrumCanvas.height = spectrumCanvas.offsetHeight || 120;
   }
   
   metronomeToggle = document.getElementById('metronomeToggle');
@@ -1459,6 +1470,9 @@ function analyzeAudio() {
   // 绘制波形（使用相同的 timeDataCache）
   drawWaveform(timeDataCache, rms);
   
+  // 绘制时域频谱图
+  drawSpectrumWaveform(freqDataCache);
+  
   // 检测和弦识别
   processChordRecognition();
   
@@ -1547,6 +1561,48 @@ function drawRecorderWaveform(timeData, rms) {
   
   // 绘制轮廓线
   recorderCtx.stroke();
+}
+
+// 绘制时域频谱图
+function drawSpectrumWaveform(freqData) {
+  if (!spectrumCanvas || !spectrumCtx) return;
+  
+  // 清空画布
+  spectrumCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  spectrumCtx.fillRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
+  
+  // 绘制频谱条（从左到右，低频到高频）
+  const barWidth = spectrumCanvas.width / freqData.length;
+  
+  for (let i = 0; i < freqData.length; i++) {
+    const value = freqData[i];
+    const barHeight = (value / 255) * spectrumCanvas.height;
+    
+    // 渐变色（低频紫色 → 高频蓝色）
+    const hue = 270 + (i / freqData.length) * 30;  // 270°(紫) → 300°(蓝紫)
+    const color = `hsla(${hue}, 80%, 60%, 0.8)`;
+    
+    spectrumCtx.fillStyle = color;
+    spectrumCtx.fillRect(i * barWidth, spectrumCanvas.height - barHeight, barWidth - 1, barHeight);
+  }
+  
+  // 绘制顶部轮廓线
+  spectrumCtx.strokeStyle = '#b866ff';
+  spectrumCtx.lineWidth = 1;
+  spectrumCtx.beginPath();
+  
+  for (let i = 0; i < freqData.length; i++) {
+    const value = freqData[i];
+    const y = spectrumCanvas.height - (value / 255) * spectrumCanvas.height;
+    
+    if (i === 0) {
+      spectrumCtx.moveTo(0, y);
+    } else {
+      spectrumCtx.lineTo(i * barWidth, y);
+    }
+  }
+  
+  spectrumCtx.stroke();
 }
 
 // ========== Spectral Flux Onset Detection 算法实现 ==========
