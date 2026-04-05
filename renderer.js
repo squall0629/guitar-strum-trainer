@@ -1395,8 +1395,10 @@ function detectFluxPeak(currentFlux, threshold) {
   const isRising = currentFlux > prevFlux && prevFlux > prevPrevFlux;
   const isAboveThreshold = currentFlux > threshold;
   
-  // 额外检查：峰值应该显著高于前几帧
-  const isSignificantPeak = currentFlux > prevFlux * 1.2;  // 至少 20% 增长
+  // 额外检查：峰值应该显著高于前几帧（降低要求：10% 增长即可）
+  const isSignificantPeak = currentFlux > prevFlux * 1.1;  // 至少 10% 增长
+  
+  console.log('[DEBUG detectFluxPeak] flux:', currentFlux.toFixed(2), 'threshold:', threshold.toFixed(2), 'isRising:', isRising, 'isAboveThreshold:', isAboveThreshold, 'isSignificantPeak:', isSignificantPeak, 'result:', isRising && isAboveThreshold && isSignificantPeak);
   
   if (isRising && isAboveThreshold && isSignificantPeak) {
     fluxPeakCooldown = FLUX_COOLDOWN_FRAMES;  // 进入冷却期
@@ -1442,9 +1444,11 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
   const rmsThreshold = strumThreshold * 100;  // 调整 RMS 阈值范围
   const rmsOnset = rms > rmsThreshold;
   
+  console.log('[DEBUG detectOnsetWithFlux] rms:', rms.toFixed(3), 'rmsThreshold:', rmsThreshold.toFixed(3), 'rmsOnset:', rmsOnset, 'fluxPeak:', fluxPeak, 'flux:', currentFlux.toFixed(2), 'threshold:', fluxThreshold.toFixed(2));
+  
   // 混合策略：
   // 1. Flux 峰值 + RMS 超过 50% 阈值 = 强检测到
-  // 2. Flux 峰值 + RMS 上升 = 中等检测到
+  // 2. Flux 峰值 + RMS 超过 30% 阈值 = 中等检测到
   // 3. 仅 RMS 超过阈值 = 弱检测到（传统模式）
   const minStrumInterval = 80;  // 最小扫弦间隔 (ms)
   const timeSinceLastStrum = now - lastStrumTime;
@@ -1464,6 +1468,8 @@ function detectOnsetWithFlux(freqData, timeData, rms) {
       confidence = 0.5;  // 低置信度（仅 RMS）
     }
   }
+  
+  console.log('[DEBUG detectOnsetWithFlux] timeSinceLastStrum:', timeSinceLastStrum, 'onsetDetected:', onsetDetected, 'confidence:', confidence);
   
   return {
     onset: onsetDetected,
@@ -1493,8 +1499,12 @@ function detectStrum(freqData, timeData) {
   }
   highFreqEnergy /= (freqData.length - highFreqStart);
   
+  console.log('[DEBUG detectStrum] rms:', rms.toFixed(3), 'highFreqEnergy:', highFreqEnergy.toFixed(1));
+  
   // 使用 Spectral Flux Onset Detection
   const onsetResult = detectOnsetWithFlux(freqData, timeData, rms);
+  
+  console.log('[DEBUG detectStrum] onsetResult:', onsetResult);
   
   // 检测到扫弦
   if (onsetResult.onset) {
