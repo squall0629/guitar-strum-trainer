@@ -1288,16 +1288,24 @@ function analyzeAudio() {
   analyser.getByteFrequencyData(freqDataCache);
   analyser.getByteTimeDomainData(timeDataCache);
   
-  // 更新音量电平
+  // 计算 RMS（和波形图、扫弦检测使用相同的数据源）
+  let sum = 0;
+  for (let i = 0; i < timeDataCache.length; i++) {
+    const normalized = (timeDataCache[i] - 128) / 128;
+    sum += normalized * normalized;
+  }
+  const rms = Math.sqrt(sum / timeDataCache.length);
+  
+  // 更新音量电平（使用 RMS，和波形图一致）
   if (volumeMeterFill) {
-    let sum = 0;
-    for (let i = 0; i < freqDataCache.length; i++) sum += freqDataCache[i];
-    const avg = sum / freqDataCache.length;
-    volumeMeterFill.style.width = Math.min(100, (avg / 128) * 100) + '%';
+    // RMS 范围 0-1，映射到 0-100%
+    // 乘以 2 是为了让正常说话/演奏时指示条在中间位置
+    const volumePercent = Math.min(100, rms * 2 * 100);
+    volumeMeterFill.style.width = volumePercent + '%';
   }
   
-  // 绘制波形
-  drawWaveform(timeDataCache);
+  // 绘制波形（使用相同的 timeDataCache）
+  drawWaveform(timeDataCache, rms);
   
   // 检测和弦识别
   processChordRecognition();
@@ -1312,7 +1320,7 @@ function analyzeAudio() {
 }
 
 // 绘制波形
-function drawWaveform(timeData) {
+function drawWaveform(timeData, rms) {
   canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
   
@@ -1338,22 +1346,15 @@ function drawWaveform(timeData) {
   
   canvasCtx.stroke();
   
-  // 绘制 Windows 录音机风格波形
-  drawRecorderWaveform(timeData);
+  // 绘制 Windows 录音机风格波形（使用相同的 RMS）
+  drawRecorderWaveform(timeData, rms);
 }
 
-// 绘制 Windows 录音机风格波形
-function drawRecorderWaveform(timeData) {
+// 绘制 Windows 录音机风格波形（使用传入的 RMS 值）
+function drawRecorderWaveform(timeData, rms) {
   if (!recorderCanvas || !recorderCtx) return;
   
-  // 计算当前帧的 RMS 作为波形高度
-  let sum = 0;
-  for (let i = 0; i < timeData.length; i++) {
-    const normalized = (timeData[i] - 128) / 128;
-    sum += normalized * normalized;
-  }
-  const rms = Math.sqrt(sum / timeData.length);
-  
+  // 直接使用传入的 RMS 值（和音量指示条一致）
   // 添加到波形缓冲区
   recorderWaveformData.push(rms);
   if (recorderWaveformData.length > RECORDER_BUFFER_SIZE) {
@@ -1380,6 +1381,7 @@ function drawRecorderWaveform(timeData) {
   recorderCtx.beginPath();
   
   for (let i = 0; i < recorderWaveformData.length; i++) {
+    // 使用 RMS 值作为波形高度（和音量指示条一致）
     const amplitude = recorderWaveformData[i] * centerY * 3;  // 放大波形
     const x = i * barWidth;
     const y = centerY - amplitude;
