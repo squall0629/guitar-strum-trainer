@@ -374,9 +374,13 @@ TransitionDetector.prototype.onChordDetected = function(detectedChord, expectedC
  * 获取平均转换时间
  */
 TransitionDetector.prototype.getAverageTransitionTime = function() {
-  if (this.transitions.length === 0) return 0;
-  var sum = this.transitions.reduce(function(acc, t) { return acc + t.time; }, 0);
-  return Math.round(sum / this.transitions.length);
+  if (!this.transitions || this.transitions.length === 0) return 0;
+  var validTransitions = this.transitions.filter(function(t) {
+    return t && typeof t.time === 'number' && !isNaN(t.time) && isFinite(t.time);
+  });
+  if (validTransitions.length === 0) return 0;
+  var sum = validTransitions.reduce(function(acc, t) { return acc + t.time; }, 0);
+  return Math.round(sum / validTransitions.length);
 };
 
 /**

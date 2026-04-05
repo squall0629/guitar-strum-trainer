@@ -258,6 +258,11 @@ function checkMeasureUpdate() {
   const measureDuration = getMeasureDuration();
   const timeInMeasure = now - currentMeasureStartTime;
   
+  // 防止重复评分：检查是否已经对当前小节评分过
+  if (lastScoredMeasureEnd > 0 && now - lastScoredMeasureEnd < measureDuration * 0.5) {
+    return;
+  }
+  
   // 如果当前小节已结束，计算评分并开始新小节
   if (timeInMeasure >= measureDuration && currentMeasureStrums.length >= 2) {
     // 计算小节评分
@@ -297,6 +302,9 @@ function checkMeasureUpdate() {
     
 if (DEBUG)     console.log('[DEBUG 小节评分] 小节时长:', measureDuration, 'ms, 扫弦数:', currentMeasureStrums.length, '得分:', totalScore);
     
+    // 记录评分时间戳，防止重复评分
+    lastScoredMeasureEnd = now;
+    
     // 开始新小节
     currentMeasureStartTime = now;
     currentMeasureStrums = [];
@@ -313,6 +321,7 @@ let isListening = false;
 let currentMeasureStartTime = 0;  // 当前小节开始时间
 let currentMeasureStrums = [];    // 当前小节的扫弦数据
 let lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };  // 上次小节评分
+let lastScoredMeasureEnd = 0;     // 上次评分的小节结束时间戳（防止重复评分）
 
 // 历史稳定性评分相关
 let measureHistory = {
@@ -364,7 +373,7 @@ let _diagnosticFrameCounter = 0;  // 诊断日志帧计数器
 // 时域频谱图
 let spectrumCanvas, spectrumCtx;
 let spectrumHistory = [];  // 频谱历史缓冲区（用于 STFT 热力图）
-const SPECTRUM_HISTORY_SIZE = 120;  // 保留 120 帧历史（约 2 秒，60 FPS）
+const SPECTRUM_HISTORY_SIZE = 60;  // 保留 60 帧历史（约 1 秒，60 FPS）
 
 // 和弦训练 DOM 元素
 let modeButtons, modePreset, modeCustom, modeFree;
@@ -1187,36 +1196,54 @@ async function playStrumSoundSynth(direction, duration = 0.15) {
     
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.value = freq;
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
-    osc2.type = 'sawtooth';
-    osc2.frequency.value = freq * 2.0;
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
     
-    const peakTime = startTime + attackTime;
-    const sustainTime = startTime + attackTime + decayTime;
-    const endTime = startTime + duration;
-    
-    gain1.gain.setValueAtTime(0.001, startTime);
-    gain1.gain.linearRampToValueAtTime(baseVolume, peakTime);
-    gain1.gain.exponentialRampToValueAtTime(baseVolume * sustainLevel, sustainTime);
-    gain1.gain.setValueAtTime(baseVolume * sustainLevel, endTime);
-    gain1.gain.exponentialRampToValueAtTime(0.001, endTime + releaseTime);
-    
-    gain2.gain.setValueAtTime(0.001, startTime);
-    gain2.gain.linearRampToValueAtTime(harmonic2Volume, peakTime);
-    gain2.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.5);
-    
-    osc1.start(startTime);
-    osc1.stop(endTime + releaseTime + 0.01);
-    osc2.start(startTime);
-    osc2.stop(sustainTime + releaseTime * 0.5 + 0.01);
+    try {
+      osc1.type = 'triangle';
+      osc1.frequency.value = freq;
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      
+      osc2.type = 'sawtooth';
+      osc2.frequency.value = freq * 2.0;
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      
+      const peakTime = startTime + attackTime;
+      const sustainTime = startTime + attackTime + decayTime;
+      const endTime = startTime + duration;
+      
+      gain1.gain.setValueAtTime(0.001, startTime);
+      gain1.gain.linearRampToValueAtTime(baseVolume, peakTime);
+      gain1.gain.exponentialRampToValueAtTime(baseVolume * sustainLevel, sustainTime);
+      gain1.gain.setValueAtTime(baseVolume * sustainLevel, endTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, endTime + releaseTime);
+      
+      gain2.gain.setValueAtTime(0.001, startTime);
+      gain2.gain.linearRampToValueAtTime(harmonic2Volume, peakTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, sustainTime + releaseTime * 0.5);
+      
+      osc1.start(startTime);
+      osc1.stop(endTime + releaseTime + 0.01);
+      osc2.start(startTime);
+      osc2.stop(sustainTime + releaseTime * 0.5 + 0.01);
+      
+      osc1.onended = () => {
+        osc1.disconnect();
+        gain1.disconnect();
+      };
+      osc2.onended = () => {
+        osc2.disconnect();
+        gain2.disconnect();
+      };
+    } catch (e) {
+      osc1.disconnect();
+      gain1.disconnect();
+      osc2.disconnect();
+      gain2.disconnect();
+      console.error('[GuitarStrumTrainer] Failed to play strum sound:', e);
+    }
   });
 }
 
@@ -1322,6 +1349,7 @@ if (DEBUG)     console.log('[DEBUG startListening] 音频上下文和节点已�
     // 重置历史评分记录
     measureHistory = { rhythm: [], tone: [], dynamics: [] };
     lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };
+    lastScoredMeasureEnd = 0;
     
     // 重置稳定性评分显示
     const rhythmStabilityEl = document.getElementById('rhythmStabilityScore');
@@ -1414,10 +1442,13 @@ function stopListening() {
   }
   
   if (microphone) {
+    microphone.mediaStream.getTracks().forEach(track => track.stop());
     microphone.disconnect();
+    microphone = null;
   }
   if (audioContext) {
     audioContext.close();
+    audioContext = null;
   }
   
   btnStart.style.display = 'block';
@@ -3131,9 +3162,9 @@ function importUserSettings(event) {
 }
 
 // HTML 转义（使用字符串替换，避免 DOM 创建开销）
-const _escapeHtmlMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-const _escapeHtmlRegex = /[&<>"']/g;
 function escapeHtml(text) {
+  const _escapeHtmlMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const _escapeHtmlRegex = /[&<>"']/g;
   return String(text).replace(_escapeHtmlRegex, m => _escapeHtmlMap[m]);
 }
 
@@ -3325,9 +3356,14 @@ function resetChordTraining() {
 }
 
 // 自动保存设置（定期）
-setInterval(() => {
+let autoSaveIntervalId = setInterval(() => {
   saveUserSettings();
 }, 5000); // 每 5 秒自动保存
+
+// 页面卸载时清理自动保存定时器
+window.addEventListener('beforeunload', () => {
+  clearInterval(autoSaveIntervalId);
+});
 
 // ========== 和弦训练功能 ==========
 
@@ -3637,31 +3673,31 @@ function drawChordDiagram(canvas, chordName) {
     return;
   }
   
-    try {
-      // 使用 chordictionary 生成 SVG
-      const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
-      
-      // 将 SVG 转换为图片并绘制到 Canvas
-      const img = new Image();
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const blobUrl = URL.createObjectURL(svgBlob);
-      
-      img.onload = () => {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        // 延迟释放 Blob URL，确保浏览器完成绘制
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      };
-      
-      img.onerror = () => {
-        console.warn('[ChordDiagram] SVG 加载失败，使用备用方案');
-        // SVG 加载失败，使用备用 Canvas 绘制
-        drawChordDiagramFallback(canvas, chordName);
-        URL.revokeObjectURL(blobUrl);
-      };
-      
-      img.src = blobUrl;
+  try {
+    // 使用 chordictionary 生成 SVG
+    const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
+    
+    // 将 SVG 转换为图片并绘制到 Canvas
+    const img = new Image();
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(svgBlob);
+    
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      // 延迟释放 Blob URL，确保浏览器完成绘制
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    };
+    
+    img.onerror = () => {
+      console.warn('[ChordDiagram] SVG 加载失败，使用备用方案');
+      // SVG 加载失败，使用备用 Canvas 绘制
+      drawChordDiagramFallback(canvas, chordName);
+      URL.revokeObjectURL(blobUrl);
+    };
+    
+    img.src = blobUrl;
   } catch (e) {
     console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
     drawChordDiagramFallback(canvas, chordName);
