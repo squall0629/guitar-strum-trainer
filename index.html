@@ -606,16 +606,19 @@
     }
     
     /* Chord diagram centering */
-    #currentChordDiagram,
-    .chord-diagram,
-    #nextChordDiagram {
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .chord-diagram {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 120px !important;
+      height: 140px !important;
+      background: rgba(0,0,0,0.2) !important;
+      border-radius: 8px !important;
     }
     
-    #currentChordDiagram svg,
-    #nextChordDiagram svg {
+    .chord-diagram svg {
+      width: 120px !important;
+      height: 140px !important;
       margin: 0 auto;
       display: block;
     }
@@ -1046,9 +1049,6 @@
       }
 
       /* Chord diagram responsive */
-      #currentChordDiagram,
-      .chord-diagram,
-    #nextChordDiagram {
         max-width: 100%;
         height: auto;
         display: flex !important;
@@ -1121,8 +1121,6 @@
 
       /* Chord diagrams: larger on phone */
       #currentChordDiagram,
-      .chord-diagram,
-    #nextChordDiagram {
         width: 150px !important;
         height: 170px !important;
         display: flex !important;
