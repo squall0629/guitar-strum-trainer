@@ -67,7 +67,7 @@ var COMMON_PROGRESSIONS = [
   { name: '12 小节蓝调', chords: ['C', 'F', 'G'], desc: '蓝调摇滚基础，简单有力' },
   { name: '251 进行', chords: ['Dm', 'G', 'Cmaj7'], desc: '爵士乐核心 ii-V-I 进行' },
   // 小调色彩
-  { name: '小调 1645', chords: ['Am', 'F', 'C', 'G'], desc: '小调起始，忧郁深情' },
+  { name: '小调 6415', chords: ['Am', 'F', 'C', 'G'], desc: '小调起始，忧郁深情' },
   // 摇滚/流行
   { name: '流行摇滚', chords: ['C', 'G', 'D', 'Em'], desc: '能量递增，适合摇滚' },
   { name: '抒情流行', chords: ['C', 'Em', 'F', 'G'], desc: '温暖柔和，情绪递进' },
