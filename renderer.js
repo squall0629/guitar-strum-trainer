@@ -245,7 +245,8 @@ async function startListening() {
     (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
       drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
     (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
-      drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug)
+      drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
+    (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
   );
 }
 

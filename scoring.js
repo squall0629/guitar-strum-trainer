@@ -6,8 +6,8 @@
  * @returns {number} 稳定性评分 (0-100)
  */
 export function calculateStabilityScore(history) {
-  const MAX_HISTORY = 10;
-  if (history.length < MAX_HISTORY) return 0;  // 至少 MAX_HISTORY(10) 个小节才能计算
+  const MIN_HISTORY = 10;
+  if (history.length < MIN_HISTORY) return 0;  // 至少 10 个小节才能计算
   
   // 1. 计算平均分
   const avg = history.reduce((a, b) => a + b, 0) / history.length;
@@ -79,7 +79,7 @@ export function checkMeasureUpdate(isListening, currentMeasureStartTime, current
   }
   
   // 如果当前小节已结束，计算评分并开始新小节
-  if (timeInMeasure >= measureDuration && currentMeasureStrums.length >= 2) {
+  if (timeInMeasure >= measureDuration && currentMeasureStrums.length >= 1) {
     // 计算小节评分
     const rhythmScore = calculateRhythmScore(currentMeasureStrums, pattern, currentBPM);
     const toneScore = calculateToneScore(currentMeasureStrums);
@@ -196,7 +196,7 @@ export function calculateRhythmScore(strums, pattern, currentBPM, DEBUG = false)
   const cvs = [];
   const groupStats = [];
   for (let i = 0; i < patternLength; i++) {
-    if (groups[i].length < 2) {
+    if (groups[i].length < 1) {
       cvs.push(0);
       groupStats.push({ avg: 0, stdDev: 0, cv: 0, count: groups[i].length });
       continue;
@@ -211,9 +211,9 @@ export function calculateRhythmScore(strums, pattern, currentBPM, DEBUG = false)
     groupStats.push({ avg, stdDev, cv, count: groups[i].length });
   }
   
-  // 4. 计算平均 CV（排除样本不足的组）
-  const validCvs = cvs.filter((cv, i) => groupStats[i].count >= 2);
-  if (validCvs.length === 0) return 0;
+  // 4. 计算平均 CV（有 1 个样本就算有效，没有样本的组排除）
+  const validCvs = cvs.filter((cv, i) => groupStats[i].count >= 1);
+  if (validCvs.length === 0) return 50; // 没有数据时给中等分数
   
   const avgCV = validCvs.reduce((a, b) => a + b, 0) / validCvs.length;
   

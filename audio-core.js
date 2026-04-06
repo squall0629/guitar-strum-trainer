@@ -25,6 +25,7 @@ const SPECTRUM_HISTORY_SIZE = 60;
 // 回调函数引用
 let getActiveRhythmCallback = null;
 let updateScoreRingCallback = null;
+let detectStrumCallback = null;
 
 // 调试模式
 const DEBUG = false;
@@ -87,13 +88,13 @@ export function isListeningState() {
 }
 
 // ========== 音频分析主循环 ==========
-export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback) {
+export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback) {
   if (!isListening) return;
   
   const now = performance.now();
   const delta = now - lastAnalyzeTime;
   if (delta < ANALYZE_INTERVAL) {
-    requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback));
+    requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback));
     return;
   }
   lastAnalyzeTime = now;
@@ -112,6 +113,11 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
   }
   const rms = Math.sqrt(sum / timeDataCache.length);
   
+  // 调用扫弦检测
+  if (detectStrumCallback) {
+    detectStrumCallback(freqDataCache, timeDataCache, rms);
+  }
+  
   if (volumeMeterFill) {
     const sensitivityLevel = window.getSensitivityLevel ? window.getSensitivityLevel() : 50;
     const sensitivityGain = 1 + (sensitivityLevel / 100);
@@ -126,7 +132,7 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
     drawSpectrumWaveformCallback(spectrumCanvas, spectrumCtx, freqDataCache, spectrumHistory, SPECTRUM_HISTORY_SIZE, 67, audioContext, DEBUG);
   }
   
-  requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback));
+  requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback));
 }
 
 // ========== 初始化 ==========

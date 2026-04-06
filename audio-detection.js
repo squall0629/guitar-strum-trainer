@@ -11,7 +11,7 @@ let lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };
 let lastScoredMeasureEnd = 0;
 
 let measureHistory = { rhythm: [], tone: [], dynamics: [] };
-const MAX_HISTORY = 4;
+const MAX_HISTORY = 10;
 let detectedStrums = [];
 let lastStrumTime = 0;
 let expectedStrumIndex = 0;
