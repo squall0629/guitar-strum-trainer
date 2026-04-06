@@ -248,6 +248,14 @@ async function startListening() {
     return;
   }
   
+  // 调音器模式特殊处理：立即开始检测
+  if (currentMode === 'tuner') {
+    updateListeningState(true);
+    updateStatus('listening');
+    const feedbackMessage = document.getElementById('feedbackMessage');
+    if (feedbackMessage) feedbackMessage.textContent = '🎛️ 调音器已启动，请弹吉他弦';
+  }
+  
   resetFluxState();
   setPracticeStartTime(Date.now());
   setCurrentMeasureStartTime(Date.now()); // 初始化小节开始时间
@@ -295,6 +303,13 @@ async function startListening() {
       updateTunerDisplay(result, tunerStringName, tunerCents, tunerFrequency, tunerNeededle, tunerStatusLight);
     };
     
+    // 调音器模式也需要波形显示
+    const volumeMeterFill = document.getElementById('volumeMeterFill');
+    const recorderCanvas = document.getElementById('recorderWaveform');
+    const recorderCtx = recorderCanvas?.getContext('2d');
+    const spectrumCanvas = document.getElementById('spectrumWaveform');
+    const spectrumCtx = spectrumCanvas?.getContext('2d');
+    
     analyzeAudio(
       null,
       (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
@@ -305,6 +320,12 @@ async function startListening() {
       tunerCallback
     );
   } else {
+    const volumeMeterFill = document.getElementById('volumeMeterFill');
+    const recorderCanvas = document.getElementById('recorderWaveform');
+    const recorderCtx = recorderCanvas?.getContext('2d');
+    const spectrumCanvas = document.getElementById('spectrumWaveform');
+    const spectrumCtx = spectrumCanvas?.getContext('2d');
+    
     analyzeAudio(
       () => updateScoresWrapper(),
       (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
@@ -609,8 +630,19 @@ function init() {
   });
   
   // 初始化调音器 UI
-  initTunerUI((stringIndex) => {
-    const audioCtx = getAudioContext();
+  initTunerUI(async (stringIndex) => {
+    let audioCtx = getAudioContext();
+    if (!audioCtx) {
+      // 如果 AudioContext 未初始化，先初始化音频引擎
+      await initAudioEngine();
+      audioCtx = getAudioContext();
+    }
+    
+    // 确保 AudioContext 处于 running 状态
+    if (audioCtx && audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+    
     if (audioCtx) {
       playReferenceTone(audioCtx, stringIndex, 2);
     }
