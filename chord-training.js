@@ -35,6 +35,7 @@ let progressionProgress = null;
 let btnSaveProgression = null;
 let btnClearProgression = null;
 let chordTrainingPanel = null;
+let chordDisplayPanel = null;
 let practiceModeRhythm = null;
 let practiceModeComprehensive = null;
 let practiceModeDescription = null;
@@ -124,6 +125,7 @@ export function initChordTraining(options = {}) {
   btnSaveProgression = options.btnSaveProgression || null;
   btnClearProgression = options.btnClearProgression || null;
   chordTrainingPanel = options.chordTrainingPanel || null;
+  chordDisplayPanel = options.chordDisplayPanel || null;
   practiceModeRhythm = options.practiceModeRhythm || null;
   practiceModeComprehensive = options.practiceModeComprehensive || null;
   practiceModeDescription = options.practiceModeDescription || null;
@@ -184,9 +186,12 @@ function updatePracticeModeUI() {
   if (practiceModeRhythm) practiceModeRhythm.classList.toggle('active', practiceMode === 'rhythm');
   if (practiceModeComprehensive) practiceModeComprehensive.classList.toggle('active', practiceMode === 'comprehensive');
   if (practiceModeDescription) {
-    practiceModeDescription.textContent = practiceMode === 'rhythm' ? '💡 纯节奏模式：专注节奏准确度，任意和弦均可练习' : '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
+    practiceModeDescription.textContent = practiceMode === 'rhythm' ? '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习' : '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
   }
-  if (chordTrainingPanel) chordTrainingPanel.style.display = practiceMode === 'comprehensive' ? 'block' : 'none';
+  // 纯节奏模式隐藏和弦训练相关面板
+  const displayStyle = practiceMode === 'comprehensive' ? 'block' : 'none';
+  if (chordTrainingPanel) chordTrainingPanel.style.display = displayStyle;
+  if (chordDisplayPanel) chordDisplayPanel.style.display = displayStyle;
 }
 
 export function getPracticeMode() {

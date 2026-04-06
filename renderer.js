@@ -546,6 +546,7 @@ function init() {
     btnSaveProgression: document.getElementById('btnSaveProgression'),
     btnClearProgression: document.getElementById('btnClearProgression'),
     chordTrainingPanel: document.querySelector('.chord-training-panel'),
+    chordDisplayPanel: document.getElementById('chordDisplayPanel'),
     practiceModeRhythm: document.getElementById('practiceModeRhythm'),
     practiceModeComprehensive: document.getElementById('practiceModeComprehensive'),
     practiceModeDescription: document.getElementById('practiceModeDescription'),

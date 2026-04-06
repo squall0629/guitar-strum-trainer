@@ -30,7 +30,7 @@
     </div>
     
     <!-- 和弦训练模式选择 -->
-    <div class="panel chord-training-panel" style="margin-bottom: 20px;">
+    <div class="panel chord-training-panel" id="chordModePanel" style="margin-bottom: 20px;">
       <h2>🎯 训练模式</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <button class="mode-btn active" id="modePreset" data-mode="preset" aria-pressed="true">
@@ -105,7 +105,7 @@
     </div>
     
     <!-- 和弦显示区域 -->
-    <div class="panel" style="margin-bottom: 20px;">
+    <div class="panel" id="chordDisplayPanel" style="margin-bottom: 20px;">
       <h2>🎸 和弦训练</h2>
       <div style="display: grid; grid-template-columns: 1fr 100px 1fr; gap: 20px; align-items: center;">
         <!-- 当前和弦 -->
