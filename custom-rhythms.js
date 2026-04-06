@@ -2,7 +2,7 @@
 // 功能：自定义节奏型的渲染、保存、删除、编辑
 
 // ========== 导入 ==========
-import { playDemo, getIsPlayingDemo, stopDemo } from './audio-engine.js';
+import { playDemo, getIsPlayingDemo, stopDemo } from './audio-demo.js';
 
 // ========== 全局状态 ==========
 const RHYTHM_PATTERNS = [

@@ -6,43 +6,11 @@ import { saveUserSettings, loadUserSettings, saveHistory, loadHistoryFromStorage
 import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, updateStabilityScores } from './scoring.js';
 import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition as updateChordRecognitionUI, updateTransitionTime as updateTransitionTimeUI } from './ui-renderer.js';
 
-import {
-  initAudioEngine,
-  startListening as audioStartListening,
-  stopListening as audioStopListening,
-  isListeningState,
-  analyzeAudio,
-  detectStrum,
-  provideFeedback,
-  calculateToneScore as audioCalculateToneScore,
-  setCurrentBPM,
-  getCurrentBPM,
-  setMetronomeEnabled,
-  isMetronomeEnabled,
-  startMetronome,
-  stopMetronome,
-  playMetronomeSound,
-  getIsPlayingDemo,
-  setIsPlayingDemo,
-  stopDemo,
-  playDemo,
-  loadGuitarSoundfont,
-  resetFluxState,
-  getDetectedStrums,
-  getCurrentMeasureStrums,
-  getMeasureHistory,
-  getLastMeasureScores,
-  setLastMeasureScores,
-  getLastScoredMeasureEnd,
-  setLastScoredMeasureEnd,
-  setCurrentMeasureStartTime,
-  getCurrentMeasureStartTime,
-  setCurrentMeasureStrums,
-  setSensitivityLevel,
-  updateThreshold,
-  getAudioContext,
-  getAnalyser
-} from './audio-engine.js';
+// 音频模块导入
+import { initAudioEngine, startListening as audioStartListening, stopListening as audioStopListening, isListeningState, analyzeAudio, getAudioContext, getAnalyser } from './audio-core.js';
+import { setCurrentBPM, getCurrentBPM, setMetronomeEnabled, isMetronomeEnabled, startMetronome, stopMetronome, playMetronomeSound } from './audio-metronome.js';
+import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo, loadGuitarSoundfont } from './audio-demo.js';
+import { detectStrum, provideFeedback, calculateToneScore as audioCalculateToneScore, resetFluxState, getDetectedStrums, getCurrentMeasureStrums, getMeasureHistory, getLastMeasureScores, setLastMeasureScores, getLastScoredMeasureEnd, setLastScoredMeasureEnd, setCurrentMeasureStartTime, getCurrentMeasureStartTime, setCurrentMeasureStrums, setSensitivityLevel, updateThreshold } from './audio-detection.js';
 
 import {
   initChordTraining,
