@@ -10,6 +10,7 @@ import { updateTunerDisplay, initTunerUI } from './tuner-ui.js';
 
 // ========== 调音器状态 ==========
 let tunerAnimationFrame = null;
+let isTunerListening = false;
 
 // 音频模块导入
 import { initAudioEngine, startListening as audioStartListening, stopListening as audioStopListening, isListeningState, analyzeAudio, getAudioContext, getAnalyser } from './audio-core.js';
@@ -224,7 +225,67 @@ function checkMeasureUpdateWrapper() {
   }
 }
 
-// ========== 开始/停止监听 ==========
+// ========== 调音器独立监听 ==========
+async function startTunerListening() {
+  if (isTunerListening) return;
+  
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
+  const success = await audioStartListening();
+  
+  if (loadingOverlay) loadingOverlay.style.display = 'none';
+  
+  if (!success) {
+    const tunerStringName = document.getElementById('tunerStringName');
+    if (tunerStringName) tunerStringName.textContent = '❌ 无法访问麦克风';
+    return;
+  }
+  
+  isTunerListening = true;
+  
+  const tunerNeededle = document.getElementById('tunerNeededle');
+  const tunerStatusLight = document.getElementById('tunerStatusLight');
+  const tunerStringName = document.getElementById('tunerStringName');
+  const tunerCents = document.getElementById('tunerCents');
+  const tunerFrequency = document.getElementById('tunerFrequency');
+  
+  function tunerLoop() {
+    if (!isTunerListening || currentMode !== 'tuner') return;
+    
+    const bufferLength = analyser.frequencyBinCount;
+    const timeData = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(timeData);
+    
+    // 将 Uint8Array 转换为 Float32Array（-1 到 1）
+    const floatData = new Float32Array(timeData.length);
+    for (let i = 0; i < timeData.length; i++) {
+      floatData[i] = (timeData[i] - 128) / 128;
+    }
+    
+    const frequency = detectPitch(floatData, audioContext.sampleRate);
+    const result = identifyString(frequency);
+    updateTunerDisplay(result, tunerStringName, tunerCents, tunerFrequency, tunerNeededle, tunerStatusLight);
+    
+    tunerAnimationFrame = requestAnimationFrame(tunerLoop);
+  }
+  
+  tunerLoop();
+}
+
+function stopTunerListening() {
+  if (!isTunerListening) return;
+  
+  if (tunerAnimationFrame) {
+    cancelAnimationFrame(tunerAnimationFrame);
+    tunerAnimationFrame = null;
+  }
+  
+  isTunerListening = false;
+  audioStopListening();
+}
+
+// ========== 开始/停止监听（练习模式） ==========
 async function startListening() {
   // 显示加载遮罩（请求麦克风权限时）
   const loadingOverlay = document.getElementById('loadingOverlay');
@@ -246,14 +307,6 @@ async function startListening() {
     const feedbackMessage = document.getElementById('feedbackMessage');
     if (feedbackMessage) feedbackMessage.textContent = '❌ 无法访问麦克风';
     return;
-  }
-  
-  // 调音器模式特殊处理：立即开始检测
-  if (currentMode === 'tuner') {
-    updateListeningState(true);
-    updateStatus('listening');
-    const feedbackMessage = document.getElementById('feedbackMessage');
-    if (feedbackMessage) feedbackMessage.textContent = '🎛️ 调音器已启动，请弹吉他弦';
   }
   
   resetFluxState();
@@ -283,61 +336,20 @@ async function startListening() {
   const spectrumCanvas = document.getElementById('spectrumWaveform');
   const spectrumCtx = spectrumCanvas?.getContext('2d');
   
-  // 调音器模式特殊处理
-  if (currentMode === 'tuner') {
-    const tunerNeededle = document.getElementById('tunerNeededle');
-    const tunerStatusLight = document.getElementById('tunerStatusLight');
-    const tunerStringName = document.getElementById('tunerStringName');
-    const tunerCents = document.getElementById('tunerCents');
-    const tunerFrequency = document.getElementById('tunerFrequency');
-    
-    const tunerCallback = (timeData, sampleRate) => {
-      // 将 Uint8Array 转换为 Float32Array（-1 到 1）
-      const floatData = new Float32Array(timeData.length);
-      for (let i = 0; i < timeData.length; i++) {
-        floatData[i] = (timeData[i] - 128) / 128;
-      }
-      
-      const frequency = detectPitch(floatData, sampleRate);
-      const result = identifyString(frequency);
-      updateTunerDisplay(result, tunerStringName, tunerCents, tunerFrequency, tunerNeededle, tunerStatusLight);
-    };
-    
-    // 调音器模式也需要波形显示
-    const volumeMeterFill = document.getElementById('volumeMeterFill');
-    const recorderCanvas = document.getElementById('recorderWaveform');
-    const recorderCtx = recorderCanvas?.getContext('2d');
-    const spectrumCanvas = document.getElementById('spectrumWaveform');
-    const spectrumCtx = spectrumCanvas?.getContext('2d');
-    
-    analyzeAudio(
-      null,
-      (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
-        drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
-      (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
-        drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
-      null,
-      tunerCallback
-    );
-  } else {
-    const volumeMeterFill = document.getElementById('volumeMeterFill');
-    const recorderCanvas = document.getElementById('recorderWaveform');
-    const recorderCtx = recorderCanvas?.getContext('2d');
-    const spectrumCanvas = document.getElementById('spectrumWaveform');
-    const spectrumCtx = spectrumCanvas?.getContext('2d');
-    
-    analyzeAudio(
-      () => updateScoresWrapper(),
-      (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
-        drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
-      (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
-        drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
-      (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
-    );
-  }
+  analyzeAudio(
+    () => updateScoresWrapper(),
+    (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
+      drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
+    (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
+      drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
+    (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
+  );
 }
 
 function stopListening() {
+  // 调音器模式下不处理
+  if (currentMode === 'tuner') return;
+  
   if (autoSaveIntervalId) {
     clearInterval(autoSaveIntervalId);
     autoSaveIntervalId = null;
@@ -618,8 +630,9 @@ function init() {
         practicePanel.style.display = 'none';
         scorePanel.style.display = 'none';
         practiceModeDesc.textContent = '💡 调音器模式：6 弦音准检测，±5 音分精度';
-        // 调音器模式自动启动监听
-        startListening();
+        // 调音器独立启动监听
+        stopListening();
+        startTunerListening();
       } else if (btn.id === 'practiceModeRhythm') {
         currentMode = 'rhythm';
         practiceMode = 'rhythm';
@@ -630,6 +643,8 @@ function init() {
         practicePanel.style.display = 'block';
         scorePanel.style.display = 'block';
         practiceModeDesc.textContent = '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习';
+        // 停止调音器监听
+        stopTunerListening();
         setPracticeMode('rhythm');
       } else if (btn.id === 'practiceModeComprehensive') {
         currentMode = 'comprehensive';
@@ -641,6 +656,8 @@ function init() {
         practicePanel.style.display = 'block';
         scorePanel.style.display = 'block';
         practiceModeDesc.textContent = '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
+        // 停止调音器监听
+        stopTunerListening();
         setPracticeMode('comprehensive');
       }
     });
