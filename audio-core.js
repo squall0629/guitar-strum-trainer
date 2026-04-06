@@ -130,7 +130,7 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
 }
 
 // ========== 初始化 ==========
-export function initAudioCore(options = {}) {
+export function initAudioEngine(options = {}) {
   volumeMeterFill = options.volumeMeterFill || null;
   recorderCanvas = options.recorderCanvas || null;
   recorderCtx = options.recorderCtx || null;
