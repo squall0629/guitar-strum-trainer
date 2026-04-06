@@ -604,15 +604,19 @@ function init() {
   setupPracticeReport();
 }
 
-// ========== 窗口大小调整 ==========
+// ========== 窗口大小调整（带防抖） ==========
+let resizeDebounceTimer = null;
 window.addEventListener('resize', () => {
-  const recorderCanvas = document.getElementById('recorderWaveform');
-  const spectrumCanvas = document.getElementById('spectrumWaveform');
-  const statsChartCanvas = document.getElementById('statsChart');
-  
-  if (recorderCanvas) { recorderCanvas.width = recorderCanvas.offsetWidth; recorderCanvas.height = recorderCanvas.offsetHeight; }
-  if (spectrumCanvas) { spectrumCanvas.width = spectrumCanvas.offsetWidth; spectrumCanvas.height = spectrumCanvas.offsetHeight; }
-  if (statsChartCanvas) { statsChartCanvas.width = statsChartCanvas.offsetWidth; statsChartCanvas.height = statsChartCanvas.offsetHeight; renderStatsChart(); }
+  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+  resizeDebounceTimer = setTimeout(() => {
+    const recorderCanvas = document.getElementById('recorderWaveform');
+    const spectrumCanvas = document.getElementById('spectrumWaveform');
+    const statsChartCanvas = document.getElementById('statsChart');
+    
+    if (recorderCanvas) { recorderCanvas.width = recorderCanvas.offsetWidth; recorderCanvas.height = recorderCanvas.offsetHeight; }
+    if (spectrumCanvas) { spectrumCanvas.width = spectrumCanvas.offsetWidth; spectrumCanvas.height = spectrumCanvas.offsetHeight; }
+    if (statsChartCanvas) { statsChartCanvas.width = statsChartCanvas.offsetWidth; statsChartCanvas.height = statsChartCanvas.offsetHeight; renderStatsChart(); }
+  }, 250); // 250ms 防抖
 });
 
 // ========== 启动 ==========

@@ -343,18 +343,20 @@ export function playMetronomeSound(frequency = 1000, duration = 0.05) {
   oscillator.stop(audioContextForMetronome.currentTime + duration);
 }
 
+// [BACKUP] 节拍器逻辑 - 2026-04-06
+// 核心逻辑：首拍重音 + 循环检测节奏型拍数
 export function startMetronome() {
   if (metronomeInterval) clearInterval(metronomeInterval);
   const beatInterval = (60 / currentBPM) * 1000;
   metronomeBeat = 0;
-  playMetronomeSound(1200, 0.05);
+  playMetronomeSound(1200, 0.05); // 首拍重音
   triggerMetronomeDot(true);
   
   metronomeInterval = setInterval(() => {
     metronomeBeat++;
     const activeRhythm = getActiveRhythmCallback ? getActiveRhythmCallback(currentDemoRhythmIndex) : null;
     const beats = activeRhythm ? activeRhythm.beats : 4;
-    const isAccent = metronomeBeat % beats === 0;
+    const isAccent = metronomeBeat % beats === 0; // 每小节第一拍重音
     playMetronomeSound(isAccent ? 1200 : 800, 0.05);
     triggerMetronomeDot(isAccent);
   }, beatInterval);
