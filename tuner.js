@@ -15,7 +15,8 @@ const STRING_NAMES = ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'];
 const STRING_DISPLAY = ['6 弦 E', '5 弦 A', '4 弦 D', '3 弦 G', '2 弦 B', '1 弦 E'];
 
 // 调音阈值（音分）
-const IN_TUNE_CENTS = 50;   // 绿色（准，±50 音分）
+const IN_TUNE_CENTS = 5;    // 绿色（准，±5 音分）
+const CLOSE_CENTS = 50;     // 橙色（接近，±50 音分）
 // >50 音分：红色（不准）
 
 /**
