@@ -188,8 +188,8 @@ function updatePracticeModeUI() {
   if (practiceModeDescription) {
     practiceModeDescription.textContent = practiceMode === 'rhythm' ? '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习' : '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
   }
-  // 纯节奏模式隐藏和弦训练相关面板
-  const displayStyle = practiceMode === 'comprehensive' ? 'block' : 'none';
+  // 纯节奏模式隐藏和弦训练相关面板（用空字符串恢复 CSS 默认布局）
+  const displayStyle = practiceMode === 'comprehensive' ? '' : 'none';
   if (chordTrainingPanel) chordTrainingPanel.style.display = displayStyle;
   if (chordDisplayPanel) chordDisplayPanel.style.display = displayStyle;
 }
