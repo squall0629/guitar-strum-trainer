@@ -600,30 +600,47 @@ function init() {
       modeBtns.forEach(b => b && b.classList.remove('active'));
       btn.classList.add('active');
       
+      const tunerPanel = document.getElementById('tunerPanel');
+      const chordModePanel = document.getElementById('chordModePanel');
+      const chordDisplayPanel = document.getElementById('chordDisplayPanel');
+      const practicePanel = document.getElementById('practicePanel');
+      const scorePanel = document.getElementById('scorePanel');
+      const practiceModeDesc = document.getElementById('practiceModeDescription');
+      
       if (btn.id === 'modeTuner') {
         currentMode = 'tuner';
         practiceMode = 'tuner';
-        document.getElementById('tunerPanel').style.display = 'block';
-        document.getElementById('chordModePanel').style.display = 'none';
-        document.getElementById('chordDisplayPanel').style.display = 'none';
-        document.getElementById('practiceModeDescription').textContent = '💡 调音器模式：6 弦音准检测，±5 音分精度';
-        stopListening();
-        updateStatus('idle');
+        // 显示调音器面板
+        tunerPanel.style.display = 'block';
+        // 隐藏其他面板
+        chordModePanel.style.display = 'none';
+        chordDisplayPanel.style.display = 'none';
+        practicePanel.style.display = 'none';
+        scorePanel.style.display = 'none';
+        practiceModeDesc.textContent = '💡 调音器模式：6 弦音准检测，±5 音分精度';
+        // 调音器模式自动启动监听
+        startListening();
       } else if (btn.id === 'practiceModeRhythm') {
         currentMode = 'rhythm';
         practiceMode = 'rhythm';
-        document.getElementById('tunerPanel').style.display = 'none';
-        document.getElementById('chordModePanel').style.display = 'none';
-        document.getElementById('chordDisplayPanel').style.display = 'none';
-        document.getElementById('practiceModeDescription').textContent = '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习';
+        // 显示练习面板
+        tunerPanel.style.display = 'none';
+        chordModePanel.style.display = 'none';
+        chordDisplayPanel.style.display = 'none';
+        practicePanel.style.display = 'block';
+        scorePanel.style.display = 'block';
+        practiceModeDesc.textContent = '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习';
         setPracticeMode('rhythm');
       } else if (btn.id === 'practiceModeComprehensive') {
         currentMode = 'comprehensive';
         practiceMode = 'comprehensive';
-        document.getElementById('tunerPanel').style.display = 'none';
-        document.getElementById('chordModePanel').style.display = 'block';
-        document.getElementById('chordDisplayPanel').style.display = 'block';
-        document.getElementById('practiceModeDescription').textContent = '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
+        // 显示和弦训练面板
+        tunerPanel.style.display = 'none';
+        chordModePanel.style.display = 'block';
+        chordDisplayPanel.style.display = 'block';
+        practicePanel.style.display = 'block';
+        scorePanel.style.display = 'block';
+        practiceModeDesc.textContent = '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
         setPracticeMode('comprehensive');
       }
     });
