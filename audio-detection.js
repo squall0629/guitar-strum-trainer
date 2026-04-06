@@ -1,20 +1,42 @@
-// 吉他扫弦练习助手 - 扫弦检测模块
-// 功能：Spectral Flux 计算、Onset 检测、扫弦识别、音色评分
+/**
+ * 吉他扫弦练习助手 - 扫弦检测模块
+ * @module audio-detection
+ * @description 实现 Spectral Flux 计算、Onset 检测、扫弦识别、音色评分
+ */
 
 import { getAudioContext } from './audio-core.js';
 import { getCurrentBPM } from './audio-metronome.js';
 
-// 扫弦检测状态
+// ========== 状态变量 ==========
+
+/** @type {number} 当前小节开始时间戳 */
 let currentMeasureStartTime = 0;
+
+/** @type {Array} 当前小节的扫弦数据数组 */
 let currentMeasureStrums = [];
+
+/** @type {Object} 上次小节评分 */
 let lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };
+
+/** @type {number} 上次评分的小节结束时间戳 */
 let lastScoredMeasureEnd = 0;
 
+/** @type {Object} 评分历史记录 */
 let measureHistory = { rhythm: [], tone: [], dynamics: [] };
+
+/** @constant {number} 最大历史记录数 */
 const MAX_HISTORY = 10;
+
+/** @type {Array} 检测到的扫弦历史 */
 let detectedStrums = [];
+
+/** @type {number} 上次扫弦时间 */
 let lastStrumTime = 0;
+
+/** @type {number} 期望的扫弦索引（用于节奏反馈） */
 let expectedStrumIndex = 0;
+
+/** @type {Array} 扫弦历史记录（用于统计） */
 let strumHistory = [];
 
 // Spectral Flux
@@ -31,7 +53,15 @@ let strumThreshold = 0.05;
 
 let lastStrumEventTime = 0;
 
+// 采样率缓存（避免每帧调用 getAudioContext）
+let cachedSampleRate = null;
+
 // ========== 灵敏度管理 ==========
+
+/**
+ * 更新扫弦检测阈值（根据灵敏度等级）
+ * @description 灵敏度 1-100，阈值 0.01-0.30
+ */
 export function updateThreshold() {
   strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.29 / 99);
   strumThreshold = Math.max(0.01, Math.min(0.30, strumThreshold));
@@ -107,15 +137,26 @@ export function resetFluxState() {
 }
 
 // ========== Spectral Flux 计算 ==========
+/**
+ * 计算频谱通量（Spectral Flux）
+ * @description 检测音频频谱变化，用于识别扫弦 onset
+ * @param {Uint8Array} currentSpectrum - 当前帧频谱
+ * @param {Uint8Array} previousSpectrum - 上一帧频谱
+ * @returns {number} 频谱通量值（归一化到 80-1000Hz 范围）
+ */
 export function computeSpectralFlux(currentSpectrum, previousSpectrum) {
   if (!previousSpectrum || currentSpectrum.length !== previousSpectrum.length) {
     return 0;
   }
   
+  // 使用缓存的采样率，避免每帧调用 getAudioContext()
+  if (!cachedSampleRate) {
+    const audioContext = getAudioContext();
+    cachedSampleRate = audioContext ? audioContext.sampleRate : 44100;
+  }
+  
   let flux = 0;
-  const audioContext = getAudioContext();
-  const sampleRate = audioContext ? audioContext.sampleRate : 44100;
-  const binFrequency = sampleRate / 2048;
+  const binFrequency = cachedSampleRate / 2048;
   const startBin = Math.max(0, Math.floor(80 / binFrequency));
   const endBin = Math.min(currentSpectrum.length, Math.ceil(1000 / binFrequency));
   
@@ -126,7 +167,9 @@ export function computeSpectralFlux(currentSpectrum, previousSpectrum) {
     }
   }
   
-  return flux / (endBin - startBin);
+  const binRange = endBin - startBin;
+  if (binRange <= 0) return 0;
+  return flux / binRange;
 }
 
 function computeAdaptiveThreshold() {
@@ -209,6 +252,14 @@ export function detectOnsetWithFlux(freqData, timeData, rms) {
 }
 
 // ========== 扫弦检测 ==========
+/**
+ * 扫弦检测主函数
+ * @description 使用频谱通量和 RMS 检测吉他扫弦事件
+ * @param {Uint8Array} freqData - 频域数据
+ * @param {Uint8Array} timeData - 时域数据
+ * @param {number} rms - 均方根振幅
+ * @returns {{onset: boolean, flux: number, threshold: number, confidence: number}} 检测结果
+ */
 export function detectStrum(freqData, timeData, rms) {
   const now = Date.now();
   
@@ -220,11 +271,6 @@ export function detectStrum(freqData, timeData, rms) {
   highFreqEnergy /= (freqData.length - highFreqStart);
   
   const onsetResult = detectOnsetWithFlux(freqData, timeData, rms);
-  
-  // 调试日志
-  if (onsetResult.onset) {
-    console.log('[DEBUG detectStrum] 检测到扫弦！rms:', rms.toFixed(3), 'flux:', onsetResult.flux.toFixed(2), 'threshold:', onsetResult.threshold.toFixed(2));
-  }
   
   if (onsetResult.onset) {
     const strum = {
@@ -245,8 +291,6 @@ export function detectStrum(freqData, timeData, rms) {
     if (detectedStrums.length > 20) {
       detectedStrums.shift();
     }
-    
-    console.log('[DEBUG detectStrum] currentMeasureStrums 长度:', currentMeasureStrums.length);
   }
   
   return onsetResult;
@@ -272,10 +316,11 @@ export function calculateToneScore(strum) {
 // ========== 反馈提供 ==========
 export function provideFeedback(strum, currentRhythm, getActiveRhythmFn) {
   const pattern = getActiveRhythmFn(currentRhythm);
+  if (!pattern || !pattern.pattern || pattern.pattern.length === 0) return;
   const expectedInterval = pattern.pattern[expectedStrumIndex];
   let feedback = '';
   
-  if (strum.interval > 0) {
+  if (strum.interval > 0 && expectedInterval > 0) {
     const diff = strum.interval - expectedInterval;
     const percentDiff = (diff / expectedInterval) * 100;
     const absPercent = Math.abs(percentDiff);

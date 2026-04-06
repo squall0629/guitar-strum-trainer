@@ -6,8 +6,8 @@
  * @returns {number} 稳定性评分 (0-100)
  */
 export function calculateStabilityScore(history) {
-  const MIN_HISTORY = 10;
-  if (history.length < MIN_HISTORY) return 0;  // 至少 10 个小节才能计算
+  const MIN_HISTORY = 4;  // 至少 4 个小节才能计算（近 4 个小节）
+  if (history.length < MIN_HISTORY) return 0;
   
   // 1. 计算平均分
   const avg = history.reduce((a, b) => a + b, 0) / history.length;
@@ -58,93 +58,206 @@ export function getMeasureDuration(currentBPM, pattern) {
 }
 
 /**
- * 检查是否需要更新小节评分
+ * @typedef {Object} MeasureUpdateConfig
+ * @property {boolean} isListening - 是否正在监听
+ * @property {number} currentMeasureStartTime - 当前小节开始时间
+ * @property {Array} currentMeasureStrums - 当前小节扫弦数据
+ * @property {number} lastScoredMeasureEnd - 上次评分小节结束时间
+ * @property {number} currentBPM - 当前 BPM
+ * @property {Function} getActiveRhythm - 获取节奏型函数
+ * @property {number} currentRhythm - 当前节奏型索引
+ * @property {Function} calculateRhythmScore - 节奏评分函数
+ * @property {Function} calculateToneScore - 音色评分函数
+ * @property {Function} calculateDynamicsScore - 强弱评分函数
+ * @property {Function} calculateTransitionScore - 转换评分函数
+ * @property {Object} transitionDetector - 转换检测器实例
+ * @property {Object} measureHistory - 评分历史对象
+ * @property {number} MAX_HISTORY - 最大历史记录数
+ * @property {Object} lastMeasureScores - 上次评分结果
+ * @property {HTMLElement} rhythmScoreEl - 节奏评分元素
+ * @property {HTMLElement} toneScoreEl - 音色评分元素
+ * @property {HTMLElement} dynamicsScoreEl - 强弱评分元素
+ * @property {HTMLElement} transitionScoreEl - 转换评分元素
+ * @property {HTMLElement} totalScoreEl - 总分元素
+ * @property {HTMLElement} rhythmRingEl - 节奏评分环
+ * @property {HTMLElement} toneRingEl - 音色评分环
+ * @property {HTMLElement} dynamicsRingEl - 强弱评分环
+ * @property {HTMLElement} transitionRingEl - 转换评分环
+ * @property {HTMLElement} totalRingEl - 总分环
+ * @property {Function} updateScoreRing - 更新评分环函数
+ * @property {Function} updateStabilityScores - 更新稳定性评分函数
+ * @property {boolean} DEBUG - 调试模式
  */
-export function checkMeasureUpdate(isListening, currentMeasureStartTime, currentMeasureStrums, lastScoredMeasureEnd,
-                                   currentBPM, getActiveRhythm, currentRhythm, calculateRhythmScore, calculateToneScore,
-                                   calculateDynamicsScore, measureHistory, MAX_HISTORY, lastMeasureScores,
-                                   rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl,
-                                   rhythmRingEl, toneRingEl, dynamicsRingEl, totalRingEl, updateScoreRing,
-                                   updateStabilityScores, DEBUG = false) {
-  if (!isListening) return;
+
+/**
+ * 计算转换熟练度评分
+ * @param {Array} currentMeasureStrums - 当前小节扫弦数据
+ * @param {Object} transitionDetector - 转换检测器实例
+ * @param {number} currentBPM - 当前 BPM
+ * @param {boolean} DEBUG - 调试模式
+ * @returns {number} 转换评分 (0-100)
+ */
+export function calculateTransitionScore(currentMeasureStrums, transitionDetector, currentBPM, DEBUG = false) {
+  if (!transitionDetector) return 0;
   
+  const stats = transitionDetector.getStats();
+  if (stats.transitionCount === 0) return 0;
+  
+  // 1. 转换时间评分（基于平均转换时间与目标时间的偏差）
+  // 目标转换时间：300ms（优秀）- 800ms（及格）
+  const targetTime = 300; // 理想转换时间 (ms)
+  const maxTime = 800;    // 最大可接受转换时间 (ms)
+  const avgTime = stats.avgTransitionTime;
+  
+  let timeScore;
+  if (avgTime <= targetTime) {
+    timeScore = 100;
+  } else if (avgTime >= maxTime) {
+    timeScore = 0;
+  } else {
+    // 线性衰减
+    timeScore = 100 * (1 - (avgTime - targetTime) / (maxTime - targetTime));
+  }
+  
+  // 2. 转换准确率评分（基于正确转换的比例）
+  // 注意：这里使用 transitionCount 作为已完成的转换次数
+  // 如果需要准确率，需要在 TransitionDetector 中添加准确/错误计数
+  const accuracyScore = 100; // 暂时假设所有转换都是正确的
+  
+  // 3. 综合评分（时间 70% + 准确率 30%）
+  const score = Math.round(timeScore * 0.7 + accuracyScore * 0.3);
+  
+  if (DEBUG) {
+    console.log('[DEBUG 转换评分] 转换次数:', stats.transitionCount, '平均时间:', Math.round(avgTime) + 'ms', '时间分:', Math.round(timeScore), '准确率分:', accuracyScore, '总分:', score);
+  }
+  
+  return Math.min(100, Math.max(0, score));
+}
+
+/**
+ * 检查是否需要更新小节评分
+ * @param {MeasureUpdateConfig} config - 配置对象
+ * @returns {Object|undefined} 评分结果对象
+ */
+export function checkMeasureUpdate(config) {
+  const {
+    isListening,
+    currentMeasureStartTime,
+    currentMeasureStrums,
+    lastScoredMeasureEnd,
+    currentBPM,
+    getActiveRhythm,
+    currentRhythm,
+    calculateRhythmScore,
+    calculateToneScore,
+    calculateDynamicsScore,
+    calculateTransitionScore,
+    transitionDetector,
+    measureHistory,
+    MAX_HISTORY,
+    lastMeasureScores,
+    rhythmScoreEl,
+    toneScoreEl,
+    dynamicsScoreEl,
+    transitionScoreEl,
+    totalScoreEl,
+    rhythmRingEl,
+    toneRingEl,
+    dynamicsRingEl,
+    transitionRingEl,
+    totalRingEl,
+    updateScoreRing,
+    updateStabilityScores,
+    DEBUG = false
+  } = config;
+
+  if (!isListening) return;
+
   const now = Date.now();
   const pattern = getActiveRhythm(currentRhythm);
   const measureDuration = getMeasureDuration(currentBPM, pattern);
   const timeInMeasure = now - currentMeasureStartTime;
-  
-  // 调试日志
-  console.log('[DEBUG checkMeasureUpdate] isListening:', isListening, 'timeInMeasure:', timeInMeasure, 'measureDuration:', measureDuration, 'strums:', currentMeasureStrums.length);
-  
+
   // 防止重复评分：检查是否已经对当前小节评分过
   if (lastScoredMeasureEnd > 0 && now - lastScoredMeasureEnd < measureDuration * 0.5) {
-    console.log('[DEBUG] 跳过：防止重复评分');
+    if (DEBUG) console.log('[DEBUG] 跳过：防止重复评分');
     return;
   }
-  
+
   // 如果当前小节已结束，计算评分并开始新小节
   if (timeInMeasure >= measureDuration && currentMeasureStrums.length >= 1) {
-    console.log('[DEBUG] 开始评分！小节时长:', measureDuration, '扫弦数:', currentMeasureStrums.length);
+    if (!pattern || !pattern.pattern) {
+      if (DEBUG) console.log('[DEBUG] 跳过评分：pattern 为空');
+      return;
+    }
+    if (DEBUG) console.log('[DEBUG] 开始评分！小节时长:', measureDuration, '扫弦数:', currentMeasureStrums.length);
+    
     // 计算小节评分
     const rhythmScore = calculateRhythmScore(currentMeasureStrums, pattern, currentBPM);
     const toneScore = calculateToneScore(currentMeasureStrums);
     const dynamicsScore = calculateDynamicsScore(currentMeasureStrums, pattern);
-    
-    // 计算总分
+    const transitionScore = calculateTransitionScore(currentMeasureStrums, transitionDetector, currentBPM, DEBUG);
+
+    // 计算总分（新权重：节奏 40% + 音色 25% + 强弱 15% + 转换 20%）
     const totalScore = Math.round(
-      rhythmScore * 0.5 + 
-      toneScore * 0.3 + 
-      dynamicsScore * 0.2
+      rhythmScore * 0.4 +
+      toneScore * 0.25 +
+      dynamicsScore * 0.15 +
+      transitionScore * 0.2
     );
-    
+
     // 保存评分
     lastMeasureScores.rhythm = rhythmScore;
     lastMeasureScores.tone = toneScore;
     lastMeasureScores.dynamics = dynamicsScore;
+    lastMeasureScores.transition = transitionScore;
     lastMeasureScores.total = totalScore;
-    
+
     // 添加到历史记录
     measureHistory.rhythm.push(rhythmScore);
     measureHistory.tone.push(toneScore);
     measureHistory.dynamics.push(dynamicsScore);
-    
+
     // 保持最近 MAX_HISTORY 个小节
     if (measureHistory.rhythm.length > MAX_HISTORY) measureHistory.rhythm.shift();
     if (measureHistory.tone.length > MAX_HISTORY) measureHistory.tone.shift();
     if (measureHistory.dynamics.length > MAX_HISTORY) measureHistory.dynamics.shift();
-    
+
     // 更新显示
     rhythmScoreEl.textContent = rhythmScore;
     toneScoreEl.textContent = toneScore;
     dynamicsScoreEl.textContent = dynamicsScore;
+    if (transitionScoreEl) transitionScoreEl.textContent = transitionScore > 0 ? transitionScore : '--';
     totalScoreEl.textContent = totalScore;
-    
+
     // 更新评分环颜色
     updateScoreRing(rhythmRingEl, rhythmScoreEl, rhythmScore);
     updateScoreRing(toneRingEl, toneScoreEl, toneScore);
     updateScoreRing(dynamicsRingEl, dynamicsScoreEl, dynamicsScore);
+    if (transitionRingEl) updateScoreRing(transitionRingEl, transitionScoreEl, transitionScore);
     updateScoreRing(totalRingEl, totalScoreEl, totalScore);
-    
+
     // 更新历史稳定性评分
     if (updateStabilityScores) {
       updateStabilityScores(measureHistory, calculateStabilityScore, DEBUG);
     }
-    
+
     if (DEBUG) {
       console.log('[DEBUG 小节评分] 小节时长:', measureDuration, 'ms, 扫弦数:', currentMeasureStrums.length, '得分:', totalScore);
     }
-    
+
     // 记录评分时间戳，防止重复评分
     lastScoredMeasureEnd = now;
-    
+
     // 开始新小节
     currentMeasureStartTime = now;
     currentMeasureStrums = [];
-    
+
     return {
       rhythmScore,
       toneScore,
       dynamicsScore,
+      transitionScore,
       totalScore,
       lastMeasureScores,
       lastScoredMeasureEnd,
@@ -156,13 +269,21 @@ export function checkMeasureUpdate(isListening, currentMeasureStartTime, current
 
 /**
  * 更新评分显示
+ * @param {Object} lastMeasureScores - 上次评分结果
+ * @param {HTMLElement} rhythmScoreEl - 节奏评分元素
+ * @param {HTMLElement} toneScoreEl - 音色评分元素
+ * @param {HTMLElement} dynamicsScoreEl - 强弱评分元素
+ * @param {HTMLElement} transitionScoreEl - 转换评分元素
+ * @param {HTMLElement} totalScoreEl - 总分元素
+ * @param {Function} checkMeasureUpdateFn - 检查小节更新函数
  */
-export function updateScores(lastMeasureScores, rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl,
+export function updateScores(lastMeasureScores, rhythmScoreEl, toneScoreEl, dynamicsScoreEl, transitionScoreEl, totalScoreEl,
                             checkMeasureUpdateFn) {
   // 显示上次小节的评分（保持显示，不频繁变化）
   rhythmScoreEl.textContent = lastMeasureScores.rhythm > 0 ? lastMeasureScores.rhythm : '--';
   toneScoreEl.textContent = lastMeasureScores.tone > 0 ? lastMeasureScores.tone : '--';
   dynamicsScoreEl.textContent = lastMeasureScores.dynamics > 0 ? lastMeasureScores.dynamics : '--';
+  if (transitionScoreEl) transitionScoreEl.textContent = (lastMeasureScores.transition || 0) > 0 ? lastMeasureScores.transition : '--';
   totalScoreEl.textContent = lastMeasureScores.total > 0 ? lastMeasureScores.total : '--';
   
   // 检查是否需要更新小节评分
@@ -180,6 +301,7 @@ export function updateScores(lastMeasureScores, rhythmScoreEl, toneScoreEl, dyna
  */
 export function calculateRhythmScore(strums, pattern, currentBPM, DEBUG = false) {
   if (strums.length < 2) return 0;
+  if (!pattern || !pattern.pattern) return 50;
   
   // 1. 根据 BPM 缩放理论时值（节奏型定义基于 120BPM）
   const bpmRatio = 120 / currentBPM;
@@ -295,6 +417,7 @@ export function calculateToneScore(strums, DEBUG = false) {
  */
 export function calculateDynamicsScore(strums, pattern) {
   if (strums.length < 2) return 0;
+  if (!pattern || !pattern.demo || !pattern.pattern) return 50;
   
   const amplitudes = strums.map(s => s.amplitude);
   
@@ -315,7 +438,7 @@ export function calculateDynamicsScore(strums, pattern) {
  */
 function calculateAccentAwareDynamics(strums, pattern) {
   let totalScore = 0;
-  const count = Math.min(strums.length, pattern.pattern.length * 2); // 至少评估两个循环
+  const count = Math.min(strums.length, pattern.pattern.length * 2);
   
   for (let i = 0; i < count; i++) {
     const patternIndex = i % pattern.pattern.length;
@@ -380,15 +503,15 @@ export function updateStabilityScores(measureHistory, calculateStabilityScoreFn,
   const dynamicsStabilityEl = document.getElementById('dynamicsStabilityScore');
   const overallStabilityEl = document.getElementById('overallStabilityScore');
   
+  // 调试日志：显示历史数据长度
+  if (DEBUG) console.log('[DEBUG 稳定性] 历史数据长度 - 节奏:', measureHistory.rhythm.length, '音色:', measureHistory.tone.length, '强弱:', measureHistory.dynamics.length);
+  
   // 计算各维度稳定性
   const rhythmStability = calculateStabilityScoreFn(measureHistory.rhythm);
   const toneStability = calculateStabilityScoreFn(measureHistory.tone);
   const dynamicsStability = calculateStabilityScoreFn(measureHistory.dynamics);
   
-  if (DEBUG) {
-    console.log('[DEBUG 稳定性评分] 历史数据 - 节奏:', measureHistory.rhythm, '音色:', measureHistory.tone, '强弱:', measureHistory.dynamics);
-    console.log('[DEBUG 稳定性评分] 计算结果 - 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability);
-  }
+  if (DEBUG) console.log('[DEBUG 稳定性] 计算结果 - 节奏:', rhythmStability, '音色:', toneStability, '强弱:', dynamicsStability);
   
   // 综合稳定性（三个维度的平均）
   const overallStability = Math.round((rhythmStability + toneStability + dynamicsStability) / 3);

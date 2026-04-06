@@ -102,8 +102,26 @@ export function drawSpectrumWaveform(spectrumCanvas, spectrumCtx, freqData, spec
     spectrumCanvas._spectrumBackgroundDirty = true;
   }
   
-  // 添加当前频谱到历史缓冲区
-  spectrumHistory.push(new Uint8Array(freqData));
+  // 添加当前频谱到历史缓冲区（使用预分配环形缓冲区，避免每帧 GC）
+  if (!spectrumCanvas._spectrumRingBuffer) {
+    spectrumCanvas._spectrumRingBuffer = [];
+    for (let i = 0; i < SPECTRUM_HISTORY_SIZE; i++) {
+      spectrumCanvas._spectrumRingBuffer.push(new Uint8Array(freqData.length));
+    }
+    spectrumCanvas._spectrumRingHead = 0;
+    spectrumCanvas._spectrumRingCount = 0;
+  }
+  const head = spectrumCanvas._spectrumRingHead;
+  spectrumCanvas._spectrumRingBuffer[head].set(freqData);
+  spectrumCanvas._spectrumRingHead = (head + 1) % SPECTRUM_HISTORY_SIZE;
+  spectrumCanvas._spectrumRingCount = Math.min(spectrumCanvas._spectrumRingCount + 1, SPECTRUM_HISTORY_SIZE);
+  
+  // 重建 spectrumHistory 为当前环形缓冲区的视图
+  spectrumHistory.length = 0;
+  for (let i = 0; i < spectrumCanvas._spectrumRingCount; i++) {
+    const idx = (head - spectrumCanvas._spectrumRingCount + i + SPECTRUM_HISTORY_SIZE) % SPECTRUM_HISTORY_SIZE;
+    spectrumHistory.push(spectrumCanvas._spectrumRingBuffer[idx]);
+  }
   if (spectrumHistory.length > SPECTRUM_HISTORY_SIZE) {
     spectrumHistory.shift();
   }
@@ -225,7 +243,7 @@ export function drawChordDiagram(container, chordName) {
       svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     }
   } catch (e) {
-    console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
+    if (DEBUG) console.warn('[ChordDiagram] SVG 生成失败，使用备用方案:', e);
     drawChordDiagramFallbackSVG(container, chordName);
   }
 }

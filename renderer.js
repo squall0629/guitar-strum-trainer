@@ -3,14 +3,14 @@
 
 // ========== 模块导入 ==========
 import { saveUserSettings, loadUserSettings, saveHistory, loadHistoryFromStorage, exportUserSettings, importUserSettings } from './storage.js';
-import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, updateStabilityScores } from './scoring.js';
+import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, calculateTransitionScore, updateStabilityScores } from './scoring.js';
 import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition as updateChordRecognitionUI, updateTransitionTime as updateTransitionTimeUI } from './ui-renderer.js';
 
 // 音频模块导入
 import { initAudioEngine, startListening as audioStartListening, stopListening as audioStopListening, isListeningState, analyzeAudio, getAudioContext, getAnalyser } from './audio-core.js';
 import { setCurrentBPM, getCurrentBPM, setMetronomeEnabled, isMetronomeEnabled, startMetronome, stopMetronome, playMetronomeSound } from './audio-metronome.js';
 import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo, loadGuitarSoundfont } from './audio-demo.js';
-import { detectStrum, provideFeedback, calculateToneScore as audioCalculateToneScore, resetFluxState, getDetectedStrums, getCurrentMeasureStrums, getMeasureHistory, getLastMeasureScores, setLastMeasureScores, getLastScoredMeasureEnd, setLastScoredMeasureEnd, setCurrentMeasureStartTime, getCurrentMeasureStartTime, setCurrentMeasureStrums, setSensitivityLevel, updateThreshold } from './audio-detection.js';
+import { detectStrum, provideFeedback, calculateToneScore as audioCalculateToneScore, resetFluxState, getDetectedStrums, getCurrentMeasureStrums, getMeasureHistory, getLastMeasureScores, setLastMeasureScores, getLastScoredMeasureEnd, setLastScoredMeasureEnd, setCurrentMeasureStartTime, getCurrentMeasureStartTime, setCurrentMeasureStrums, setSensitivityLevel, getSensitivityLevel, updateThreshold } from './audio-detection.js';
 
 import {
   initChordTraining,
@@ -152,15 +152,17 @@ function updateScoresWrapper() {
   const rhythmScoreEl = document.getElementById('rhythmScore');
   const toneScoreEl = document.getElementById('toneScore');
   const dynamicsScoreEl = document.getElementById('dynamicsScore');
+  const transitionScoreEl = document.getElementById('transitionScore');
   const totalScoreEl = document.getElementById('totalScore');
   const rhythmRingEl = document.getElementById('rhythmRing');
   const toneRingEl = document.getElementById('toneRing');
   const dynamicsRingEl = document.getElementById('dynamicsRing');
+  const transitionRingEl = document.getElementById('transitionRing');
   const totalRingEl = document.getElementById('totalRing');
   
   updateScores(
     getLastMeasureScores(),
-    rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl,
+    rhythmScoreEl, toneScoreEl, dynamicsScoreEl, transitionScoreEl, totalScoreEl,
     () => checkMeasureUpdateWrapper()
   );
 }
@@ -169,32 +171,44 @@ function checkMeasureUpdateWrapper() {
   const rhythmScoreEl = document.getElementById('rhythmScore');
   const toneScoreEl = document.getElementById('toneScore');
   const dynamicsScoreEl = document.getElementById('dynamicsScore');
+  const transitionScoreEl = document.getElementById('transitionScore');
   const totalScoreEl = document.getElementById('totalScore');
   const rhythmRingEl = document.getElementById('rhythmRing');
   const toneRingEl = document.getElementById('toneRing');
   const dynamicsRingEl = document.getElementById('dynamicsRing');
+  const transitionRingEl = document.getElementById('transitionRing');
   const totalRingEl = document.getElementById('totalRing');
   
-  const result = checkMeasureUpdate(
-    isListeningState(),
-    getCurrentMeasureStartTime(),
-    getCurrentMeasureStrums(),
-    getLastScoredMeasureEnd(),
-    currentBPM,
-    getActiveRhythm,
-    currentRhythm,
-    calculateRhythmScore,
-    calculateToneScore,
-    calculateDynamicsScore,
-    getMeasureHistory(),
-    MAX_HISTORY,
-    getLastMeasureScores(),
-    rhythmScoreEl, toneScoreEl, dynamicsScoreEl, totalScoreEl,
-    rhythmRingEl, toneRingEl, dynamicsRingEl, totalRingEl,
-    updateScoreRing,
-    () => updateStabilityScores(getMeasureHistory(), calculateStabilityScore, DEBUG),
-    DEBUG
-  );
+  const result = checkMeasureUpdate({
+    isListening: isListeningState(),
+    currentMeasureStartTime: getCurrentMeasureStartTime(),
+    currentMeasureStrums: getCurrentMeasureStrums(),
+    lastScoredMeasureEnd: getLastScoredMeasureEnd(),
+    currentBPM: currentBPM,
+    getActiveRhythm: getActiveRhythm,
+    currentRhythm: currentRhythm,
+    calculateRhythmScore: calculateRhythmScore,
+    calculateToneScore: calculateToneScore,
+    calculateDynamicsScore: calculateDynamicsScore,
+    calculateTransitionScore: calculateTransitionScore,
+    transitionDetector: getTransitionDetector(),
+    measureHistory: getMeasureHistory(),
+    MAX_HISTORY: MAX_HISTORY,
+    lastMeasureScores: getLastMeasureScores(),
+    rhythmScoreEl: rhythmScoreEl,
+    toneScoreEl: toneScoreEl,
+    dynamicsScoreEl: dynamicsScoreEl,
+    transitionScoreEl: transitionScoreEl,
+    totalScoreEl: totalScoreEl,
+    rhythmRingEl: rhythmRingEl,
+    toneRingEl: toneRingEl,
+    dynamicsRingEl: dynamicsRingEl,
+    transitionRingEl: transitionRingEl,
+    totalRingEl: totalRingEl,
+    updateScoreRing: updateScoreRing,
+    updateStabilityScores: () => updateStabilityScores(getMeasureHistory(), calculateStabilityScore, DEBUG),
+    DEBUG: DEBUG
+  });
   
   if (result) {
     setLastMeasureScores(result.lastMeasureScores);
@@ -206,7 +220,21 @@ function checkMeasureUpdateWrapper() {
 
 // ========== 开始/停止监听 ==========
 async function startListening() {
+  // 显示加载遮罩（请求麦克风权限时）
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
+  // 清除之前的自动保存 interval（防止泄漏）
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+    autoSaveIntervalId = null;
+  }
+  
   const success = await audioStartListening();
+  
+  // 隐藏加载遮罩
+  if (loadingOverlay) loadingOverlay.style.display = 'none';
+  
   if (!success) {
     updateStatus('error');
     const feedbackMessage = document.getElementById('feedbackMessage');
@@ -216,6 +244,7 @@ async function startListening() {
   
   resetFluxState();
   setPracticeStartTime(Date.now());
+  setCurrentMeasureStartTime(Date.now()); // 初始化小节开始时间
   resetPracticeStats();
   initChordDetector(getAudioContext(), getAnalyser());
   setChordRecognitionEnabled(practiceMode === 'comprehensive');
@@ -232,7 +261,7 @@ async function startListening() {
       : `🎯 开始练习：${activeRhythm.name}`;
   }
   
-  if (metronomeEnabled) startMetronome();
+  if (metronomeEnabled) startMetronome(getActiveRhythm, currentRhythm);
   
   const volumeMeterFill = document.getElementById('volumeMeterFill');
   const recorderCanvas = document.getElementById('recorderWaveform');
@@ -485,13 +514,13 @@ function init() {
       setMetronomeEnabled(enabled);
       const feedbackMessage = document.getElementById('feedbackMessage');
       if (feedbackMessage) feedbackMessage.textContent = enabled ? `节拍器已开启 - ${currentBPM} BPM` : '节拍器已关闭';
-      if (enabled && isListeningState()) startMetronome();
+      if (enabled && isListeningState()) startMetronome(getActiveRhythm, currentRhythm);
       else stopMetronome();
     },
     onBPMChange: (bpm) => {
       currentBPM = bpm;
       setCurrentBPM(bpm);
-      if (metronomeEnabled && isListeningState()) { stopMetronome(); startMetronome(); }
+      if (metronomeEnabled && isListeningState()) { stopMetronome(); startMetronome(getActiveRhythm, currentRhythm); }
     },
     onSensitivityChange: (level) => {
       sensitivityLevel = level;
@@ -590,7 +619,7 @@ window.addEventListener('resize', () => {
 
 // ========== 启动 ==========
 document.addEventListener('DOMContentLoaded', () => {
-  try { init(); } catch (error) { console.error('[GuitarStrumTrainer] 初始化失败:', error); }
+  try { init(); } catch (error) { if (DEBUG) console.error('[GuitarStrumTrainer] 初始化失败:', error); }
 });
 
 // ========== 导出到全局 ==========
@@ -598,6 +627,10 @@ window.playDemo = (rhythmIndex, btn) => playDemo(rhythmIndex, btn, getActiveRhyt
 window.playCustomRhythmFromList = playCustomRhythmFromList;
 window.stopDemo = stopDemo;
 window.getIsPlayingDemo = getIsPlayingDemo;
+
+// 挂载灵敏度函数到 window（供 audio-core.js 使用）
+window.getSensitivityLevel = getSensitivityLevel;
+window.setSensitivityLevel = setSensitivityLevel;
 
 window.guitarTrainer = {
   chordDetector: getChordDetector,

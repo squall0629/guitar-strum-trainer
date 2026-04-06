@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "electron": "^35.1.0",
+    "http-server": "^14.1.1",
     "puppeteer": "^24.40.0"
   }
 }

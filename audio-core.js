@@ -22,6 +22,10 @@ let spectrumCtx = null;
 let spectrumHistory = [];
 const SPECTRUM_HISTORY_SIZE = 60;
 
+// 音频分析缓存（避免每帧分配）
+let freqDataCache = null;
+let timeDataCache = null;
+
 // 回调函数引用
 let getActiveRhythmCallback = null;
 let updateScoreRingCallback = null;
@@ -64,7 +68,7 @@ export async function startListening() {
     
     return true;
   } catch (err) {
-    console.error('[AudioCore] 音频初始化失败:', err);
+    if (DEBUG) console.error('[AudioCore] 音频初始化失败:', err);
     return false;
   }
 }
@@ -99,9 +103,14 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
   }
   lastAnalyzeTime = now;
   
+  // 初始化缓存（首次调用时）
   const bufferLength = analyser.frequencyBinCount;
-  const freqDataCache = new Uint8Array(bufferLength);
-  const timeDataCache = new Uint8Array(bufferLength);
+  if (!freqDataCache || freqDataCache.length !== bufferLength) {
+    freqDataCache = new Uint8Array(bufferLength);
+  }
+  if (!timeDataCache || timeDataCache.length !== bufferLength) {
+    timeDataCache = new Uint8Array(bufferLength);
+  }
   
   analyser.getByteFrequencyData(freqDataCache);
   analyser.getByteTimeDomainData(timeDataCache);
@@ -116,6 +125,11 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
   // 调用扫弦检测
   if (detectStrumCallback) {
     detectStrumCallback(freqDataCache, timeDataCache, rms);
+  }
+  
+  // 调用小节评分更新（每帧检查）
+  if (updateScoresCallback) {
+    updateScoresCallback();
   }
   
   if (volumeMeterFill) {

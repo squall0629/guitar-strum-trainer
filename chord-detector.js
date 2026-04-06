@@ -176,7 +176,7 @@ class ChordDetector {
         return chordName;
       }
     } catch (e) {
-      console.warn('[ChordDetector] tonaljs 和弦识别失败:', e);
+      if (DEBUG) console.warn('[ChordDetector] tonaljs 和弦识别失败:', e);
     }
     
     return null;

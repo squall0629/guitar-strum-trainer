@@ -85,14 +85,32 @@ function setupRhythmSelector() {
   options.forEach((option, index) => {
     option.addEventListener('click', (e) => {
       if (isListening || e.target.classList.contains('btn-demo')) return;
-      options.forEach(o => o.classList.remove('active'));
-      option.classList.add('active');
-      currentRhythm = index;
-      if (onRhythmSelectCallback) {
-        onRhythmSelectCallback(index);
+      selectRhythm(option, index);
+    });
+    
+    // 键盘支持（Enter 或 Space 激活）
+    option.addEventListener('keydown', (e) => {
+      if (isListening || e.target.classList.contains('btn-demo')) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectRhythm(option, index);
       }
     });
   });
+}
+
+function selectRhythm(option, index) {
+  const options = rhythmSelector.querySelectorAll('.rhythm-option');
+  options.forEach(o => {
+    o.classList.remove('active');
+    o.setAttribute('aria-pressed', 'false');
+  });
+  option.classList.add('active');
+  option.setAttribute('aria-pressed', 'true');
+  currentRhythm = index;
+  if (onRhythmSelectCallback) {
+    onRhythmSelectCallback(index);
+  }
 }
 
 export function setCurrentRhythm(index) {

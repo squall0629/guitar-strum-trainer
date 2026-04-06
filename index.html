@@ -17,10 +17,10 @@
     <div class="panel" style="margin-bottom: 20px;">
       <h2>🎮 练习模式</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <button class="mode-btn active" id="practiceModeRhythm" data-practice-mode="rhythm">
+        <button class="mode-btn active" id="practiceModeRhythm" data-practice-mode="rhythm" aria-pressed="true">
           🥁 纯节奏训练
         </button>
-        <button class="mode-btn" id="practiceModeComprehensive" data-practice-mode="comprehensive">
+        <button class="mode-btn" id="practiceModeComprehensive" data-practice-mode="comprehensive" aria-pressed="false">
           🎸 和弦 + 节奏综合
         </button>
       </div>
@@ -33,20 +33,20 @@
     <div class="panel chord-training-panel" style="margin-bottom: 20px;">
       <h2>🎯 训练模式</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <button class="mode-btn active" id="modePreset" data-mode="preset">
+        <button class="mode-btn active" id="modePreset" data-mode="preset" aria-pressed="true">
           📖 预设进行
         </button>
-        <button class="mode-btn" id="modeCustom" data-mode="custom">
+        <button class="mode-btn" id="modeCustom" data-mode="custom" aria-pressed="false">
           ✏️ 自定义
         </button>
-        <button class="mode-btn" id="modeFree" data-mode="free">
+        <button class="mode-btn" id="modeFree" data-mode="free" aria-pressed="false">
           🎸 自由练习
         </button>
       </div>
       
       <!-- 预设进行选择器 -->
       <div id="presetSelector" style="margin-top: 15px;">
-        <select id="progressionSelect" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(184,102,255,0.3); border-radius: 8px; color: white; font-size: 16px;">
+        <select id="progressionSelect" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(184,102,255,0.3); border-radius: 8px; color: white; font-size: 16px;" aria-label="选择和弦进行">
           <option value="0">🎹 低音下行 (8-7-6-5-4-3-2-5)</option>
           <option value="1">🎵 流行 1645 (1-6-4-5)</option>
           <option value="2">🎵 流行 4536 (4-5-3-6)</option>
@@ -68,7 +68,7 @@
         <!-- 和弦进行详情显示 -->
         <div id="progressionDetail" style="margin-top: 12px; padding: 12px; background: rgba(0,217,255,0.08); border-radius: 8px; border-left: 3px solid #00d9ff;">
           <div style="color: #888; font-size: 0.85em; margin-bottom: 6px;">📋 和弦进行</div>
-          <div id="progressionChords" style="color: #00d9ff; font-size: 1.1em; font-weight: bold;">C → G/B → Am → Am/G → F → C/E → Dm → G</div>
+          <div id="progressionChords" style="color: #00d9ff; font-size: 1.1em; font-weight: bold;" aria-live="polite">C → G/B → Am → Am/G → F → C/E → Dm → G</div>
           <div id="progressionDesc" style="color: #888; font-size: 0.85em; margin-top: 6px;">经典低音 C→B→A→G→F→E→D→G 下行，抒情必备</div>
         </div>
       </div>
@@ -113,7 +113,7 @@
           <div style="color: #888; margin-bottom: 10px;">当前和弦</div>
           <div id="currentChordDisplay" style="font-size: 3em; font-weight: bold; color: #00d9ff; margin-bottom: 10px;">--</div>
           <div id="currentChordDiagram" class="chord-diagram"></div>
-          <div id="chordRecognitionResult" style="margin-top: 10px; padding: 8px; background: rgba(0,217,255,0.1); border-radius: 8px; font-size: 0.9em;">
+          <div id="chordRecognitionResult" style="margin-top: 10px; padding: 8px; background: rgba(0,217,255,0.1); border-radius: 8px; font-size: 0.9em;" aria-live="polite">
             识别：<span id="recognizedChord">--</span>
             <span id="chordConfidence" style="color: #888; margin-left: 10px;">(--%)</span>
           </div>
@@ -149,30 +149,30 @@
       <div class="panel">
         <h2>📋 选择节奏型</h2>
         <div class="rhythm-selector" id="rhythmSelector">
-          <div class="rhythm-option active" data-rhythm="0">
+          <div class="rhythm-option active" data-rhythm="0" tabindex="0" role="button" aria-pressed="true">
             <div class="name">前八后十六</div>
             <div class="pattern">↓ ↓↑</div>
-            <button class="btn-demo" data-rhythm="0">🔊 试听演示</button>
+            <button class="btn-demo" data-rhythm="0" aria-label="试听前八后十六节奏">🔊 试听演示</button>
           </div>
-          <div class="rhythm-option" data-rhythm="1">
+          <div class="rhythm-option" data-rhythm="1" tabindex="0" role="button" aria-pressed="false">
             <div class="name">前十六后八</div>
             <div class="pattern">↓↑ ↓</div>
-            <button class="btn-demo" data-rhythm="1">🔊 试听演示</button>
+            <button class="btn-demo" data-rhythm="1" aria-label="试听前十六后八节奏">🔊 试听演示</button>
           </div>
-          <div class="rhythm-option" data-rhythm="2">
+          <div class="rhythm-option" data-rhythm="2" tabindex="0" role="button" aria-pressed="false">
             <div class="name">民谣常用</div>
             <div class="pattern">↓ ↓↑↓↑ ↓</div>
-            <button class="btn-demo" data-rhythm="2">🔊 试听演示</button>
+            <button class="btn-demo" data-rhythm="2" aria-label="试听民谣常用节奏">🔊 试听演示</button>
           </div>
-          <div class="rhythm-option" data-rhythm="3">
+          <div class="rhythm-option" data-rhythm="3" tabindex="0" role="button" aria-pressed="false">
             <div class="name">摇滚八分</div>
             <div class="pattern">↓↑ ↓↑ ↓↑ ↓↑</div>
-            <button class="btn-demo" data-rhythm="3">🔊 试听演示</button>
+            <button class="btn-demo" data-rhythm="3" aria-label="试听摇滚八分节奏">🔊 试听演示</button>
           </div>
-          <div class="rhythm-option" data-rhythm="4">
+          <div class="rhythm-option" data-rhythm="4" tabindex="0" role="button" aria-pressed="false">
             <div class="name">华尔兹</div>
             <div class="pattern">↓ ↑↑ ↓ ↑↑</div>
-            <button class="btn-demo" data-rhythm="4">🔊 试听演示</button>
+            <button class="btn-demo" data-rhythm="4" aria-label="试听华尔兹节奏">🔊 试听演示</button>
           </div>
           <div class="rhythm-add-card" id="btnAddRhythm">
             <span class="add-icon">+</span>
@@ -227,6 +227,14 @@
             <span class="status-indicator ready" id="statusIndicator"></span>
             <span id="statusText">准备就绪</span>
           </div>
+          
+          <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center;">
+            <div style="text-align: center; color: #fff;">
+              <div style="font-size: 2em; margin-bottom: 15px;">🎤</div>
+              <div style="font-size: 1.2em; font-weight: bold;">正在请求麦克风权限...</div>
+              <div style="margin-top: 10px; color: #888; font-size: 0.9em;">请在浏览器弹窗中点击"允许"</div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -271,6 +279,18 @@
                   <div class="ring-value" id="dynamicsScore">--</div>
                 </div>
                 <div class="ring-label">强弱控制</div>
+              </div>
+            </div>
+            <div class="score-item">
+              <div class="score-ring-container">
+                <div class="score-ring">
+                  <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+                    <circle class="ring-progress" id="transitionRing" cx="60" cy="60" r="52" stroke="#ffa502" stroke-dasharray="326.73" stroke-dashoffset="326.73"></circle>
+                  </svg>
+                  <div class="ring-value" id="transitionScore">--</div>
+                </div>
+                <div class="ring-label">转换熟练度</div>
               </div>
             </div>
           </div>
@@ -341,7 +361,7 @@
         
         <div class="feedback">
           <div class="title">💡 实时反馈</div>
-          <div class="message" id="feedbackMessage">选择节奏型，点击"开始练习"开始</div>
+          <div class="message" id="feedbackMessage" aria-live="polite" role="status">选择节奏型，点击"开始练习"开始</div>
         </div>
         
         <div class="history">

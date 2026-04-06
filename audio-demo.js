@@ -8,6 +8,9 @@ let guitarSoundfont = null;
 let soundfontLoading = false;
 let soundfontLoaded = false;
 
+// 调试模式
+const DEBUG = false;
+
 // 演示播放相关
 let _isPlayingDemo = false;
 let demoTimeout = null;
@@ -71,7 +74,7 @@ export async function loadGuitarSoundfont() {
     });
     soundfontLoaded = true;
   } catch (error) {
-    console.error('[AudioDemo] 音源加载失败:', error);
+    if (DEBUG) console.error('[AudioDemo] 音源加载失败:', error);
     soundfontLoading = false;
   }
 }
@@ -191,7 +194,7 @@ async function playStrumSoundSynth(direction, duration = 0.15) {
       osc1.onended = () => { osc1.disconnect(); gain1.disconnect(); };
       osc2.onended = () => { osc2.disconnect(); gain2.disconnect(); };
     } catch (err) {
-      console.error('[playStrumSoundSynth] 播放失败:', err);
+      if (DEBUG) console.error('[playStrumSoundSynth] 播放失败:', err);
     }
   });
 }
@@ -238,7 +241,7 @@ export async function playDemo(rhythmIndex, btn, getActiveRhythmFn) {
         await playStrumSound(direction);
       }
     } catch (err) {
-      console.error('[playDemo] 播放失败:', err);
+      if (DEBUG) console.error('[playDemo] 播放失败:', err);
     }
     
     const baseBPM = 120;

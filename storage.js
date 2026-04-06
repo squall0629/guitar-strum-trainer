@@ -17,7 +17,7 @@ export function saveUserSettings(currentBPM, metronomeEnabled, sensitivityLevel,
     localStorage.setItem('guitarStrumUserSettings', JSON.stringify(settings));
     if (DEBUG) console.log('[GuitarStrumTrainer] 用户设置已保存');
   } catch (e) {
-    console.warn('无法保存用户设置:', e);
+    if (DEBUG) console.warn('无法保存用户设置:', e);
   }
 }
 
@@ -67,7 +67,7 @@ export function loadUserSettings(customRhythmsRef, DEBUG = false) {
     
     if (DEBUG) console.log('[GuitarStrumTrainer] 用户设置已加载');
   } catch (e) {
-    console.warn('无法加载用户设置:', e);
+    if (DEBUG) console.warn('无法加载用户设置:', e);
   }
   
   return result;
@@ -125,7 +125,7 @@ export function saveHistory(strumHistory, detectedStrums, totalScoreEl, rhythmSc
   try {
     localStorage.setItem('guitarStrumHistory', JSON.stringify(strumHistory));
   } catch (e) {
-    console.warn('无法保存历史记录:', e);
+    if (DEBUG) console.warn('无法保存历史记录:', e);
   }
   
   return historyItem;
@@ -142,7 +142,7 @@ export function loadHistoryFromStorage() {
       return JSON.parse(stored);
     }
   } catch (e) {
-    console.warn('无法加载历史记录:', e);
+    if (DEBUG) console.warn('无法加载历史记录:', e);
   }
   return [];
 }
@@ -266,7 +266,7 @@ export function importUserSettings(event, customRhythmsRef, callbacks, DEBUG = f
       alert('设置导入成功！');
     } catch (err) {
       alert('导入失败：' + (err.message || '文件格式错误'));
-      console.error('导入设置失败:', err);
+      if (DEBUG) console.error('导入设置失败:', err);
     }
   };
   reader.readAsText(file);

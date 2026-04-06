@@ -1,6 +1,9 @@
 // 吉他扫弦练习助手 - 节拍器模块
 // 功能：节拍器声音生成、节奏控制、BPM 管理
 
+// 调试模式
+const DEBUG = false;
+
 let audioContextForMetronome = null;
 let metronomeEnabled = false;
 let currentBPM = 70;
@@ -13,7 +16,7 @@ export function playMetronomeSound(frequency = 1000, duration = 0.05) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioContextForMetronome.state === 'suspended') {
-    audioContextForMetronome.resume().catch(err => console.warn(err));
+    audioContextForMetronome.resume().catch(err => { if (DEBUG) console.warn(err); });
   }
   
   const oscillator = audioContextForMetronome.createOscillator();
