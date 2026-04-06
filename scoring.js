@@ -142,9 +142,6 @@ export function calculateTransitionScore(currentMeasureStrums, transitionDetecto
 export function checkMeasureUpdate(config) {
   const {
     isListening,
-    currentMeasureStartTime,
-    currentMeasureStrums,
-    lastScoredMeasureEnd,
     currentBPM,
     getActiveRhythm,
     currentRhythm,
@@ -170,6 +167,9 @@ export function checkMeasureUpdate(config) {
     updateStabilityScores,
     DEBUG = false
   } = config;
+  
+  // 需要修改的变量用 let 声明
+  let { currentMeasureStartTime, currentMeasureStrums, lastScoredMeasureEnd } = config;
 
   if (!isListening) return;
 
