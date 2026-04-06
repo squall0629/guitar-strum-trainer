@@ -608,6 +608,7 @@
       background: rgba(0,0,0,0.2) !important;
       border-radius: 8px !important;
       overflow: hidden !important;
+      margin: 0 auto !important;
     }
     
     .chord-diagram svg {
@@ -615,8 +616,8 @@
       max-height: 100% !important;
       width: auto !important;
       height: auto !important;
-      display: inline-block !important;
-      margin: auto !important;
+      display: block !important;
+      margin: 0 auto !important;
     }
     
     /* Desktop: chord diagrams centered */
@@ -625,6 +626,7 @@
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
+      margin: 0 auto !important;
     }
 
     .chart-toggle-btn {
