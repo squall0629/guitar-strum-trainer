@@ -1,6 +1,9 @@
 // 吉他扫弦练习助手 - 自定义节奏型管理模块
 // 功能：自定义节奏型的渲染、保存、删除、编辑
 
+// ========== 导入 ==========
+import { playDemo, getIsPlayingDemo, stopDemo } from './audio-engine.js';
+
 // ========== 全局状态 ==========
 const RHYTHM_PATTERNS = [
   { name: '前八后十六', pattern: [250, 125, 125], beats: 4, description: '↓ ↓↑', demo: ['D', 'D', 'U'] },
@@ -169,6 +172,22 @@ export function renderCustomRhythmsList() {
   });
   
   syncCustomRhythmsToSelector();
+}
+
+// ========== 试听自定义节奏型 ==========
+export function playCustomRhythmFromList(index, btn) {
+  if (index < 0 || index >= customRhythms.length) return;
+  const rhythm = customRhythms[index];
+  if (!rhythm.notes || rhythm.notes.length === 0) return;
+  if (getIsPlayingDemo()) { stopDemo(); return; }
+  
+  const rhythmIndex = RHYTHM_PATTERNS.length + index;
+  if (btn && btn.classList) btn.classList.add('playing');
+  if (btn && btn.textContent !== undefined) btn.textContent = '⏹ 停止演示';
+  
+  playDemo(rhythmIndex, btn, getActiveRhythm);
+  
+  window.customRhythmCleanup = setTimeout(() => { if (getIsPlayingDemo()) stopDemo(); }, 10000);
 }
 
 function syncCustomRhythmsToSelector() {

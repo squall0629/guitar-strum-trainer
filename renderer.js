@@ -25,6 +25,8 @@ import {
   getIsPlayingDemo,
   setIsPlayingDemo,
   stopDemo,
+  playDemo,
+  loadGuitarSoundfont,
   resetFluxState,
   getDetectedStrums,
   getCurrentMeasureStrums,
@@ -71,7 +73,8 @@ import {
   renderCustomRhythmsList,
   exportCustomRhythms,
   importCustomRhythms,
-  generateArrowPattern
+  generateArrowPattern,
+  playCustomRhythmFromList
 } from './custom-rhythms.js';
 
 import {
@@ -523,8 +526,8 @@ function init() {
       const feedbackMessage = document.getElementById('feedbackMessage');
       if (feedbackMessage && !isListeningState()) feedbackMessage.textContent = `灵敏度：${level} - 开始练习后生效`;
     },
-    onStart: () => audioStartListening(),
-    onStop: () => audioStopListening()
+    onStart: () => startListening(),
+    onStop: () => stopListening()
   });
   
   // 初始化和弦训练
@@ -560,6 +563,9 @@ function init() {
     rhythmSelector
   });
   
+  // 加载吉他音源（用于试听演示）
+  loadGuitarSoundfont();
+  
   // 加载历史
   strumHistory = loadHistoryFromStorage();
   renderHistory();
@@ -586,6 +592,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ========== 导出到全局 ==========
+window.playDemo = (rhythmIndex, btn) => playDemo(rhythmIndex, btn, getActiveRhythm);
+window.playCustomRhythmFromList = playCustomRhythmFromList;
+window.stopDemo = stopDemo;
+window.getIsPlayingDemo = getIsPlayingDemo;
+
 window.guitarTrainer = {
   chordDetector: getChordDetector,
   transitionDetector: getTransitionDetector,

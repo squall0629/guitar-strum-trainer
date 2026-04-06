@@ -154,9 +154,15 @@ function setupDemoButtons() {
     
     if (btn.dataset.rhythm !== undefined) {
       const rhythmIndex = parseInt(btn.dataset.rhythm);
-      if (window.stopDemo && window.getIsPlayingDemo()) {
-        window.stopDemo();
+      
+      // 如果点击的是正在播放的同一个按钮，只停止不播放
+      if (window.getIsPlayingDemo() && window.currentPlayingDemoBtn === btn) {
+        if (window.stopDemo) window.stopDemo();
+        return;
       }
+      
+      // 否则先停止当前播放，再播放新的
+      if (window.stopDemo) window.stopDemo();
       if (window.playDemo) {
         window.playDemo(rhythmIndex, btn);
       }
@@ -165,9 +171,15 @@ function setupDemoButtons() {
     
     if (btn.dataset.customIndex !== undefined) {
       const customIndex = parseInt(btn.dataset.customIndex);
-      if (window.stopDemo && window.getIsPlayingDemo()) {
-        window.stopDemo();
+      
+      // 如果点击的是正在播放的同一个按钮，只停止不播放
+      if (window.getIsPlayingDemo() && window.currentPlayingDemoBtn === btn) {
+        if (window.stopDemo) window.stopDemo();
+        return;
       }
+      
+      // 否则先停止当前播放，再播放新的
+      if (window.stopDemo) window.stopDemo();
       if (window.playCustomRhythmFromList) {
         window.playCustomRhythmFromList(customIndex, btn);
       }

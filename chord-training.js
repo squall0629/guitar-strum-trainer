@@ -1,6 +1,9 @@
 // 吉他扫弦练习助手 - 和弦训练模块
 // 功能：和弦训练逻辑、和弦转换检测、和弦图绘制
 
+// ========== 导入 ==========
+import { drawChordDiagram as drawChordDiagramSVG, drawChordDiagramFallbackSVG as drawChordDiagramFallbackSVGUI } from './ui-renderer.js';
+
 // ========== 全局状态 ==========
 let chordDetector = null;
 let transitionDetector = null;
@@ -317,8 +320,8 @@ export function updateChordProgressionDisplay() {
   if (currentProgression.length === 0 || currentTrainingMode === 'free') {
     currentChordDisplay.textContent = '--';
     nextChordDisplay.textContent = '--';
-    if (currentChordCanvas) drawChordDiagram(currentChordCanvas, null);
-    if (nextChordCanvas) drawChordDiagram(nextChordCanvas, null);
+    if (currentChordCanvas) drawChordDiagramSVG(currentChordCanvas, null);
+    if (nextChordCanvas) drawChordDiagramSVG(nextChordCanvas, null);
     return;
   }
   
@@ -329,8 +332,8 @@ export function updateChordProgressionDisplay() {
   currentChordDisplay.textContent = expectedChord;
   nextChordDisplay.textContent = nextChord;
   
-  if (currentChordCanvas) drawChordDiagram(currentChordCanvas, expectedChord);
-  if (nextChordCanvas) drawChordDiagram(nextChordCanvas, nextChord);
+  if (currentChordCanvas) drawChordDiagramSVG(currentChordCanvas, expectedChord);
+  if (nextChordCanvas) drawChordDiagramSVG(nextChordCanvas, nextChord);
   
   if (progressionBar && progressionProgress) {
     const progress = ((currentChordIndex) / currentProgression.length) * 100;
@@ -368,7 +371,7 @@ export function updateChordRecognition(chordResult) {
   }
   if (chordConfidenceEl) chordConfidenceEl.textContent = `(${Math.round(chordResult.confidence * 100)}%)`;
   if (currentChordDisplayEl) currentChordDisplayEl.textContent = chordResult.chord;
-  if (currentChordCanvas && chordResult.chord) drawChordDiagram(currentChordCanvas, chordResult.chord);
+  if (currentChordCanvas && chordResult.chord) drawChordDiagramSVG(currentChordCanvas, chordResult.chord);
   
   if (expectedChord) {
     if (chordResult.chord === expectedChord) {
@@ -400,7 +403,7 @@ export function updateChordDisplay(chordResult) {
   }
   if (chordConfidenceEl) chordConfidenceEl.textContent = `(${Math.round(chordResult.confidence * 100)}%)`;
   if (currentChordDisplayEl) currentChordDisplayEl.textContent = chordResult.chord;
-  if (currentChordCanvas && chordResult.chord) drawChordDiagram(currentChordCanvas, chordResult.chord);
+  if (currentChordCanvas && chordResult.chord) drawChordDiagramSVG(currentChordCanvas, chordResult.chord);
   
   if (expectedChord) {
     if (chordResult.chord === expectedChord) {
@@ -422,121 +425,9 @@ function showFeedback(message, type = 'info') {
   setTimeout(() => { if (feedbackEl.textContent === message) feedbackEl.textContent = ''; }, 3000);
 }
 
-// ========== 和弦图绘制 ==========
-function drawChordDiagram(canvas, chordName) {
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  
-  const width = canvas.width || 120;
-  const height = canvas.height || 150;
-  
-  ctx.clearRect(0, 0, width, height);
-  
-  if (!chordName || !window.ChordLibrary || !window.ChordLibrary.getChordFingering) {
-    drawChordDiagramFallbackSVG(ctx, width, height, null);
-    return;
-  }
-  
-  const fingering = window.ChordLibrary.getChordFingering(chordName);
-  if (!fingering) {
-    drawChordDiagramFallbackSVG(ctx, width, height, chordName);
-    return;
-  }
-  
-  drawChordDiagramFallbackSVG(ctx, width, height, chordName, fingering);
-}
-
-function drawChordDiagramFallbackSVG(ctx, width, height, chordName, fingering = null) {
-  const padding = 10;
-  const diagramWidth = width - padding * 2;
-  const diagramHeight = height - padding * 2 - 20;
-  
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, width, height);
-  
-  if (!chordName) {
-    ctx.fillStyle = '#666';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('和弦图', width / 2, height / 2);
-    return;
-  }
-  
-  ctx.fillStyle = '#333';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(chordName, width / 2, 18);
-  
-  const startX = padding + diagramWidth * 0.15;
-  const endX = padding + diagramWidth * 0.85;
-  const startY = padding + 25;
-  const endY = startY + diagramHeight;
-  
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2;
-  
-  const stringSpacing = (endX - startX) / 5;
-  const fretSpacing = (endY - startY) / 4;
-  
-  for (let i = 0; i <= 5; i++) {
-    const x = startX + i * stringSpacing;
-    ctx.beginPath();
-    ctx.moveTo(x, startY);
-    ctx.lineTo(x, endY);
-    ctx.stroke();
-  }
-  
-  for (let i = 0; i <= 4; i++) {
-    const y = startY + i * fretSpacing;
-    ctx.beginPath();
-    ctx.moveTo(startX, y);
-    ctx.lineTo(endX, y);
-    ctx.stroke();
-  }
-  
-  const nutThickness = 3;
-  ctx.lineWidth = nutThickness;
-  ctx.beginPath();
-  ctx.moveTo(startX, startY - nutThickness / 2);
-  ctx.lineTo(endX, startY - nutThickness / 2);
-  ctx.stroke();
-  ctx.lineWidth = 2;
-  
-  if (fingering && fingering.positions) {
-    ctx.fillStyle = '#00d9ff';
-    fingering.positions.forEach((pos, stringIndex) => {
-      if (pos > 0) {
-        const x = startX + stringIndex * stringSpacing;
-        const y = startY + (pos - 0.5) * fretSpacing;
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(pos), x, y);
-        ctx.fillStyle = '#00d9ff';
-      } else if (pos === 0) {
-        const x = startX + stringIndex * stringSpacing;
-        ctx.beginPath();
-        ctx.arc(x, startY - 8, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-  }
-  
-  ctx.fillStyle = '#666';
-  ctx.font = '10px sans-serif';
-  ctx.textAlign = 'center';
-  const strings = ['E', 'A', 'D', 'G', 'B', 'e'];
-  strings.forEach((s, i) => {
-    const x = startX + i * stringSpacing;
-    ctx.fillText(s, x, endY + 12);
-  });
-}
+// ========== 和弦图绘制（使用 ui-renderer.js 的 SVG 版本） ==========
+// drawChordDiagram 和 drawChordDiagramFallbackSVG 已从 ui-renderer.js 导入
+// 直接使用导入的函数，支持 div 容器元素
 
 // ========== 重置和弦训练 ==========
 export function resetChordTraining() {
