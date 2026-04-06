@@ -5,6 +5,11 @@
 import { saveUserSettings, loadUserSettings, saveHistory, loadHistoryFromStorage, exportUserSettings, importUserSettings } from './storage.js';
 import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, calculateTransitionScore, updateStabilityScores } from './scoring.js';
 import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition as updateChordRecognitionUI, updateTransitionTime as updateTransitionTimeUI } from './ui-renderer.js';
+import { detectPitch, identifyString, playReferenceTone } from './tuner.js';
+import { updateTunerDisplay, initTunerUI } from './tuner-ui.js';
+
+// ========== 调音器状态 ==========
+let tunerAnimationFrame = null;
 
 // 音频模块导入
 import { initAudioEngine, startListening as audioStartListening, stopListening as audioStopListening, isListeningState, analyzeAudio, getAudioContext, getAnalyser } from './audio-core.js';
@@ -61,7 +66,8 @@ let currentRhythm = 0;
 let currentBPM = 70;
 let metronomeEnabled = false;
 let sensitivityLevel = 50;
-let practiceMode = 'rhythm';
+let practiceMode = 'tuner';  // 默认调音器模式
+let currentMode = 'tuner';   // tuner | rhythm | comprehensive
 
 // 历史统计
 let strumHistory = [];
@@ -269,14 +275,45 @@ async function startListening() {
   const spectrumCanvas = document.getElementById('spectrumWaveform');
   const spectrumCtx = spectrumCanvas?.getContext('2d');
   
-  analyzeAudio(
-    () => updateScoresWrapper(),
-    (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
-      drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
-    (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
-      drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
-    (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
-  );
+  // 调音器模式特殊处理
+  if (currentMode === 'tuner') {
+    const tunerNeededle = document.getElementById('tunerNeededle');
+    const tunerStatusLight = document.getElementById('tunerStatusLight');
+    const tunerStringName = document.getElementById('tunerStringName');
+    const tunerCents = document.getElementById('tunerCents');
+    const tunerFrequency = document.getElementById('tunerFrequency');
+    
+    const tunerCallback = (timeData, sampleRate) => {
+      // 将 Uint8Array 转换为 Float32Array（-1 到 1）
+      const floatData = new Float32Array(timeData.length);
+      for (let i = 0; i < timeData.length; i++) {
+        floatData[i] = (timeData[i] - 128) / 128;
+      }
+      
+      const frequency = detectPitch(floatData, sampleRate);
+      const result = identifyString(frequency);
+      updateTunerDisplay(result, tunerStringName, tunerCents, tunerFrequency, tunerNeededle, tunerStatusLight);
+    };
+    
+    analyzeAudio(
+      null,
+      (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
+        drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
+      (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
+        drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
+      null,
+      tunerCallback
+    );
+  } else {
+    analyzeAudio(
+      () => updateScoresWrapper(),
+      (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
+        drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
+      (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
+        drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
+      (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
+    );
+  }
 }
 
 function stopListening() {
@@ -530,6 +567,53 @@ function init() {
     },
     onStart: () => startListening(),
     onStop: () => stopListening()
+  });
+  
+  // 初始化模式切换
+  const modeTuner = document.getElementById('modeTuner');
+  const modeBtns = [modeTuner, document.getElementById('practiceModeRhythm'), document.getElementById('practiceModeComprehensive')];
+  
+  modeBtns.forEach(btn => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      modeBtns.forEach(b => b && b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      if (btn.id === 'modeTuner') {
+        currentMode = 'tuner';
+        practiceMode = 'tuner';
+        document.getElementById('tunerPanel').style.display = 'block';
+        document.getElementById('chordModePanel').style.display = 'none';
+        document.getElementById('chordDisplayPanel').style.display = 'none';
+        document.getElementById('practiceModeDescription').textContent = '💡 调音器模式：6 弦音准检测，±5 音分精度';
+        stopListening();
+        updateStatus('idle');
+      } else if (btn.id === 'practiceModeRhythm') {
+        currentMode = 'rhythm';
+        practiceMode = 'rhythm';
+        document.getElementById('tunerPanel').style.display = 'none';
+        document.getElementById('chordModePanel').style.display = 'none';
+        document.getElementById('chordDisplayPanel').style.display = 'none';
+        document.getElementById('practiceModeDescription').textContent = '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习';
+        setPracticeMode('rhythm');
+      } else if (btn.id === 'practiceModeComprehensive') {
+        currentMode = 'comprehensive';
+        practiceMode = 'comprehensive';
+        document.getElementById('tunerPanel').style.display = 'none';
+        document.getElementById('chordModePanel').style.display = 'block';
+        document.getElementById('chordDisplayPanel').style.display = 'block';
+        document.getElementById('practiceModeDescription').textContent = '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
+        setPracticeMode('comprehensive');
+      }
+    });
+  });
+  
+  // 初始化调音器 UI
+  initTunerUI((stringIndex) => {
+    const audioCtx = getAudioContext();
+    if (audioCtx) {
+      playReferenceTone(audioCtx, stringIndex, 2);
+    }
   });
   
   // 初始化和弦训练

@@ -15,9 +15,12 @@
     
     <!-- 练习模式切换 -->
     <div class="panel" style="margin-bottom: 20px;">
-      <h2>🎮 练习模式</h2>
+      <h2>🎮 模式选择</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <button class="mode-btn active" id="practiceModeRhythm" data-practice-mode="rhythm" aria-pressed="true">
+        <button class="mode-btn active" id="modeTuner" data-mode="tuner" aria-pressed="true">
+          🎛️ 调音器
+        </button>
+        <button class="mode-btn" id="practiceModeRhythm" data-practice-mode="rhythm" aria-pressed="false">
           🥁 纯节奏训练
         </button>
         <button class="mode-btn" id="practiceModeComprehensive" data-practice-mode="comprehensive" aria-pressed="false">
@@ -25,7 +28,54 @@
         </button>
       </div>
       <div style="margin-top: 10px; font-size: 0.85em; color: #888;" id="practiceModeDescription">
-        💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习
+        💡 调音器模式：6 弦音准检测，±5 音分精度
+      </div>
+    </div>
+    
+    <!-- 调音器面板 -->
+    <div class="panel" id="tunerPanel" style="margin-bottom: 20px;">
+      <h2>🎛️ 吉他调音器</h2>
+      
+      <!-- 指针表盘 -->
+      <div style="text-align: center; margin: 30px 0;">
+        <div style="position: relative; width: 200px; height: 120px; margin: 0 auto;">
+          <!-- 表盘背景 -->
+          <svg width="200" height="120" viewBox="0 0 200 120">
+            <!-- 刻度线 -->
+            <g stroke="#888" stroke-width="2">
+              <line x1="100" y1="10" x2="100" y2="25" />
+              <line x1="150" y1="35" x2="140" y2="45" />
+              <line x1="180" y1="70" x2="170" y2="70" />
+              <line x1="50" y1="35" x2="60" y2="45" />
+              <line x1="20" y1="70" x2="30" y2="70" />
+            </g>
+            <!-- 中心点 -->
+            <circle cx="100" cy="100" r="8" fill="#444" />
+          </svg>
+          <!-- 指针 -->
+          <div id="tunerNeededle" style="position: absolute; bottom: 100px; left: 96px; width: 8px; height: 90px; background: #ff4757; transform-origin: bottom center; transform: rotate(0deg); border-radius: 4px; transition: transform 0.1s;"></div>
+        </div>
+        
+        <!-- 状态灯 -->
+        <div id="tunerStatusLight" style="width: 60px; height: 60px; border-radius: 50%; background: #888; margin: 20px auto; box-shadow: 0 0 20px #888; transition: all 0.2s;"></div>
+        
+        <!-- 弦名和音分 -->
+        <div style="font-size: 2em; font-weight: bold; color: #888; margin: 10px 0;" id="tunerStringName">检测中...</div>
+        <div style="font-size: 1.2em; color: #888; margin: 5px 0;" id="tunerCents">--</div>
+        <div style="font-size: 0.9em; color: #666;" id="tunerFrequency">-- Hz</div>
+      </div>
+      
+      <!-- 参考音播放按钮 -->
+      <div style="margin-top: 30px;">
+        <div style="color: #888; margin-bottom: 10px; text-align: center;">🔊 点击播放标准音参考</div>
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;">
+          <button id="btnPlayString0" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">6 弦 E</button>
+          <button id="btnPlayString1" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">5 弦 A</button>
+          <button id="btnPlayString2" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">4 弦 D</button>
+          <button id="btnPlayString3" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">3 弦 G</button>
+          <button id="btnPlayString4" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">2 弦 B</button>
+          <button id="btnPlayString5" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">1 弦 E</button>
+        </div>
       </div>
     </div>
     

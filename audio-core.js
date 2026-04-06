@@ -92,13 +92,13 @@ export function isListeningState() {
 }
 
 // ========== 音频分析主循环 ==========
-export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback) {
+export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback, tunerCallback) {
   if (!isListening) return;
   
   const now = performance.now();
   const delta = now - lastAnalyzeTime;
   if (delta < ANALYZE_INTERVAL) {
-    requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback));
+    requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback, tunerCallback));
     return;
   }
   lastAnalyzeTime = now;
@@ -125,6 +125,11 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
   // 调用扫弦检测
   if (detectStrumCallback) {
     detectStrumCallback(freqDataCache, timeDataCache, rms);
+  }
+  
+  // 调用调音器检测（如果启用）
+  if (tunerCallback) {
+    tunerCallback(timeDataCache, audioContext.sampleRate);
   }
   
   // 调用小节评分更新（每帧检查）
