@@ -73,13 +73,18 @@ export function checkMeasureUpdate(isListening, currentMeasureStartTime, current
   const measureDuration = getMeasureDuration(currentBPM, pattern);
   const timeInMeasure = now - currentMeasureStartTime;
   
+  // 调试日志
+  console.log('[DEBUG checkMeasureUpdate] isListening:', isListening, 'timeInMeasure:', timeInMeasure, 'measureDuration:', measureDuration, 'strums:', currentMeasureStrums.length);
+  
   // 防止重复评分：检查是否已经对当前小节评分过
   if (lastScoredMeasureEnd > 0 && now - lastScoredMeasureEnd < measureDuration * 0.5) {
+    console.log('[DEBUG] 跳过：防止重复评分');
     return;
   }
   
   // 如果当前小节已结束，计算评分并开始新小节
   if (timeInMeasure >= measureDuration && currentMeasureStrums.length >= 1) {
+    console.log('[DEBUG] 开始评分！小节时长:', measureDuration, '扫弦数:', currentMeasureStrums.length);
     // 计算小节评分
     const rhythmScore = calculateRhythmScore(currentMeasureStrums, pattern, currentBPM);
     const toneScore = calculateToneScore(currentMeasureStrums);

@@ -221,6 +221,11 @@ export function detectStrum(freqData, timeData, rms) {
   
   const onsetResult = detectOnsetWithFlux(freqData, timeData, rms);
   
+  // 调试日志
+  if (onsetResult.onset) {
+    console.log('[DEBUG detectStrum] 检测到扫弦！rms:', rms.toFixed(3), 'flux:', onsetResult.flux.toFixed(2), 'threshold:', onsetResult.threshold.toFixed(2));
+  }
+  
   if (onsetResult.onset) {
     const strum = {
       time: now,
@@ -240,6 +245,8 @@ export function detectStrum(freqData, timeData, rms) {
     if (detectedStrums.length > 20) {
       detectedStrums.shift();
     }
+    
+    console.log('[DEBUG detectStrum] currentMeasureStrums 长度:', currentMeasureStrums.length);
   }
   
   return onsetResult;
