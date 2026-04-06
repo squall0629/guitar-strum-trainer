@@ -282,6 +282,10 @@ async function startListening() {
 }
 
 function stopListening() {
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+    autoSaveIntervalId = null;
+  }
   setChordRecognitionEnabled(false);
   stopMetronome();
   if (getIsPlayingDemo()) stopDemo();
@@ -570,6 +574,31 @@ function init() {
   strumHistory = loadHistoryFromStorage();
   renderHistory();
   renderStatsChart();
+  
+  // 加载并恢复用户设置
+  const savedSettings = loadUserSettings(getRhythmPatterns(), DEBUG);
+  if (savedSettings.bpm !== null) {
+    currentBPM = savedSettings.bpm;
+    setCurrentBPM(savedSettings.bpm);
+    if (bpmSlider) bpmSlider.value = savedSettings.bpm;
+    if (bpmValue) bpmValue.textContent = savedSettings.bpm;
+  }
+  if (savedSettings.metronomeEnabled !== null) {
+    metronomeEnabled = savedSettings.metronomeEnabled;
+    setMetronomeEnabled(savedSettings.metronomeEnabled);
+    if (metronomeToggle) metronomeToggle.checked = savedSettings.metronomeEnabled;
+  }
+  if (savedSettings.sensitivityLevel !== null) {
+    sensitivityLevel = savedSettings.sensitivityLevel;
+    setSensitivityLevel(savedSettings.sensitivityLevel);
+    if (sensitivitySlider) sensitivitySlider.value = savedSettings.sensitivityLevel;
+    if (sensitivityValueEl) sensitivityValueEl.textContent = savedSettings.sensitivityLevel;
+  }
+  if (savedSettings.currentRhythm !== null) {
+    currentRhythm = savedSettings.currentRhythm;
+    if (rhythmSelector) rhythmSelector.value = savedSettings.currentRhythm;
+  }
+  
   updateStatus('ready');
   
   setupPracticeReport();
