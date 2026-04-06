@@ -15,8 +15,7 @@ const STRING_NAMES = ['E2', 'A2', 'D3', 'G3', 'B3', 'E4'];
 const STRING_DISPLAY = ['6 弦 E', '5 弦 A', '4 弦 D', '3 弦 G', '2 弦 B', '1 弦 E'];
 
 // 调音阈值（音分）
-const IN_TUNE_CENTS = 5;    // 绿色（准）
-const CLOSE_CENTS = 50;     // 黄色（接近）
+const IN_TUNE_CENTS = 50;   // 绿色（准，±50 音分）
 // >50 音分：红色（不准）
 
 /**
@@ -132,14 +131,8 @@ export function identifyString(frequency) {
   const cents = calculateCents(frequency, closestString.freq);
   const absCents = Math.abs(cents);
   
-  let status;
-  if (absCents <= IN_TUNE_CENTS) {
-    status = 'in-tune';    // 绿色
-  } else if (absCents <= CLOSE_CENTS) {
-    status = 'close';      // 黄色
-  } else {
-    status = 'out-of-tune'; // 红色
-  }
+  // 简化状态：±50 音分内绿色，超过红色
+  const status = absCents <= IN_TUNE_CENTS ? 'in-tune' : 'out-of-tune';
   
   return {
     stringName: closestString.name,
@@ -165,14 +158,13 @@ export function getStringDisplay(stringName) {
 
 /**
  * 获取状态颜色
- * @param {string} status - 'silent' | 'unknown' | 'out-of-tune' | 'close' | 'in-tune'
+ * @param {string} status - 'silent' | 'unknown' | 'out-of-tune' | 'in-tune'
  * @returns {string} 颜色代码
  */
 export function getStatusColor(status) {
   switch (status) {
-    case 'in-tune': return '#2ed573';    // 绿色
-    case 'close': return '#ffa502';      // 橙色
-    case 'out-of-tune': return '#ff4757'; // 红色
+    case 'in-tune': return '#2ed573';    // 绿色（±50 音分）
+    case 'out-of-tune': return '#ff4757'; // 红色（超过 50 音分）
     default: return '#888888';            // 灰色
   }
 }

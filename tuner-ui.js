@@ -73,9 +73,8 @@ export function updateTunerDisplay(result, stringNameEl, centsEl, frequencyEl, n
  */
 function getStatusColor(status) {
   switch (status) {
-    case 'in-tune': return '#2ed573';    // 绿色
-    case 'close': return '#ffa502';      // 橙色
-    case 'out-of-tune': return '#ff4757'; // 红色
+    case 'in-tune': return '#2ed573';    // 绿色（±50 音分）
+    case 'out-of-tune': return '#ff4757'; // 红色（超过 50 音分）
     default: return '#888888';            // 灰色
   }
 }
