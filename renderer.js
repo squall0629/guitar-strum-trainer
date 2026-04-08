@@ -70,6 +70,7 @@ import {
 // ========== 调音器状态 ==========
 let tunerAnimationFrame = null;
 let isTunerListening = false;
+let tunerAutoStartPending = false; // 不再自动启动，改为按钮触发
 
 // ========== 全局状态 ==========
 let currentRhythm = 0;
@@ -307,20 +308,28 @@ function checkMeasureUpdateWrapper() {
 
 // ========== 调音器独立监听 ==========
 async function startTunerListening() {
-  if (isTunerListening) return;
+  if (isTunerListening) {
+    console.log('[Renderer] 调音器已在监听中');
+    return;
+  }
+  
+  console.log('[Renderer] startTunerListening 开始...');
   
   try {
     if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'flex';
     
     const success = await audioStartListening();
+    console.log('[Renderer] audioStartListening 返回:', success);
     
     if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
     
     if (!success) {
+      console.warn('[Renderer] 麦克风访问失败，audioStartListening 返回 false');
       if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '❌ 无法访问麦克风';
       return;
     }
     
+    console.log('[Renderer] ✓ 麦克风访问成功，启动调音器...');
     isTunerListening = true;
     
     initChordbookTuner((pitchResult) => {
@@ -334,10 +343,11 @@ async function startTunerListening() {
     });
     
     startChordbookTuner();
+    console.log('[Renderer] ✓ 调音器启动成功');
   } catch (err) {
     if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    console.error('[Renderer] startTunerListening 异常:', err);
     if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '❌ 麦克风访问失败';
-    console.error('[Renderer] startTunerListening 失败:', err);
   }
 }
 
@@ -752,6 +762,9 @@ function init() {
   });
   
   // 初始化调音器 UI
+  const btnStartTuner = document.getElementById('btnStartTuner');
+  const tunerStatusText = document.getElementById('tunerStatusText');
+  
   initTunerUI(async (stringIndex) => {
     try {
       let audioCtx = getAudioContext();
@@ -771,6 +784,26 @@ function init() {
       console.error('[Renderer] 播放标准音失败:', err);
     }
   });
+  
+  // 调音器启动按钮事件
+  if (btnStartTuner) {
+    btnStartTuner.addEventListener('click', async () => {
+      if (isTunerListening) {
+        // 已启动，变为停止按钮
+        stopTunerListening();
+        btnStartTuner.innerHTML = '🎤 启动调音器';
+        btnStartTuner.style.background = 'linear-gradient(135deg, #2ed573, #17a555)';
+        if (tunerStatusText) tunerStatusText.textContent = '点击按钮开始麦克风监听';
+        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '已停止';
+      } else {
+        // 未启动，启动监听
+        btnStartTuner.innerHTML = '⏹️ 停止监听';
+        btnStartTuner.style.background = 'linear-gradient(135deg, #ff4757, #c0392b)';
+        if (tunerStatusText) tunerStatusText.textContent = '正在监听麦克风...';
+        await startTunerListening();
+      }
+    });
+  }
   
   // 初始化和弦训练
   initChordTraining({
@@ -852,11 +885,10 @@ function init() {
   if (practicePanel) practicePanel.style.display = 'none';
   if (scorePanel) scorePanel.style.display = 'none';
   
-  // 自动启动调音器监听（延迟确保 DOM 完全加载）
-  initTunerTimeoutId = setTimeout(() => {
-    console.log('[Renderer] 自动启动调音器监听...');
-    startTunerListening();
-  }, INIT_TUNER_DELAY);
+  // 页面加载时显示调音器为就绪状态
+  console.log('[Renderer] 调音器就绪，等待用户点击启动按钮...');
+  if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '就绪';
+  if (tunerStatusText) tunerStatusText.textContent = '点击按钮开始麦克风监听';
   
   // 立即更新状态为 ready
   updateStatus('ready');
@@ -943,8 +975,23 @@ function cleanupAllTimers() {
   audioStopListening();
 }
 
-window.addEventListener('beforeunload', cleanupAllTimers);
-window.addEventListener('pagehide', cleanupAllTimers);
+// 清理用户交互监听器（防止内存泄漏）
+function cleanupUserInteractionListeners() {
+  const userInteractionEvents = ['click', 'touchstart', 'keydown'];
+  const handleUserInteraction = () => {};
+  userInteractionEvents.forEach(event => {
+    document.removeEventListener(event, handleUserInteraction);
+  });
+}
+
+window.addEventListener('beforeunload', () => {
+  cleanupUserInteractionListeners();
+  cleanupAllTimers();
+});
+window.addEventListener('pagehide', () => {
+  cleanupUserInteractionListeners();
+  cleanupAllTimers();
+});
 
 // ========== 导出到全局 ==========
 window.playDemo = (rhythmIndex, btn) => playDemo(rhythmIndex, btn, getActiveRhythm);
