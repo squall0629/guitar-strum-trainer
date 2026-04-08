@@ -2,14 +2,13 @@
 // 功能：吉他音源加载、扫弦声音播放、演示播放
 
 import { playMetronomeSound, getCurrentBPM } from './audio-metronome.js';
+import { DEBUG } from './constants.js';
 
 // ========== 吉他音源（用于试听演示） ==========
 let guitarSoundfont = null;
 let soundfontLoading = false;
 let soundfontLoaded = false;
-
-// 调试模式
-const DEBUG = false;
+let sharedAudioContext = null;
 
 // 演示播放相关
 let _isPlayingDemo = false;
@@ -19,15 +18,29 @@ let currentDemoRhythmIndex = -1;
 let playingCustomBtn = null;
 let currentPlayingDemoBtn = null;
 
+// ========== 调试模式（从 constants.js 导入） ==========
+// DEBUG 已从 constants.js 导入，直接使用
+
 // ========== 演示状态 ==========
+/**
+ * 获取是否正在播放演示
+ * @returns {boolean} 是否正在播放
+ */
 export function getIsPlayingDemo() {
   return _isPlayingDemo;
 }
 
+/**
+ * 设置演示播放状态
+ * @param {boolean} val - 是否正在播放
+ */
 export function setIsPlayingDemo(val) {
   _isPlayingDemo = val;
 }
 
+/**
+ * 停止演示播放
+ */
 export function stopDemo() {
   setIsPlayingDemo(false);
   if (demoTimeout) clearTimeout(demoTimeout);
@@ -58,28 +71,53 @@ export function stopDemo() {
 }
 
 // ========== 吉他音源加载 ==========
+
+/**
+ * 加载钢弦吉他音源（用于调音器标准音播放）
+ */
 export async function loadGuitarSoundfont() {
   if (soundfontLoading || soundfontLoaded) return;
   soundfontLoading = true;
   
+  console.log('[AudioDemo] 开始加载钢弦吉他音源...');
+  
   try {
     if (typeof window.Soundfont === 'undefined') {
+      console.warn('[AudioDemo] Soundfont 未加载，跳过');
       soundfontLoading = false;
       return;
     }
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    guitarSoundfont = await window.Soundfont.instrument(audioCtx, 'acoustic_guitar_steel', {
+    
+    // 创建共享 AudioContext
+    sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // 加载钢弦吉他音源
+    guitarSoundfont = await window.Soundfont.instrument(sharedAudioContext, 'acoustic_guitar_steel', {
       soundfont: 'FluidR3_GM',
       gain: 1.5
     });
+    
     soundfontLoaded = true;
+    
+    // 暴露到全局
+    window.guitarSoundfont = guitarSoundfont;
+    window.guitarAudioContext = sharedAudioContext;
+    
+    console.log('[AudioDemo] ✓ 钢弦吉他音源加载完成');
   } catch (error) {
-    if (DEBUG) console.error('[AudioDemo] 音源加载失败:', error);
+    console.error('[AudioDemo] 音源加载失败:', error);
     soundfontLoading = false;
   }
 }
 
 // ========== 播放扫弦声音（使用真实吉他音源） ==========
+/**
+ * 播放扫弦声音
+ * @param {string} direction - 扫弦方向 ('D' 下扫, 'U' 上扫)
+ * @param {number} duration - 持续时间 (秒)
+ * @param {Array} noteVelocities - 各弦力度数组
+ * @returns {Promise<void>}
+ */
 export async function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
   if (!guitarSoundfont) {
     await playStrumSoundSynth(direction, duration);
@@ -87,7 +125,9 @@ export async function playStrumSound(direction, duration = 0.15, noteVelocities 
   }
   
   const ctx = guitarSoundfont.context;
-  if (ctx.state === 'suspended') await ctx.resume();
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
+  }
   
   const bassNotes = ['E3', 'B3', 'E4'];
   const trebleNotes = ['G#4', 'B4', 'E5'];
@@ -134,7 +174,12 @@ async function playStrumSoundSynth(direction, duration = 0.15) {
   audioContextForMetronome = window.audioContextForMetronome;
   
   if (audioContextForMetronome.state === 'suspended') {
-    await audioContextForMetronome.resume();
+    try {
+      await audioContextForMetronome.resume();
+    } catch (err) {
+      if (DEBUG) console.error('[playStrumSoundSynth] AudioContext resume 失败:', err);
+      return;
+    }
   }
   
   const ctx = audioContextForMetronome;
@@ -200,6 +245,13 @@ async function playStrumSoundSynth(direction, duration = 0.15) {
 }
 
 // ========== 试听演示功能（完整版） ==========
+/**
+ * 播放节奏型演示
+ * @param {number} rhythmIndex - 节奏型索引
+ * @param {HTMLElement} btn - 播放按钮元素
+ * @param {Function} getActiveRhythmFn - 获取节奏型函数
+ * @returns {Promise<void>}
+ */
 export async function playDemo(rhythmIndex, btn, getActiveRhythmFn) {
   if (!btn || !getActiveRhythmFn) return;
   

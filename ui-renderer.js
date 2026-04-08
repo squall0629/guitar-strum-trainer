@@ -1,4 +1,28 @@
-// 吉他扫弦练习助手 - UI 渲染模块
+/**
+ * HTML 转义，防止 XSS
+ */
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// 导入常量
+import {
+  RECORDER_DRAW_INTERVAL,
+  SPECTRUM_DRAW_INTERVAL,
+  SPECTRUM_MIN_FREQ,
+  SPECTRUM_MAX_FREQ,
+  SCORE_COLOR_EXCELLENT,
+  SCORE_COLOR_GOOD,
+  TRANSITION_TIME_EXCELLENT,
+  TRANSITION_TIME_GOOD,
+  CHORD_CONFIDENCE_HIGH,
+  CHORD_CONFIDENCE_MEDIUM,
+  FFT_SIZE,
+  DEBUG
+} from './constants.js';
 
 /**
  * 绘制 Windows 录音机风格波形（使用传入的 RMS 值）- 节流到 10 FPS
@@ -131,7 +155,7 @@ export function drawSpectrumWaveform(spectrumCanvas, spectrumCtx, freqData, spec
   
   // 性能优化：只处理 80Hz-1000Hz 关键频段（吉他核心频段）
   const sampleRate = audioContext ? audioContext.sampleRate : 44100;
-  const binFrequency = sampleRate / 2048;
+  const binFrequency = sampleRate / FFT_SIZE;
   const startBin = Math.max(0, Math.floor(80 / binFrequency));
   const endBin = Math.min(Math.floor(freqData.length / 4), Math.ceil(1000 / binFrequency));
   const freqBins = endBin - startBin;
@@ -224,7 +248,11 @@ export function drawChordDiagram(container, chordName) {
   
   if (!chordName) {
     // 显示空状态
-    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;">未选择和弦</div>';
+    container.innerHTML = '';
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;';
+    div.textContent = '未选择和弦';
+    container.appendChild(div);
     return;
   }
   
@@ -232,8 +260,13 @@ export function drawChordDiagram(container, chordName) {
     // 使用 chordictionary 生成 SVG
     const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
     
-    // 直接插入 SVG（避免 Canvas 位图渲染导致的模糊）
-    container.innerHTML = svgString;
+    // 安全地插入 SVG（清理潜在危险内容）
+    container.innerHTML = '';
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = svgString;
+    while (tempDiv.firstChild) {
+      container.appendChild(tempDiv.firstChild);
+    }
     
     // 确保 SVG 适配容器
     const svg = container.querySelector('svg');
@@ -262,7 +295,11 @@ export function drawChordDiagramFallbackSVG(container, chordName) {
   const chordData = window.ChordLibrary.getChordData(chordName);
   
   if (!chordData) {
-    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;">无指法数据</div>';
+    container.innerHTML = '';
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;color:#666;font-size:14px;';
+    div.textContent = '无指法数据';
+    container.appendChild(div);
     return;
   }
   
@@ -307,11 +344,18 @@ export function drawChordDiagramFallbackSVG(container, chordName) {
     }
   }
   
-  // 和弦名称
-  svg += `<text x="${width / 2}" y="${height - 5 * dpr}" fill="#fff" font-size="${12 * dpr}" font-weight="bold" text-anchor="middle" font-family="Microsoft YaHei">${chordName}</text>`;
+  // 和弦名称（转义防止 XSS）
+  svg += `<text x="${width / 2}" y="${height - 5 * dpr}" fill="#fff" font-size="${12 * dpr}" font-weight="bold" text-anchor="middle" font-family="Microsoft YaHei">${escapeHtml(chordName)}</text>`;
   
   svg += `</svg>`;
-  container.innerHTML = svg;
+  
+  // 安全地插入 SVG（使用 DOM 方法）
+  container.innerHTML = '';
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = svg;
+  while (tempDiv.firstChild) {
+    container.appendChild(tempDiv.firstChild);
+  }
 }
 
 /**

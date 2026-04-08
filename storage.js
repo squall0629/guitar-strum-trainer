@@ -2,6 +2,12 @@
 
 /**
  * 保存用户设置到 localStorage
+ * @param {number} currentBPM - 当前 BPM
+ * @param {boolean} metronomeEnabled - 节拍器是否启用
+ * @param {number} sensitivityLevel - 灵敏度等级
+ * @param {number} currentRhythm - 当前节奏型索引
+ * @param {Array} customRhythms - 自定义节奏型数组
+ * @param {boolean} DEBUG - 调试模式
  */
 export function saveUserSettings(currentBPM, metronomeEnabled, sensitivityLevel, currentRhythm, customRhythms, DEBUG = false) {
   const settings = {
@@ -23,7 +29,9 @@ export function saveUserSettings(currentBPM, metronomeEnabled, sensitivityLevel,
 
 /**
  * 从 localStorage 加载用户设置
- * @returns {object} 设置对象
+ * @param {Array} customRhythmsRef - 自定义节奏型引用
+ * @param {boolean} DEBUG - 调试模式
+ * @returns {Object} 设置对象 {bpm, metronomeEnabled, sensitivityLevel, currentRhythm}
  */
 export function loadUserSettings(customRhythmsRef, DEBUG = false) {
   const result = {
@@ -75,6 +83,24 @@ export function loadUserSettings(customRhythmsRef, DEBUG = false) {
 
 /**
  * 保存历史记录到 localStorage
+ * @param {Array} strumHistory - 扫弦历史
+ * @param {Array} detectedStrums - 检测到的扫弦
+ * @param {HTMLElement} totalScoreEl - 总分元素
+ * @param {HTMLElement} rhythmScoreEl - 节奏分元素
+ * @param {HTMLElement} toneScoreEl - 音色分元素
+ * @param {HTMLElement} dynamicsScoreEl - 强弱分元素
+ * @param {number} currentRhythm - 当前节奏型
+ * @param {number} currentBPM - 当前 BPM
+ * @param {string} currentTrainingMode - 训练模式
+ * @param {string} practiceMode - 练习模式
+ * @param {number} practiceChordTotal - 练习和弦总数
+ * @param {number} practiceChordCorrect - 正确和弦数
+ * @param {Array} practiceTransitionTimes - 转换时间数组
+ * @param {Object} transitionDetector - 转换检测器
+ * @param {Object} RHYTHM_PATTERNS - 节奏型模式
+ * @param {Function} getActiveRhythm - 获取节奏型函数
+ * @param {number} practiceStartTime - 练习开始时间
+ * @returns {Object} 历史记录项
  */
 export function saveHistory(strumHistory, detectedStrums, totalScoreEl, rhythmScoreEl, toneScoreEl, dynamicsScoreEl, 
                             currentRhythm, currentBPM, currentTrainingMode, practiceMode, practiceChordTotal, 
@@ -149,6 +175,11 @@ export function loadHistoryFromStorage() {
 
 /**
  * 导出用户设置为 JSON 文件
+ * @param {number} currentBPM - 当前 BPM
+ * @param {boolean} metronomeEnabled - 节拍器是否启用
+ * @param {number} sensitivityLevel - 灵敏度等级
+ * @param {Array} customRhythms - 自定义节奏型数组
+ * @param {boolean} DEBUG - 调试模式
  */
 export function exportUserSettings(currentBPM, metronomeEnabled, sensitivityLevel, customRhythms, DEBUG = false) {
   const settings = {
@@ -174,6 +205,13 @@ export function exportUserSettings(currentBPM, metronomeEnabled, sensitivityLeve
 
 /**
  * 导入用户设置从 JSON 文件
+ * @param {Event} event - 文件选择事件
+ * @param {Array} customRhythmsRef - 自定义节奏型引用
+ * @param {Object} callbacks - 回调函数对象
+ * @param {Function} callbacks.saveCustomRhythms - 保存自定义节奏型回调
+ * @param {Function} callbacks.updateUI - 更新 UI 回调
+ * @param {Function} callbacks.renderCustomRhythmsList - 渲染列表回调
+ * @param {boolean} DEBUG - 调试模式
  */
 export function importUserSettings(event, customRhythmsRef, callbacks, DEBUG = false) {
   const file = event.target.files[0];

@@ -681,11 +681,145 @@
       max-width: 800px;
     }
 
+    /* ===== Professional Tuner UI ===== */
+    .tuner-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+    }
+
+    .tuner-string-name {
+      font-size: 2.2em;
+      font-weight: bold;
+      color: #888;
+      margin-bottom: 10px;
+      text-align: center;
+      transition: color 0.3s;
+      letter-spacing: 2px;
+    }
+
+    .tuner-gauge {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+
+    .tuner-gauge-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .tuner-gauge-arc-bg {
+      transition: stroke 0.3s;
+    }
+
+    .tuner-needle-group {
+      transition: transform 0.12s ease-out;
+    }
+
+    .tuner-cents-display {
+      text-align: center;
+      font-size: 1.6em;
+      font-weight: bold;
+      color: #888;
+      margin-top: -10px;
+      margin-bottom: 5px;
+      transition: color 0.3s;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tuner-frequency {
+      font-size: 3.5em;
+      font-weight: bold;
+      color: #888;
+      text-align: center;
+      margin: 10px 0 20px;
+      transition: color 0.3s;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+    }
+
+    .tuner-reference-tones {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .tuner-reference-label {
+      color: #888;
+      margin-bottom: 12px;
+      font-size: 0.9em;
+    }
+
+    .tuner-string-buttons {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+    }
+
+    .tuner-string-btn {
+      padding: 14px 6px;
+      background: rgba(184, 102, 255, 0.12);
+      border: 2px solid rgba(184, 102, 255, 0.3);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.9em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tuner-string-btn:hover {
+      background: rgba(184, 102, 255, 0.25);
+      border-color: #b866ff;
+      box-shadow: 0 0 15px rgba(184, 102, 255, 0.3);
+    }
+
+    .tuner-string-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* 调音器缩放控制 */
+    .tuner-zoom-controls {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin: 15px 0;
+    }
+
+    .tuner-gauge-svg {
+      transition: transform 0.3s;
+      transform-origin: center;
+    }
+
     /* ===== Tablet (<=768px) ===== */
     @media (max-width: 768px) {
       body {
         padding: 15px;
         font-size: 15px;
+      }
+
+      .tuner-string-name {
+        font-size: 1.8em;
+      }
+
+      .tuner-frequency {
+        font-size: 2.8em;
+      }
+
+      .tuner-cents-display {
+        font-size: 1.3em;
+      }
+
+      .tuner-string-buttons {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .tuner-string-btn {
+        min-height: 48px;
       }
 
       header h1 {
@@ -767,6 +901,28 @@
         padding-left: max(10px, env(safe-area-inset-left, 10px));
         padding-right: max(10px, env(safe-area-inset-right, 10px));
         font-size: 14px;
+      }
+
+      .tuner-string-name {
+        font-size: 1.6em;
+      }
+
+      .tuner-frequency {
+        font-size: 2.4em;
+      }
+
+      .tuner-cents-display {
+        font-size: 1.2em;
+      }
+
+      .tuner-string-buttons {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+      .tuner-string-btn {
+        min-height: 50px;
+        font-size: 1em;
       }
 
       header {
@@ -1212,5 +1368,14 @@
       /* Report modal close button */
       #btnCloseReport2 {
         min-height: 48px !important;
+      }
+
+      /* 手机端和弦图简化 */
+      .chord-diagram-container {
+        transform: scale(0.9);
+      }
+
+      .chord-name {
+        font-size: 1.2em !important;
       }
     }

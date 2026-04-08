@@ -99,6 +99,8 @@ var COMMON_PROGRESSIONS = [
 
 /**
  * 获取和弦指法数据
+ * @param {string} chordName - 和弦名称
+ * @returns {Object|null} 和弦数据对象
  */
 var getChordData = function(chordName) {
   var fingering = CHORD_FINGERINGS[chordName];
@@ -117,7 +119,11 @@ var getChordData = function(chordName) {
 };
 
 /**
- * 生成简易 SVG 指法图
+ * 生成和弦指法图 SVG
+ * @param {string} chordName - 和弦名称
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @returns {string} SVG 字符串
  */
 var getChordSVG = function(chordName, width, height) {
   if (width === undefined) width = 120;
@@ -167,6 +173,8 @@ var getChordSVG = function(chordName, width, height) {
 
 /**
  * 获取和弦音符
+ * @param {string} chordName - 和弦名称
+ * @returns {Array} 音符数组
  */
 var getChordNotes = function(chordName) {
   return CHORD_NOTES[chordName] || [];
@@ -174,6 +182,8 @@ var getChordNotes = function(chordName) {
 
 /**
  * 验证和弦是否有效
+ * @param {string} chordName - 和弦名称
+ * @returns {boolean} 是否有效
  */
 var isValidChord = function(chordName) {
   return CHORD_FINGERINGS[chordName] !== undefined;
@@ -181,6 +191,7 @@ var isValidChord = function(chordName) {
 
 /**
  * 获取基础和弦名称列表
+ * @returns {Array} 和弦名称数组
  */
 var getBasicChordNames = function() {
   return BASIC_CHORDS.map(function(c) { return c.name; });
@@ -188,6 +199,8 @@ var getBasicChordNames = function() {
 
 /**
  * 获取和弦难度
+ * @param {string} chordName - 和弦名称
+ * @returns {number} 难度等级 (1-3)
  */
 var getChordDifficulty = function(chordName) {
   var basic = BASIC_CHORDS.find(function(c) { return c.name === chordName; });
@@ -196,6 +209,9 @@ var getChordDifficulty = function(chordName) {
 
 /**
  * 计算和弦转换难度
+ * @param {string} chord1 - 起始和弦
+ * @param {string} chord2 - 目标和弦
+ * @returns {number} 转换难度 (1-5)
  */
 var calculateTransitionDifficulty = function(chord1, chord2) {
   var f1 = CHORD_FINGERINGS[chord1];
@@ -219,10 +235,19 @@ COMMON_PROGRESSIONS.forEach(function(p) {
   COMMON_PROGRESSIONS_MAP[p.name] = p.chords;
 });
 
+/**
+ * 获取和弦进行
+ * @param {string} name - 和弦进行名称
+ * @returns {Array} 和弦数组
+ */
 var getProgression = function(name) {
   return COMMON_PROGRESSIONS_MAP[name] || [];
 };
 
+/**
+ * 获取和弦进行名称列表
+ * @returns {Array} 名称数组
+ */
 var getProgressionNames = function() {
   return COMMON_PROGRESSIONS.map(function(p) { return p.name; });
 };

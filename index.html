@@ -36,51 +36,72 @@
     <div class="panel" id="tunerPanel" style="margin-bottom: 20px;">
       <h2>🎛️ 吉他调音器</h2>
       
-      <!-- 指针表盘 -->
-      <div style="text-align: center; margin: 30px 0;">
-        <div style="position: relative; width: 200px; height: 120px; margin: 0 auto;">
-          <!-- 表盘背景 -->
-          <svg width="200" height="120" viewBox="0 0 200 120">
-            <!-- 刻度线 -->
-            <g stroke="#888" stroke-width="2">
-              <line x1="100" y1="10" x2="100" y2="25" />
-              <line x1="150" y1="35" x2="140" y2="45" />
-              <line x1="180" y1="70" x2="170" y2="70" />
-              <line x1="50" y1="35" x2="60" y2="45" />
-              <line x1="20" y1="70" x2="30" y2="70" />
+      <div class="tuner-container">
+        <!-- 弦名显示 -->
+        <div class="tuner-string-name" id="tunerStringName">检测中...</div>
+        
+        <!-- 仪表盘 -->
+        <div class="tuner-gauge">
+          <svg class="tuner-gauge-svg" viewBox="0 0 300 180">
+            <!-- 弧形刻度背景 -->
+            <path class="tuner-gauge-arc-bg" d="M 30 160 A 120 120 0 0 1 270 160" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="12" stroke-linecap="round"/>
+            <!-- 弧形刻度 -->
+            <g class="tuner-ticks">
+              <line x1="30" y1="160" x2="38" y2="148" stroke="#666" stroke-width="2"/>
+              <line x1="56" y1="118" x2="64" y2="126" stroke="#666" stroke-width="1.5"/>
+              <line x1="90" y1="82" x2="96" y2="90" stroke="#666" stroke-width="1.5"/>
+              <line x1="130" y1="56" x2="134" y2="64" stroke="#666" stroke-width="1.5"/>
+              <line x1="150" y1="48" x2="150" y2="56" stroke="#fff" stroke-width="2.5"/>
+              <line x1="170" y1="56" x2="166" y2="64" stroke="#666" stroke-width="1.5"/>
+              <line x1="210" y1="82" x2="204" y2="90" stroke="#666" stroke-width="1.5"/>
+              <line x1="244" y1="118" x2="236" y2="126" stroke="#666" stroke-width="1.5"/>
+              <line x1="270" y1="160" x2="262" y2="148" stroke="#666" stroke-width="2"/>
             </g>
-            <!-- 中心点 -->
-            <circle cx="100" cy="100" r="8" fill="#444" />
+            <!-- 刻度标签 -->
+            <g class="tuner-tick-labels" font-size="10" fill="#888" text-anchor="middle">
+              <text id="tunerTickLeft" x="22" y="175">-100</text>
+              <text id="tunerTickMidLeft" x="80" y="78">-50</text>
+              <text id="tunerTickCenter" x="150" y="42">0</text>
+              <text id="tunerTickMidRight" x="220" y="78">+50</text>
+              <text id="tunerTickRight" x="278" y="175">+100</text>
+            </g>
+            <!-- 指针 -->
+            <g class="tuner-needle-group" transform="translate(150, 160)">
+              <line id="tunerNeedle" x1="0" y1="0" x2="0" y2="-105" stroke="#2ed573" stroke-width="3" stroke-linecap="round" style="transition: stroke 0.2s;"/>
+              <circle cx="0" cy="0" r="8" fill="#333" stroke="#555" stroke-width="2"/>
+            </g>
           </svg>
-          <!-- 指针 -->
-          <div id="tunerNeededle" style="position: absolute; bottom: 100px; left: 96px; width: 8px; height: 90px; background: #ff4757; transform-origin: bottom center; transform: rotate(0deg); border-radius: 4px; transition: transform 0.1s;"></div>
+          <!-- 数字音分显示 -->
+          <div class="tuner-cents-display" id="tunerCents">--</div>
         </div>
         
-        <!-- 状态灯 -->
-        <div id="tunerStatusLight" style="width: 60px; height: 60px; border-radius: 50%; background: #888; margin: 20px auto; box-shadow: 0 0 20px #888; transition: all 0.2s;"></div>
-        
-        <!-- 弦名和音分 -->
-        <div style="font-size: 2em; font-weight: bold; color: #888; margin: 10px 0;" id="tunerStringName">检测中...</div>
-        <div style="font-size: 1.2em; color: #888; margin: 5px 0;" id="tunerCents">--</div>
-        <div style="font-size: 0.9em; color: #666;" id="tunerFrequency">-- Hz</div>
+        <!-- 频率显示 -->
+        <div class="tuner-frequency" id="tunerFrequency">-- Hz</div>
       </div>
       
       <!-- 参考音播放按钮 -->
-      <div style="margin-top: 30px;">
-        <div style="color: #888; margin-bottom: 10px; text-align: center;">🔊 点击播放标准音参考</div>
-        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;">
-          <button id="btnPlayString0" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">6 弦 E</button>
-          <button id="btnPlayString1" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">5 弦 A</button>
-          <button id="btnPlayString2" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">4 弦 D</button>
-          <button id="btnPlayString3" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">3 弦 G</button>
-          <button id="btnPlayString4" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">2 弦 B</button>
-          <button id="btnPlayString5" style="padding: 12px 4px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85em;">1 弦 E</button>
+      <div class="tuner-reference-tones">
+        <div class="tuner-reference-label">🔊 点击播放标准音参考</div>
+        <div class="tuner-string-buttons">
+          <button id="btnPlayString0" class="tuner-string-btn">6 弦 E</button>
+          <button id="btnPlayString1" class="tuner-string-btn">5 弦 A</button>
+          <button id="btnPlayString2" class="tuner-string-btn">4 弦 D</button>
+          <button id="btnPlayString3" class="tuner-string-btn">3 弦 G</button>
+          <button id="btnPlayString4" class="tuner-string-btn">2 弦 B</button>
+          <button id="btnPlayString5" class="tuner-string-btn">1 弦 E</button>
+        </div>
+        
+        <!-- 调音器表盘缩放控制 -->
+        <div class="tuner-zoom-controls">
+          <button id="btnZoomIn" style="padding: 8px 16px; background: rgba(0,217,255,0.15); border: 1px solid rgba(0,217,255,0.3); color: #00d9ff; border-radius: 6px; cursor: pointer; font-size: 0.9em;">🔍+</button>
+          <button id="btnZoomOut" style="padding: 8px 16px; background: rgba(0,217,255,0.15); border: 1px solid rgba(0,217,255,0.3); color: #00d9ff; border-radius: 6px; cursor: pointer; font-size: 0.9em;">🔍-</button>
+          <button id="btnZoomReset" style="padding: 8px 16px; background: rgba(0,217,255,0.15); border: 1px solid rgba(0,217,255,0.3); color: #00d9ff; border-radius: 6px; cursor: pointer; font-size: 0.9em;">重置</button>
         </div>
       </div>
     </div>
     
     <!-- 和弦训练模式选择 -->
-    <div class="panel chord-training-panel" id="chordModePanel" style="margin-bottom: 20px;">
+    <div class="panel chord-training-panel" id="chordModePanel" style="margin-bottom: 20px; display: none;">
       <h2>🎯 训练模式</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
         <button class="mode-btn active" id="modePreset" data-mode="preset" aria-pressed="true">
@@ -155,7 +176,7 @@
     </div>
     
     <!-- 和弦显示区域 -->
-    <div class="panel" id="chordDisplayPanel" style="margin-bottom: 20px;">
+    <div class="panel" id="chordDisplayPanel" style="margin-bottom: 20px; display: none;">
       <h2>🎸 和弦训练</h2>
       <div style="display: grid; grid-template-columns: 1fr 100px 1fr; gap: 20px; align-items: center;">
         <!-- 当前和弦 -->
@@ -443,6 +464,7 @@
       console.warn('[GuitarStrumTrainer] Chart.js CDN 加载失败，尝试备用 CDN');
       var chartFallback = document.createElement('script');
       chartFallback.src = 'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js';
+      chartFallback.async = true;
       chartFallback.onerror = function() {
         console.error('[GuitarStrumTrainer] Chart.js 所有 CDN 均加载失败，图表功能不可用');
       };
@@ -451,13 +473,14 @@
   </script>
   
   <!-- SoundFont Player for real guitar samples -->
-  <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js" integrity="sha384-SNuzpwQ3s9bSYhEQUguCQqrGl1dWASFOhU8dqrz1HH3VOdO2ULZeFGrVovhw0FKm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js" integrity="sha384-SNuzpwQ3s9bSYhEQUguCQqrGl1dWASFOhU8dqrz1HH3VOdO2ULZeFGrVovhw0FKm" crossorigin="anonymous" async></script>
   <script>
     // SoundFont Player CDN fallback
     if (typeof window.Soundfont === 'undefined') {
       console.warn('[GuitarStrumTrainer] SoundFont Player CDN 加载失败，尝试备用 CDN');
       var sfFallback = document.createElement('script');
       sfFallback.src = 'https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js';
+      sfFallback.async = true;
       sfFallback.onerror = function() {
         console.warn('[GuitarStrumTrainer] SoundFont Player 所有 CDN 均加载失败，将使用合成音色');
       };
@@ -473,6 +496,7 @@
       console.warn('[GuitarStrumTrainer] Tonal.js CDN 加载失败，尝试备用 CDN');
       var tonalFallback = document.createElement('script');
       tonalFallback.src = 'https://unpkg.com/tonal@6.4.3/browser/tonal.min.js';
+      tonalFallback.async = true;
       tonalFallback.onerror = function() {
         console.error('[GuitarStrumTrainer] Tonal.js 所有 CDN 均加载失败，和弦理论功能不可用');
       };
@@ -480,11 +504,14 @@
     }
   </script>
   
+  <!-- Constants Module (must be loaded before other modules that import it) -->
+  <script type="module" src="constants.js"></script>
+  
   <!-- Chord Library -->
   <script src="chord-library.js"></script>
   
   <!-- Chord Detector -->
-  <script src="chord-detector.js"></script>
+  <script type="module" src="chord-detector.js"></script>
   
   <!-- Modularized Components -->
   <script type="module" src="storage.js"></script>

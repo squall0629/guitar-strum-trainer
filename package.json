@@ -18,6 +18,7 @@
   "author": "老马",
   "license": "MIT",
   "dependencies": {
+    "@chordbook/tuner": "^0.0.3",
     "@tonaljs/chord-detect": "^4.9.1",
     "chordictionary": "^0.1.0-beta.4",
     "soundfont-player": "^0.12.0",

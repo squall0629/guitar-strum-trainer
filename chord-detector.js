@@ -10,9 +10,75 @@
  * FFT 分析 → 峰值检测 → 提取音符 → tonaljs 识别和弦 → chord-library 获取指法
  */
 
-// 使用全局 Tonal 对象（通过 CDN 引入）
-const ChordDetect = Tonal.ChordDetect;
-const Note = Tonal.Note;
+// 导入常量
+import { DEBUG } from './constants.js';
+
+// ========== Tonal.js 加载检测 ==========
+// 检查 Tonal 是否已通过 CDN 加载
+let ChordDetect = null;
+let Note = null;
+let TonalAvailable = false;
+
+/**
+ * 初始化 Tonal.js 引用
+ */
+function initTonal() {
+  if (typeof window !== 'undefined' && window.Tonal) {
+    ChordDetect = window.Tonal.ChordDetect;
+    Note = window.Tonal.Note;
+    TonalAvailable = true;
+    console.log('[ChordDetector] Tonal.js 加载成功');
+    return true;
+  } else {
+    console.warn('[ChordDetector] Tonal.js 未加载，和弦识别功能将不可用');
+    console.warn('[ChordDetector] 请检查 CDN 连接或使用备用 CDN:');
+    console.warn('[ChordDetector]   - https://cdn.jsdelivr.net/npm/tonal@6.4.3/browser/tonal.min.js');
+    console.warn('[ChordDetector]   - https://unpkg.com/tonal@6.4.3/browser/tonal.min.js');
+    return false;
+  }
+}
+
+// 首次尝试加载
+initTonal();
+
+/**
+ * 检查 Tonal.js 是否可用（实时检测）
+ * @returns {boolean} Tonal.js 是否已加载
+ */
+export function isTonalAvailable() {
+  // 如果之前未加载，尝试再次检查
+  if (!TonalAvailable && typeof window !== 'undefined' && window.Tonal) {
+    initTonal();
+  }
+  return TonalAvailable;
+}
+
+/**
+ * 等待 Tonal.js 加载完成
+ * @param {number} timeout - 超时时间（毫秒）
+ * @returns {Promise<boolean>} 是否加载成功
+ */
+export function waitForTonal(timeout = 3000) {
+  return new Promise((resolve) => {
+    if (TonalAvailable) {
+      resolve(true);
+      return;
+    }
+    
+    const startTime = Date.now();
+    const checkInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.Tonal) {
+        clearInterval(checkInterval);
+        initTonal();
+        resolve(true);
+      } else if (Date.now() - startTime > timeout) {
+        clearInterval(checkInterval);
+        console.warn('[ChordDetector] 等待 Tonal.js 超时');
+        resolve(false);
+      }
+    }, 100);
+  });
+}
 
 /**
  * 和弦检测器 - ES6 Class
@@ -138,6 +204,10 @@ class ChordDetector {
    * @returns {string|null} 音名
    */
   freqToNote(freq) {
+    // 运行时检查 Tonal 是否可用
+    if (!isTonalAvailable() || !Note) {
+      return null; // Tonal 未加载，返回 null
+    }
     try {
       const semitonesFromA4 = 12 * (Math.log(freq / this.A4) / Math.LN2);
       const midiNumber = Math.round(semitonesFromA4) + 69;
@@ -153,6 +223,10 @@ class ChordDetector {
    * @returns {string|null} 识别的和弦名称
    */
   detectChordWithTonal(detectedNotes) {
+    // 运行时检查 Tonal 是否可用
+    if (!isTonalAvailable() || !ChordDetect) {
+      return null; // Tonal 未加载，返回 null
+    }
     if (!detectedNotes || detectedNotes.length === 0) {
       return null;
     }

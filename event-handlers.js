@@ -1,6 +1,15 @@
 // 吉他扫弦练习助手 - 事件处理模块
 // 功能：按钮、选择器、节拍器、灵敏度等事件绑定
 
+// 导入常量
+import {
+  DEMO_CLICK_DEBOUNCE,
+  MIC_TEST_CHECK_COUNT,
+  MIC_TEST_SIGNAL_THRESHOLD,
+  MIC_TEST_RESET_DELAY,
+  MIC_TEST_VOLUME_SCALE
+} from './constants.js';
+
 // ========== 全局引用 ==========
 let btnStart = null;
 let btnStop = null;
@@ -12,6 +21,7 @@ let sensitivitySlider = null;
 let sensitivityValueEl = null;
 let btnAddRhythm = null;
 let btnMicTest = null;
+let volumeMeterFillRef = null;
 
 // 状态引用
 let currentRhythm = 0;
@@ -20,6 +30,12 @@ let isListening = false;
 // 演示播放相关
 let lastDemoClickTime = 0;
 let demoButtonsSetup = false;
+
+// 缓存的 DOM 元素
+let chartToggleBtn = null;
+let chartSection = null;
+let statusIndicatorEl = null;
+let statusTextEl = null;
 
 // 回调函数
 let onRhythmSelectCallback = null;
@@ -30,6 +46,27 @@ let onStartCallback = null;
 let onStopCallback = null;
 
 // ========== 初始化 ==========
+/**
+ * 初始化事件处理器
+ * @param {Object} options - 配置选项
+ * @param {HTMLElement} options.btnStart - 开始按钮
+ * @param {HTMLElement} options.btnStop - 停止按钮
+ * @param {HTMLElement} options.rhythmSelector - 节奏型选择器
+ * @param {HTMLElement} options.metronomeToggle - 节拍器开关
+ * @param {HTMLElement} options.bpmSlider - BPM 滑块
+ * @param {HTMLElement} options.bpmValue - BPM 值显示
+ * @param {HTMLElement} options.sensitivitySlider - 灵敏度滑块
+ * @param {HTMLElement} options.sensitivityValueEl - 灵敏度值显示
+ * @param {HTMLElement} options.btnAddRhythm - 添加节奏型按钮
+ * @param {HTMLElement} options.btnMicTest - 麦克风测试按钮
+ * @param {HTMLElement} options.volumeMeterFill - 音量指示条
+ * @param {Function} options.onRhythmSelect - 节奏型选择回调
+ * @param {Function} options.onMetronomeToggle - 节拍器开关回调
+ * @param {Function} options.onBPMChange - BPM 变化回调
+ * @param {Function} options.onSensitivityChange - 灵敏度变化回调
+ * @param {Function} options.onStart - 开始回调
+ * @param {Function} options.onStop - 停止回调
+ */
 export function initEventHandlers(options = {}) {
   btnStart = options.btnStart || null;
   btnStop = options.btnStop || null;
@@ -41,6 +78,7 @@ export function initEventHandlers(options = {}) {
   sensitivityValueEl = options.sensitivityValueEl || null;
   btnAddRhythm = options.btnAddRhythm || null;
   btnMicTest = options.btnMicTest || null;
+  volumeMeterFillRef = options.volumeMeterFill || null;
   
   onRhythmSelectCallback = options.onRhythmSelect || null;
   onMetronomeToggleCallback = options.onMetronomeToggle || null;
@@ -49,6 +87,7 @@ export function initEventHandlers(options = {}) {
   onStartCallback = options.onStart || null;
   onStopCallback = options.onStop || null;
   
+  cacheEventHandlerElements();
   setupButtons();
   setupRhythmSelector();
   setupMetronome();
@@ -57,6 +96,13 @@ export function initEventHandlers(options = {}) {
   setupMicTest();
   setupDemoButtons();
   setupChartToggle();
+}
+
+function cacheEventHandlerElements() {
+  chartToggleBtn = document.getElementById('chartToggleBtn');
+  chartSection = document.getElementById('statsChartSection');
+  statusIndicatorEl = document.getElementById('statusIndicator');
+  statusTextEl = document.getElementById('statusText');
 }
 
 // ========== 开始/停止按钮 ==========
@@ -70,6 +116,10 @@ function setupButtons() {
   });
 }
 
+/**
+ * 更新监听状态显示
+ * @param {boolean} listening - 是否正在监听
+ */
 export function updateListeningState(listening) {
   isListening = listening;
   if (btnStart && btnStop) {
@@ -113,6 +163,10 @@ function selectRhythm(option, index) {
   }
 }
 
+/**
+ * 设置当前选中的节奏型
+ * @param {number} index - 节奏型索引
+ */
 export function setCurrentRhythm(index) {
   currentRhythm = index;
   if (rhythmSelector) {
@@ -121,6 +175,10 @@ export function setCurrentRhythm(index) {
   }
 }
 
+/**
+ * 获取当前选中的节奏型索引
+ * @returns {number} 节奏型索引
+ */
 export function getCurrentRhythm() {
   return currentRhythm;
 }
@@ -144,11 +202,19 @@ function setupMetronome() {
   });
 }
 
+/**
+ * 设置 BPM 值显示
+ * @param {number} bpm - BPM 值
+ */
 export function setBPMValue(bpm) {
   if (bpmValue) bpmValue.textContent = bpm;
   if (bpmSlider) bpmSlider.value = bpm;
 }
 
+/**
+ * 设置节拍器开关状态
+ * @param {boolean} checked - 是否选中
+ */
 export function setMetronomeChecked(checked) {
   if (metronomeToggle) metronomeToggle.checked = checked;
 }
@@ -167,7 +233,7 @@ function setupDemoButtons() {
     e.preventDefault();
     
     const now = Date.now();
-    if (now - lastDemoClickTime < 100) return;
+    if (now - lastDemoClickTime < DEMO_CLICK_DEBOUNCE) return;
     lastDemoClickTime = now;
     
     if (btn.dataset.rhythm !== undefined) {
@@ -220,6 +286,10 @@ function setupSensitivity() {
   });
 }
 
+/**
+ * 设置灵敏度值
+ * @param {number} level - 灵敏度等级
+ */
 export function setSensitivityValue(level) {
   if (sensitivityValueEl) sensitivityValueEl.textContent = level;
   if (sensitivitySlider) sensitivitySlider.value = level;
@@ -254,8 +324,6 @@ function setupMicTest() {
       let maxLevel = 0;
       let checkCount = 0;
       
-      const volumeMeterFill = document.getElementById('volumeMeterFill');
-      
       function checkLevel() {
         testAnalyser.getByteFrequencyData(data);
         let sum = 0;
@@ -264,14 +332,14 @@ function setupMicTest() {
         maxLevel = Math.max(maxLevel, avg);
         checkCount++;
         
-        if (volumeMeterFill) volumeMeterFill.style.width = Math.min(100, (avg / 128) * 100) + '%';
+        if (volumeMeterFillRef) volumeMeterFillRef.style.width = Math.min(100, (avg / MIC_TEST_VOLUME_SCALE) * 100) + '%';
         
-        if (checkCount < 30) { requestAnimationFrame(checkLevel); }
+        if (checkCount < MIC_TEST_CHECK_COUNT) { requestAnimationFrame(checkLevel); }
         else {
           stream.getTracks().forEach(t => t.stop());
           testCtx.close();
           
-          if (maxLevel > 10) {
+          if (maxLevel > MIC_TEST_SIGNAL_THRESHOLD) {
             btnMicTest.textContent = '✓ 正常';
             btnMicTest.style.borderColor = '#2ed573';
             btnMicTest.style.color = '#2ed573';
@@ -286,8 +354,8 @@ function setupMicTest() {
             btnMicTest.textContent = '🎤 检测';
             btnMicTest.style.borderColor = '';
             btnMicTest.style.color = '';
-            if (volumeMeterFill) volumeMeterFill.style.width = '0%';
-          }, 3000);
+            if (volumeMeterFillRef) volumeMeterFillRef.style.width = '0%';
+          }, MIC_TEST_RESET_DELAY);
         }
       }
       
@@ -308,34 +376,42 @@ function setupMicTest() {
 
 // ========== 图表折叠 ==========
 function setupChartToggle() {
-  const toggleBtn = document.getElementById('chartToggleBtn');
-  const chartSection = document.getElementById('statsChartSection');
-  if (!toggleBtn || !chartSection) return;
+  if (!chartToggleBtn || !chartSection) return;
   
   const collapsed = localStorage.getItem('guitarStrumChartCollapsed') === 'true';
-  if (collapsed) { chartSection.classList.add('collapsed'); toggleBtn.textContent = '▶'; }
+  if (collapsed) { chartSection.classList.add('collapsed'); chartToggleBtn.textContent = '▶'; }
   
-  toggleBtn.addEventListener('click', () => {
+  chartToggleBtn.addEventListener('click', () => {
     chartSection.classList.toggle('collapsed');
     const isCollapsed = chartSection.classList.contains('collapsed');
-    toggleBtn.textContent = isCollapsed ? '▶' : '▼';
+    chartToggleBtn.textContent = isCollapsed ? '▶' : '▼';
     localStorage.setItem('guitarStrumChartCollapsed', isCollapsed);
   });
 }
 
 // ========== 状态更新 ==========
+/**
+ * 更新状态显示
+ * @param {string} status - 状态 ('ready', 'listening', 'error')
+ */
 export function updateStatus(status) {
-  const statusIndicator = document.getElementById('statusIndicator');
-  const statusText = document.getElementById('statusText');
-  if (statusIndicator) statusIndicator.className = 'status-indicator ' + status;
-  if (statusText) statusText.textContent = status === 'ready' ? '准备就绪' : status === 'listening' ? '正在监听...' : '发生错误';
+  if (statusIndicatorEl) statusIndicatorEl.className = 'status-indicator ' + status;
+  if (statusTextEl) statusTextEl.textContent = status === 'ready' ? '准备就绪' : status === 'listening' ? '正在监听...' : '发生错误';
 }
 
 // ========== 导出演示相关 ==========
+/**
+ * 设置最后演示点击时间
+ * @param {number} time - 时间戳
+ */
 export function setLastDemoClickTime(time) {
   lastDemoClickTime = time;
 }
 
+/**
+ * 获取演示按钮是否已设置
+ * @returns {boolean} 是否已设置
+ */
 export function getDemoButtonsSetup() {
   return demoButtonsSetup;
 }

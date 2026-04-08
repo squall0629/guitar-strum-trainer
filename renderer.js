@@ -2,22 +2,29 @@
 // 模块化重构版本 - 主入口文件
 
 // ========== 模块导入 ==========
+import {
+  DEFAULT_BPM,
+  DEFAULT_SENSITIVITY,
+  AUTO_SAVE_INTERVAL,
+  INIT_TUNER_DELAY,
+  CANVAS_RESIZE_DEBOUNCE,
+  FLUENCY_TIME_EXCELLENT,
+  FLUENCY_TIME_GOOD,
+  FLUENCY_TIME_FAIR,
+  FLUENCY_WEIGHT_TIME,
+  FLUENCY_WEIGHT_CONSISTENCY,
+  DEBUG
+} from './constants.js';
+
 import { saveUserSettings, loadUserSettings, saveHistory, loadHistoryFromStorage, exportUserSettings, importUserSettings } from './storage.js';
 import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, calculateTransitionScore, updateStabilityScores } from './scoring.js';
 import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition as updateChordRecognitionUI, updateTransitionTime as updateTransitionTimeUI } from './ui-renderer.js';
-import { detectPitch, identifyString, playReferenceTone } from './tuner.js';
-import { updateTunerDisplay, initTunerUI } from './tuner-ui.js';
-
-// ========== 调音器状态 ==========
-let tunerAnimationFrame = null;
-let isTunerListening = false;
-
-// 音频模块导入
+import { identifyString, playReferenceTone, resetTunerState, initChordbookTuner, startChordbookTuner, stopChordbookTuner } from './tuner.js';
+import { updateTunerDisplay, initTunerUI, resetTunerUI } from './tuner-ui.js';
 import { initAudioEngine, startListening as audioStartListening, stopListening as audioStopListening, isListeningState, analyzeAudio, getAudioContext, getAnalyser } from './audio-core.js';
 import { setCurrentBPM, getCurrentBPM, setMetronomeEnabled, isMetronomeEnabled, startMetronome, stopMetronome, playMetronomeSound } from './audio-metronome.js';
 import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo, loadGuitarSoundfont } from './audio-demo.js';
 import { detectStrum, provideFeedback, calculateToneScore as audioCalculateToneScore, resetFluxState, getDetectedStrums, getCurrentMeasureStrums, getMeasureHistory, getLastMeasureScores, setLastMeasureScores, getLastScoredMeasureEnd, setLastScoredMeasureEnd, setCurrentMeasureStartTime, getCurrentMeasureStartTime, setCurrentMeasureStrums, setSensitivityLevel, getSensitivityLevel, updateThreshold } from './audio-detection.js';
-
 import {
   initChordTraining,
   initChordDetector,
@@ -39,7 +46,6 @@ import {
   getCurrentProgression,
   setTrainingMode as setChordTrainingMode
 } from './chord-training.js';
-
 import {
   initCustomRhythms,
   getActiveRhythm,
@@ -50,7 +56,6 @@ import {
   generateArrowPattern,
   playCustomRhythmFromList
 } from './custom-rhythms.js';
-
 import {
   initEventHandlers,
   updateListeningState,
@@ -62,11 +67,15 @@ import {
   updateStatus
 } from './event-handlers.js';
 
+// ========== 调音器状态 ==========
+let tunerAnimationFrame = null;
+let isTunerListening = false;
+
 // ========== 全局状态 ==========
 let currentRhythm = 0;
-let currentBPM = 70;
+let currentBPM = DEFAULT_BPM;
 let metronomeEnabled = false;
-let sensitivityLevel = 50;
+let sensitivityLevel = DEFAULT_SENSITIVITY;
 let practiceMode = 'tuner';  // 默认调音器模式
 let currentMode = 'tuner';   // tuner | rhythm | comprehensive
 
@@ -74,29 +83,123 @@ let currentMode = 'tuner';   // tuner | rhythm | comprehensive
 let strumHistory = [];
 const MAX_HISTORY = 4;
 
-// 练习报告
-let practiceReportModal = null;
-
 // 自动保存
 let autoSaveIntervalId = null;
 
-// 调试模式
-const DEBUG = false;
-const APP_VERSION = 'v2.1';
+// 初始调音器启动定时器
+let initTunerTimeoutId = null;
+
+// ========== 缓存 DOM 元素 ==========
+const cachedDOM = {
+  // 分数元素
+  rhythmScore: null,
+  toneScore: null,
+  dynamicsScore: null,
+  transitionScore: null,
+  totalScore: null,
+  rhythmRing: null,
+  toneRing: null,
+  dynamicsRing: null,
+  transitionRing: null,
+  totalRing: null,
+  
+  // 调音器元素
+  tunerNeedle: null,
+  tunerStringName: null,
+  tunerCents: null,
+  tunerFrequency: null,
+  tunerTickLeft: null,
+  tunerTickMidLeft: null,
+  tunerTickCenter: null,
+  tunerTickMidRight: null,
+  tunerTickRight: null,
+  
+  // 练习报告元素
+  practiceReportModal: null,
+  reportDuration: null,
+  reportTotalScore: null,
+  reportTransitions: null,
+  reportAvgTime: null,
+  reportAccuracy: null,
+  reportFluency: null,
+  reportBestTransition: null,
+  reportWorstTransition: null,
+  
+  // 其他常用元素
+  feedbackMessage: null,
+  loadingOverlay: null,
+  volumeMeterFill: null,
+  recorderWaveform: null,
+  spectrumWaveform: null,
+  historyList: null,
+  avgScore: null,
+  maxScore: null,
+  practiceCount: null,
+  statsChart: null,
+  statusIndicator: null,
+  statusText: null
+};
+
+function cacheDOMElements() {
+  cachedDOM.rhythmScore = document.getElementById('rhythmScore');
+  cachedDOM.toneScore = document.getElementById('toneScore');
+  cachedDOM.dynamicsScore = document.getElementById('dynamicsScore');
+  cachedDOM.transitionScore = document.getElementById('transitionScore');
+  cachedDOM.totalScore = document.getElementById('totalScore');
+  cachedDOM.rhythmRing = document.getElementById('rhythmRing');
+  cachedDOM.toneRing = document.getElementById('toneRing');
+  cachedDOM.dynamicsRing = document.getElementById('dynamicsRing');
+  cachedDOM.transitionRing = document.getElementById('transitionRing');
+  cachedDOM.totalRing = document.getElementById('totalRing');
+  
+  cachedDOM.tunerNeedle = document.querySelector('#tunerNeedle');
+  cachedDOM.tunerStringName = document.getElementById('tunerStringName');
+  cachedDOM.tunerCents = document.getElementById('tunerCents');
+  cachedDOM.tunerFrequency = document.getElementById('tunerFrequency');
+  cachedDOM.tunerTickLeft = document.getElementById('tunerTickLeft');
+  cachedDOM.tunerTickMidLeft = document.getElementById('tunerTickMidLeft');
+  cachedDOM.tunerTickCenter = document.getElementById('tunerTickCenter');
+  cachedDOM.tunerTickMidRight = document.getElementById('tunerTickMidRight');
+  cachedDOM.tunerTickRight = document.getElementById('tunerTickRight');
+  
+  cachedDOM.practiceReportModal = document.getElementById('practiceReportModal');
+  cachedDOM.reportDuration = document.getElementById('reportDuration');
+  cachedDOM.reportTotalScore = document.getElementById('reportTotalScore');
+  cachedDOM.reportTransitions = document.getElementById('reportTransitions');
+  cachedDOM.reportAvgTime = document.getElementById('reportAvgTime');
+  cachedDOM.reportAccuracy = document.getElementById('reportAccuracy');
+  cachedDOM.reportFluency = document.getElementById('reportFluency');
+  cachedDOM.reportBestTransition = document.getElementById('reportBestTransition');
+  cachedDOM.reportWorstTransition = document.getElementById('reportWorstTransition');
+  
+  cachedDOM.feedbackMessage = document.getElementById('feedbackMessage');
+  cachedDOM.loadingOverlay = document.getElementById('loadingOverlay');
+  cachedDOM.volumeMeterFill = document.getElementById('volumeMeterFill');
+  cachedDOM.recorderWaveform = document.getElementById('recorderWaveform');
+  cachedDOM.spectrumWaveform = document.getElementById('spectrumWaveform');
+  cachedDOM.historyList = document.getElementById('historyList');
+  cachedDOM.avgScore = document.getElementById('avgScore');
+  cachedDOM.maxScore = document.getElementById('maxScore');
+  cachedDOM.practiceCount = document.getElementById('practiceCount');
+  cachedDOM.statsChart = document.getElementById('statsChart');
+  cachedDOM.statusIndicator = document.getElementById('statusIndicator');
+  cachedDOM.statusText = document.getElementById('statusText');
+}
+
+// APP_VERSION 已在 constants.js 中定义，这里不再重复
 
 // ========== 练习报告 ==========
 function setupPracticeReport() {
-  practiceReportModal = document.getElementById('practiceReportModal');
   const btnClose1 = document.getElementById('btnCloseReport');
   const btnClose2 = document.getElementById('btnCloseReport2');
   
-  if (btnClose1) btnClose1.addEventListener('click', () => practiceReportModal.style.display = 'none');
-  if (btnClose2) btnClose2.addEventListener('click', () => practiceReportModal.style.display = 'none');
-  if (practiceReportModal) practiceReportModal.addEventListener('click', (e) => { if (e.target === practiceReportModal) practiceReportModal.style.display = 'none'; });
+  if (btnClose1) btnClose1.addEventListener('click', () => cachedDOM.practiceReportModal.style.display = 'none');
+  if (btnClose2) btnClose2.addEventListener('click', () => cachedDOM.practiceReportModal.style.display = 'none');
+  if (cachedDOM.practiceReportModal) cachedDOM.practiceReportModal.addEventListener('click', (e) => { if (e.target === cachedDOM.practiceReportModal) cachedDOM.practiceReportModal.style.display = 'none'; });
 }
 
 function showPracticeReport() {
-  if (!practiceReportModal) return;
+  if (!cachedDOM.practiceReportModal) return;
   
   const duration = getPracticeStartTime() > 0 ? Math.round((Date.now() - getPracticeStartTime()) / 1000) : 0;
   const transitionStats = getTransitionDetector()?.getStats();
@@ -107,30 +210,29 @@ function showPracticeReport() {
   const practiceTransitionTimes = getPracticeTransitionTimes();
   const bestTransition = practiceTransitionTimes.length > 0 ? Math.round(Math.min(...practiceTransitionTimes)) : null;
   const worstTransition = practiceTransitionTimes.length > 0 ? Math.round(Math.max(...practiceTransitionTimes)) : null;
-  const totalScoreEl = document.getElementById('totalScore');
-  const totalScore = parseInt(totalScoreEl?.textContent) || 0;
+  const totalScore = parseInt(cachedDOM.totalScore?.textContent) || 0;
   
-  document.getElementById('reportDuration').textContent = duration + 's';
-  document.getElementById('reportTotalScore').textContent = totalScore;
+  if (cachedDOM.reportDuration) cachedDOM.reportDuration.textContent = duration + 's';
+  if (cachedDOM.reportTotalScore) cachedDOM.reportTotalScore.textContent = totalScore;
   
   if (practiceMode === 'comprehensive') {
-    document.getElementById('reportTransitions').textContent = transitionCount;
-    document.getElementById('reportAvgTime').textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
-    document.getElementById('reportAccuracy').textContent = accuracy > 0 ? accuracy + '%' : '--';
-    document.getElementById('reportFluency').textContent = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
-    document.getElementById('reportBestTransition').textContent = bestTransition !== null ? Math.round(bestTransition) + 'ms' : '--';
-    document.getElementById('reportWorstTransition').textContent = worstTransition !== null ? Math.round(worstTransition) + 'ms' : '--';
+    if (cachedDOM.reportTransitions) cachedDOM.reportTransitions.textContent = transitionCount;
+    if (cachedDOM.reportAvgTime) cachedDOM.reportAvgTime.textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
+    if (cachedDOM.reportAccuracy) cachedDOM.reportAccuracy.textContent = accuracy > 0 ? accuracy + '%' : '--';
+    if (cachedDOM.reportFluency) cachedDOM.reportFluency.textContent = calculateFluencyScore(avgTransitionTime, practiceTransitionTimes, duration);
+    if (cachedDOM.reportBestTransition) cachedDOM.reportBestTransition.textContent = bestTransition !== null ? Math.round(bestTransition) + 'ms' : '--';
+    if (cachedDOM.reportWorstTransition) cachedDOM.reportWorstTransition.textContent = worstTransition !== null ? Math.round(worstTransition) + 'ms' : '--';
   } else {
-    document.getElementById('reportTransitions').textContent = '--';
-    document.getElementById('reportAvgTime').textContent = '--';
-    document.getElementById('reportAccuracy').textContent = '--';
-    document.getElementById('reportFluency').textContent = '--';
-    document.getElementById('reportBestTransition').textContent = '--';
-    document.getElementById('reportWorstTransition').textContent = '--';
+    if (cachedDOM.reportTransitions) cachedDOM.reportTransitions.textContent = '--';
+    if (cachedDOM.reportAvgTime) cachedDOM.reportAvgTime.textContent = '--';
+    if (cachedDOM.reportAccuracy) cachedDOM.reportAccuracy.textContent = '--';
+    if (cachedDOM.reportFluency) cachedDOM.reportFluency.textContent = '--';
+    if (cachedDOM.reportBestTransition) cachedDOM.reportBestTransition.textContent = '--';
+    if (cachedDOM.reportWorstTransition) cachedDOM.reportWorstTransition.textContent = '--';
   }
   
   if (typeof renderTrendCharts === 'function') renderTrendCharts();
-  practiceReportModal.style.display = 'block';
+  cachedDOM.practiceReportModal.style.display = 'block';
 }
 
 // 流畅度评分
@@ -138,10 +240,10 @@ function calculateFluencyScore(avgTime, transitions, duration) {
   if (transitions.length === 0 || duration === 0) return '--';
   let timeScore = 0;
   if (avgTime > 0) {
-    if (avgTime < 300) timeScore = 100;
-    else if (avgTime < 500) timeScore = 100 - ((avgTime - 300) / 200) * 30;
-    else if (avgTime < 1000) timeScore = 70 - ((avgTime - 500) / 500) * 40;
-    else timeScore = Math.max(0, 30 - ((avgTime - 1000) / 1000) * 30);
+    if (avgTime < FLUENCY_TIME_EXCELLENT) timeScore = 100;
+    else if (avgTime < FLUENCY_TIME_GOOD) timeScore = 100 - ((avgTime - FLUENCY_TIME_EXCELLENT) / (FLUENCY_TIME_GOOD - FLUENCY_TIME_EXCELLENT)) * 30;
+    else if (avgTime < FLUENCY_TIME_FAIR) timeScore = 70 - ((avgTime - FLUENCY_TIME_GOOD) / (FLUENCY_TIME_FAIR - FLUENCY_TIME_GOOD)) * 40;
+    else timeScore = Math.max(0, 30 - ((avgTime - FLUENCY_TIME_FAIR) / 1000) * 30);
   }
   let consistencyScore = 0;
   if (transitions.length > 1) {
@@ -156,36 +258,14 @@ function calculateFluencyScore(avgTime, transitions, duration) {
 
 // ========== 更新包装函数 ==========
 function updateScoresWrapper() {
-  const rhythmScoreEl = document.getElementById('rhythmScore');
-  const toneScoreEl = document.getElementById('toneScore');
-  const dynamicsScoreEl = document.getElementById('dynamicsScore');
-  const transitionScoreEl = document.getElementById('transitionScore');
-  const totalScoreEl = document.getElementById('totalScore');
-  const rhythmRingEl = document.getElementById('rhythmRing');
-  const toneRingEl = document.getElementById('toneRing');
-  const dynamicsRingEl = document.getElementById('dynamicsRing');
-  const transitionRingEl = document.getElementById('transitionRing');
-  const totalRingEl = document.getElementById('totalRing');
-  
   updateScores(
     getLastMeasureScores(),
-    rhythmScoreEl, toneScoreEl, dynamicsScoreEl, transitionScoreEl, totalScoreEl,
+    cachedDOM.rhythmScore, cachedDOM.toneScore, cachedDOM.dynamicsScore, cachedDOM.transitionScore, cachedDOM.totalScore,
     () => checkMeasureUpdateWrapper()
   );
 }
 
 function checkMeasureUpdateWrapper() {
-  const rhythmScoreEl = document.getElementById('rhythmScore');
-  const toneScoreEl = document.getElementById('toneScore');
-  const dynamicsScoreEl = document.getElementById('dynamicsScore');
-  const transitionScoreEl = document.getElementById('transitionScore');
-  const totalScoreEl = document.getElementById('totalScore');
-  const rhythmRingEl = document.getElementById('rhythmRing');
-  const toneRingEl = document.getElementById('toneRing');
-  const dynamicsRingEl = document.getElementById('dynamicsRing');
-  const transitionRingEl = document.getElementById('transitionRing');
-  const totalRingEl = document.getElementById('totalRing');
-  
   const result = checkMeasureUpdate({
     isListening: isListeningState(),
     currentMeasureStartTime: getCurrentMeasureStartTime(),
@@ -202,16 +282,16 @@ function checkMeasureUpdateWrapper() {
     measureHistory: getMeasureHistory(),
     MAX_HISTORY: MAX_HISTORY,
     lastMeasureScores: getLastMeasureScores(),
-    rhythmScoreEl: rhythmScoreEl,
-    toneScoreEl: toneScoreEl,
-    dynamicsScoreEl: dynamicsScoreEl,
-    transitionScoreEl: transitionScoreEl,
-    totalScoreEl: totalScoreEl,
-    rhythmRingEl: rhythmRingEl,
-    toneRingEl: toneRingEl,
-    dynamicsRingEl: dynamicsRingEl,
-    transitionRingEl: transitionRingEl,
-    totalRingEl: totalRingEl,
+    rhythmScoreEl: cachedDOM.rhythmScore,
+    toneScoreEl: cachedDOM.toneScore,
+    dynamicsScoreEl: cachedDOM.dynamicsScore,
+    transitionScoreEl: cachedDOM.transitionScore,
+    totalScoreEl: cachedDOM.totalScore,
+    rhythmRingEl: cachedDOM.rhythmRing,
+    toneRingEl: cachedDOM.toneRing,
+    dynamicsRingEl: cachedDOM.dynamicsRing,
+    transitionRingEl: cachedDOM.transitionRing,
+    totalRingEl: cachedDOM.totalRing,
     updateScoreRing: updateScoreRing,
     updateStabilityScores: () => updateStabilityScores(getMeasureHistory(), calculateStabilityScore, DEBUG),
     DEBUG: DEBUG
@@ -229,48 +309,36 @@ function checkMeasureUpdateWrapper() {
 async function startTunerListening() {
   if (isTunerListening) return;
   
-  const loadingOverlay = document.getElementById('loadingOverlay');
-  if (loadingOverlay) loadingOverlay.style.display = 'flex';
-  
-  const success = await audioStartListening();
-  
-  if (loadingOverlay) loadingOverlay.style.display = 'none';
-  
-  if (!success) {
-    const tunerStringName = document.getElementById('tunerStringName');
-    if (tunerStringName) tunerStringName.textContent = '❌ 无法访问麦克风';
-    return;
-  }
-  
-  isTunerListening = true;
-  
-  const tunerNeededle = document.getElementById('tunerNeededle');
-  const tunerStatusLight = document.getElementById('tunerStatusLight');
-  const tunerStringName = document.getElementById('tunerStringName');
-  const tunerCents = document.getElementById('tunerCents');
-  const tunerFrequency = document.getElementById('tunerFrequency');
-  
-  function tunerLoop() {
-    if (!isTunerListening || currentMode !== 'tuner') return;
+  try {
+    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'flex';
     
-    const bufferLength = analyser.frequencyBinCount;
-    const timeData = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(timeData);
+    const success = await audioStartListening();
     
-    // 将 Uint8Array 转换为 Float32Array（-1 到 1）
-    const floatData = new Float32Array(timeData.length);
-    for (let i = 0; i < timeData.length; i++) {
-      floatData[i] = (timeData[i] - 128) / 128;
+    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    
+    if (!success) {
+      if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '❌ 无法访问麦克风';
+      return;
     }
     
-    const frequency = detectPitch(floatData, audioContext.sampleRate);
-    const result = identifyString(frequency);
-    updateTunerDisplay(result, tunerStringName, tunerCents, tunerFrequency, tunerNeededle, tunerStatusLight);
+    isTunerListening = true;
     
-    tunerAnimationFrame = requestAnimationFrame(tunerLoop);
+    initChordbookTuner((pitchResult) => {
+      if (!isTunerListening || currentMode !== 'tuner') return;
+      
+      const result = identifyString(pitchResult.frequency, { 
+        rms: pitchResult.clarity, 
+        confidence: pitchResult.clarity 
+      });
+      updateTunerDisplay(result, cachedDOM.tunerStringName, cachedDOM.tunerCents, cachedDOM.tunerFrequency, cachedDOM.tunerNeedle);
+    });
+    
+    startChordbookTuner();
+  } catch (err) {
+    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '❌ 麦克风访问失败';
+    console.error('[Renderer] startTunerListening 失败:', err);
   }
-  
-  tunerLoop();
 }
 
 function stopTunerListening() {
@@ -282,72 +350,75 @@ function stopTunerListening() {
   }
   
   isTunerListening = false;
+  
+  // 停止 @chordbook/tuner
+  stopChordbookTuner();
+  
   audioStopListening();
 }
 
 // ========== 开始/停止监听（练习模式） ==========
 async function startListening() {
-  // 显示加载遮罩（请求麦克风权限时）
-  const loadingOverlay = document.getElementById('loadingOverlay');
-  if (loadingOverlay) loadingOverlay.style.display = 'flex';
-  
-  // 清除之前的自动保存 interval（防止泄漏）
-  if (autoSaveIntervalId) {
-    clearInterval(autoSaveIntervalId);
-    autoSaveIntervalId = null;
-  }
-  
-  const success = await audioStartListening();
-  
-  // 隐藏加载遮罩
-  if (loadingOverlay) loadingOverlay.style.display = 'none';
-  
-  if (!success) {
+  try {
+    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'flex';
+    
+    if (autoSaveIntervalId) {
+      clearInterval(autoSaveIntervalId);
+      autoSaveIntervalId = null;
+    }
+    
+    const success = await audioStartListening();
+    
+    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    
+    if (!success) {
+      updateStatus('error');
+      if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = '❌ 无法访问麦克风';
+      return;
+    }
+
+    resetFluxState();
+    setPracticeStartTime(Date.now());
+    setCurrentMeasureStartTime(Date.now());
+    resetPracticeStats();
+    initChordDetector(getAudioContext(), getAnalyser());
+    setChordRecognitionEnabled(practiceMode === 'comprehensive');
+    resetChordTraining();
+    
+    updateListeningState(true);
+    updateStatus('listening');
+    
+    const activeRhythm = getActiveRhythm(currentRhythm);
+    if (cachedDOM.feedbackMessage) {
+      cachedDOM.feedbackMessage.textContent = metronomeEnabled
+        ? `🎯 开始练习：${activeRhythm.name} (节拍器：${currentBPM} BPM)`
+        : `🎯 开始练习：${activeRhythm.name}`;
+    }
+
+    if (metronomeEnabled) startMetronome(getActiveRhythm, currentRhythm);
+    
+    const recorderCanvas = cachedDOM.recorderWaveform;
+    const recorderCtx = recorderCanvas?.getContext('2d');
+    const spectrumCanvas = cachedDOM.spectrumWaveform;
+    const spectrumCtx = spectrumCanvas?.getContext('2d');
+    
+    analyzeAudio(
+      () => updateScoresWrapper(),
+      (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
+        drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
+      (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
+        drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
+      (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
+    );
+  } catch (err) {
+    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
     updateStatus('error');
-    const feedbackMessage = document.getElementById('feedbackMessage');
-    if (feedbackMessage) feedbackMessage.textContent = '❌ 无法访问麦克风';
-    return;
+    if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = '❌ 启动失败: ' + err.message;
+    console.error('[Renderer] startListening 失败:', err);
   }
-  
-  resetFluxState();
-  setPracticeStartTime(Date.now());
-  setCurrentMeasureStartTime(Date.now()); // 初始化小节开始时间
-  resetPracticeStats();
-  initChordDetector(getAudioContext(), getAnalyser());
-  setChordRecognitionEnabled(practiceMode === 'comprehensive');
-  resetChordTraining();
-  
-  updateListeningState(true);
-  updateStatus('listening');
-  
-  const activeRhythm = getActiveRhythm(currentRhythm);
-  const feedbackMessage = document.getElementById('feedbackMessage');
-  if (feedbackMessage) {
-    feedbackMessage.textContent = metronomeEnabled
-      ? `🎯 开始练习：${activeRhythm.name} (节拍器：${currentBPM} BPM)`
-      : `🎯 开始练习：${activeRhythm.name}`;
-  }
-  
-  if (metronomeEnabled) startMetronome(getActiveRhythm, currentRhythm);
-  
-  const volumeMeterFill = document.getElementById('volumeMeterFill');
-  const recorderCanvas = document.getElementById('recorderWaveform');
-  const recorderCtx = recorderCanvas?.getContext('2d');
-  const spectrumCanvas = document.getElementById('spectrumWaveform');
-  const spectrumCtx = spectrumCanvas?.getContext('2d');
-  
-  analyzeAudio(
-    () => updateScoresWrapper(),
-    (canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug) =>
-      drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
-    (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
-      drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
-    (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
-  );
 }
 
 function stopListening() {
-  // 调音器模式下不处理
   if (currentMode === 'tuner') return;
   
   if (autoSaveIntervalId) {
@@ -364,18 +435,13 @@ function stopListening() {
   
   const detectedStrums = getDetectedStrums();
   if (detectedStrums.length > 0) {
-    const totalScoreEl = document.getElementById('totalScore');
-    const rhythmScoreEl = document.getElementById('rhythmScore');
-    const toneScoreEl = document.getElementById('toneScore');
-    const dynamicsScoreEl = document.getElementById('dynamicsScore');
-    
     saveHistory(
       strumHistory,
       detectedStrums,
-      totalScoreEl,
-      rhythmScoreEl,
-      toneScoreEl,
-      dynamicsScoreEl,
+      cachedDOM.totalScore,
+      cachedDOM.rhythmScore,
+      cachedDOM.toneScore,
+      cachedDOM.dynamicsScore,
       currentRhythm,
       currentBPM,
       'preset',
@@ -391,24 +457,22 @@ function stopListening() {
     showPracticeReport();
   }
   
-  const feedbackMessage = document.getElementById('feedbackMessage');
-  if (feedbackMessage) {
-    feedbackMessage.textContent = metronomeEnabled
+  if (cachedDOM.feedbackMessage) {
+    cachedDOM.feedbackMessage.textContent = metronomeEnabled
       ? `练习结束 (节拍器：${currentBPM} BPM)`
       : '练习结束，点击"开始练习"继续';
   }
   
   autoSaveIntervalId = setInterval(() => {
     saveUserSettings(currentBPM, metronomeEnabled, sensitivityLevel, currentRhythm, exportCustomRhythms(), DEBUG);
-  }, 5000);
+  }, AUTO_SAVE_INTERVAL);
 }
 
 // ========== 渲染历史统计 ==========
 function renderHistory() {
-  const historyList = document.getElementById('historyList');
-  if (!historyList) return;
+  if (!cachedDOM.historyList) return;
   
-  historyList.innerHTML = strumHistory.map(item => {
+  cachedDOM.historyList.innerHTML = strumHistory.map(item => {
     const modeLabel = item.mode === 'preset' ? '📖' : item.mode === 'custom' ? '✏️' : item.mode === 'free' ? '🎸' : '';
     const practiceModeLabel = item.practiceMode === 'comprehensive' ? '🎸综合' : '🥁节奏';
     const accuracyInfo = item.practiceMode === 'comprehensive' && item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
@@ -418,16 +482,13 @@ function renderHistory() {
 }
 
 function renderStatsChart() {
-  const statsChartCanvas = document.getElementById('statsChart');
+  const statsChartCanvas = cachedDOM.statsChart;
   const statsChartCtx = statsChartCanvas?.getContext('2d');
-  const avgScoreEl = document.getElementById('avgScore');
-  const maxScoreEl = document.getElementById('maxScore');
-  const practiceCountEl = document.getElementById('practiceCount');
   
   if (!statsChartCtx || strumHistory.length === 0) {
-    if (avgScoreEl) avgScoreEl.textContent = '--';
-    if (maxScoreEl) maxScoreEl.textContent = '--';
-    if (practiceCountEl) practiceCountEl.textContent = '0';
+    if (cachedDOM.avgScore) cachedDOM.avgScore.textContent = '--';
+    if (cachedDOM.maxScore) cachedDOM.maxScore.textContent = '--';
+    if (cachedDOM.practiceCount) cachedDOM.practiceCount.textContent = '0';
     return;
   }
   
@@ -451,9 +512,9 @@ function renderStatsChart() {
   const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   const maxScore = Math.max(...scores);
   
-  if (avgScoreEl) avgScoreEl.textContent = avgScore;
-  if (maxScoreEl) maxScoreEl.textContent = maxScore;
-  if (practiceCountEl) practiceCountEl.textContent = strumHistory.length;
+  if (cachedDOM.avgScore) cachedDOM.avgScore.textContent = avgScore;
+  if (cachedDOM.maxScore) cachedDOM.maxScore.textContent = maxScore;
+  if (cachedDOM.practiceCount) cachedDOM.practiceCount.textContent = strumHistory.length;
   
   // 绘制图表...
   statsChartCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -534,6 +595,9 @@ function renderTrendCharts() {
 
 // ========== 初始化 ==========
 function init() {
+  // 缓存 DOM 元素
+  cacheDOMElements();
+  
   // 获取 DOM 元素
   const btnStart = document.getElementById('btnStart');
   const btnStop = document.getElementById('btnStop');
@@ -573,17 +637,16 @@ function init() {
     sensitivityValueEl,
     btnAddRhythm,
     btnMicTest,
+    volumeMeterFill: cachedDOM.volumeMeterFill,
     onRhythmSelect: (index) => {
       currentRhythm = index;
       const pattern = getActiveRhythm(index);
-      const feedbackMessage = document.getElementById('feedbackMessage');
-      if (feedbackMessage && pattern) feedbackMessage.textContent = `已选择：${pattern.name} - ${pattern.description}`;
+      if (cachedDOM.feedbackMessage && pattern) cachedDOM.feedbackMessage.textContent = `已选择：${pattern.name} - ${pattern.description}`;
     },
     onMetronomeToggle: (enabled) => {
       metronomeEnabled = enabled;
       setMetronomeEnabled(enabled);
-      const feedbackMessage = document.getElementById('feedbackMessage');
-      if (feedbackMessage) feedbackMessage.textContent = enabled ? `节拍器已开启 - ${currentBPM} BPM` : '节拍器已关闭';
+      if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = enabled ? `节拍器已开启 - ${currentBPM} BPM` : '节拍器已关闭';
       if (enabled && isListeningState()) startMetronome(getActiveRhythm, currentRhythm);
       else stopMetronome();
     },
@@ -595,8 +658,7 @@ function init() {
     onSensitivityChange: (level) => {
       sensitivityLevel = level;
       setSensitivityLevel(level);
-      const feedbackMessage = document.getElementById('feedbackMessage');
-      if (feedbackMessage && !isListeningState()) feedbackMessage.textContent = `灵敏度：${level} - 开始练习后生效`;
+      if (cachedDOM.feedbackMessage && !isListeningState()) cachedDOM.feedbackMessage.textContent = `灵敏度：${level} - 开始练习后生效`;
     },
     onStart: () => startListening(),
     onStop: () => stopListening()
@@ -604,7 +666,9 @@ function init() {
   
   // 初始化模式切换
   const modeTuner = document.getElementById('modeTuner');
-  const modeBtns = [modeTuner, document.getElementById('practiceModeRhythm'), document.getElementById('practiceModeComprehensive')];
+  const modeRhythm = document.getElementById('practiceModeRhythm');
+  const modeComprehensive = document.getElementById('practiceModeComprehensive');
+  const modeBtns = [modeTuner, modeRhythm, modeComprehensive];
   
   modeBtns.forEach(btn => {
     if (!btn) return;
@@ -630,6 +694,13 @@ function init() {
         practicePanel.style.display = 'none';
         scorePanel.style.display = 'none';
         practiceModeDesc.textContent = '💡 调音器模式：6 弦音准检测，±5 音分精度';
+        // 重置调音器状态
+        resetTunerState();
+        resetTunerUI();
+        // 预加载吉他音源（首次进入调音器模式时）
+        if (!window.guitarSoundfont) {
+          loadGuitarSoundfont();
+        }
         // 调音器独立启动监听
         stopListening();
         startTunerListening();
@@ -665,20 +736,22 @@ function init() {
   
   // 初始化调音器 UI
   initTunerUI(async (stringIndex) => {
-    let audioCtx = getAudioContext();
-    if (!audioCtx) {
-      // 如果 AudioContext 未初始化，先初始化音频引擎
-      await initAudioEngine();
-      audioCtx = getAudioContext();
-    }
-    
-    // 确保 AudioContext 处于 running 状态
-    if (audioCtx && audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
-    
-    if (audioCtx) {
-      playReferenceTone(audioCtx, stringIndex, 2);
+    try {
+      let audioCtx = getAudioContext();
+      if (!audioCtx) {
+        await initAudioEngine();
+        audioCtx = getAudioContext();
+      }
+      
+      if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+      
+      if (audioCtx) {
+        await playReferenceTone(audioCtx, stringIndex, 2);
+      }
+    } catch (err) {
+      console.error('[Renderer] 播放标准音失败:', err);
     }
   });
   
@@ -748,6 +821,30 @@ function init() {
     if (rhythmSelector) rhythmSelector.value = savedSettings.currentRhythm;
   }
   
+  // 初始化面板显示状态（默认调音器模式）
+  const tunerPanel = document.getElementById('tunerPanel');
+  const chordModePanel = document.getElementById('chordModePanel');
+  const chordDisplayPanel = document.getElementById('chordDisplayPanel');
+  const practicePanel = document.getElementById('practicePanel');
+  const scorePanel = document.getElementById('scorePanel');
+  
+  // 默认显示调音器面板，隐藏其他面板
+  if (tunerPanel) tunerPanel.style.display = 'block';
+  if (chordModePanel) chordModePanel.style.display = 'none';
+  if (chordDisplayPanel) chordDisplayPanel.style.display = 'none';
+  if (practicePanel) practicePanel.style.display = 'none';
+  if (scorePanel) scorePanel.style.display = 'none';
+  
+  // 初始化模式按钮状态（确保只有调音器按钮为 active）
+  if (modeTuner) modeTuner.classList.add('active');
+  if (modeRhythm) modeRhythm.classList.remove('active');
+  if (modeComprehensive) modeComprehensive.classList.remove('active');
+  
+  // 自动启动调音器监听
+  initTunerTimeoutId = setTimeout(() => {
+    startTunerListening();
+  }, INIT_TUNER_DELAY);
+  
   updateStatus('ready');
   
   setupPracticeReport();
@@ -765,13 +862,75 @@ window.addEventListener('resize', () => {
     if (recorderCanvas) { recorderCanvas.width = recorderCanvas.offsetWidth; recorderCanvas.height = recorderCanvas.offsetHeight; }
     if (spectrumCanvas) { spectrumCanvas.width = spectrumCanvas.offsetWidth; spectrumCanvas.height = spectrumCanvas.offsetHeight; }
     if (statsChartCanvas) { statsChartCanvas.width = statsChartCanvas.offsetWidth; statsChartCanvas.height = statsChartCanvas.offsetHeight; renderStatsChart(); }
-  }, 250); // 250ms 防抖
+  }, CANVAS_RESIZE_DEBOUNCE);
 });
 
 // ========== 启动 ==========
 document.addEventListener('DOMContentLoaded', () => {
   try { init(); } catch (error) { if (DEBUG) console.error('[GuitarStrumTrainer] 初始化失败:', error); }
 });
+
+// ========== 全局错误边界处理 ==========
+window.onerror = function(message, source, lineno, colno, error) {
+  const errorMsg = `[全局错误] ${message}`;
+  const location = source ? `${source}:${lineno}:${colno}` : '未知位置';
+  console.error(errorMsg, '\n位置:', location, '\n堆栈:', error?.stack || '无堆栈信息');
+  
+  if (cachedDOM.feedbackMessage) {
+    cachedDOM.feedbackMessage.textContent = '⚠️ 发生错误，请刷新页面重试';
+  }
+  
+  if (cachedDOM.loadingOverlay) {
+    cachedDOM.loadingOverlay.style.display = 'none';
+  }
+  
+  return false;
+};
+
+window.onunhandledrejection = function(event) {
+  const reason = event.reason;
+  const errorMsg = reason instanceof Error ? reason.message : String(reason);
+  const errorStack = reason instanceof Error ? reason.stack : '无堆栈信息';
+  
+  console.error('[未处理的Promise拒绝]', errorMsg, '\n堆栈:', errorStack);
+  
+  if (cachedDOM.feedbackMessage) {
+    cachedDOM.feedbackMessage.textContent = '⚠️ 发生异步错误，请刷新页面重试';
+  }
+  
+  if (cachedDOM.loadingOverlay) {
+    cachedDOM.loadingOverlay.style.display = 'none';
+  }
+  
+  event.preventDefault();
+};
+
+// ========== 页面卸载清理 ==========
+function cleanupAllTimers() {
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+    autoSaveIntervalId = null;
+  }
+  if (initTunerTimeoutId) {
+    clearTimeout(initTunerTimeoutId);
+    initTunerTimeoutId = null;
+  }
+  if (resizeDebounceTimer) {
+    clearTimeout(resizeDebounceTimer);
+    resizeDebounceTimer = null;
+  }
+  if (tunerAnimationFrame) {
+    cancelAnimationFrame(tunerAnimationFrame);
+    tunerAnimationFrame = null;
+  }
+  if (getIsPlayingDemo()) stopDemo();
+  stopMetronome();
+  stopTunerListening();
+  audioStopListening();
+}
+
+window.addEventListener('beforeunload', cleanupAllTimers);
+window.addEventListener('pagehide', cleanupAllTimers);
 
 // ========== 导出到全局 ==========
 window.playDemo = (rhythmIndex, btn) => playDemo(rhythmIndex, btn, getActiveRhythm);

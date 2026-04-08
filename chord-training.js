@@ -3,6 +3,7 @@
 
 // ========== 导入 ==========
 import { drawChordDiagram as drawChordDiagramSVG, drawChordDiagramFallbackSVG as drawChordDiagramFallbackSVGUI } from './ui-renderer.js';
+import { isTonalAvailable } from './chord-detector.js';
 
 // ========== 全局状态 ==========
 let chordDetector = null;
@@ -47,6 +48,18 @@ let progressionSelect = null;
 let customChordSelector = null;
 let selectedChordsDisplay = null;
 let currentChordDisplayEl = null;
+
+const cachedProgressionDetail = {
+  progressionChords: null,
+  progressionDesc: null,
+  progressionDetail: null
+};
+
+function cacheProgressionDetailElements() {
+  cachedProgressionDetail.progressionChords = document.getElementById('progressionChords');
+  cachedProgressionDetail.progressionDesc = document.getElementById('progressionDesc');
+  cachedProgressionDetail.progressionDetail = document.getElementById('progressionDetail');
+}
 
 // ========== TransitionDetector 类 ==========
 export class TransitionDetector {
@@ -138,17 +151,25 @@ export function initChordTraining(options = {}) {
   selectedChordsDisplay = options.selectedChordsDisplay || null;
   currentChordDisplayEl = options.currentChordDisplayEl || null;
   
+  cacheProgressionDetailElements();
   setupPracticeMode();
   setupChordTraining();
 }
 
 // ========== 和弦检测器初始化 ==========
 export function initChordDetector(audioContext, analyser) {
+  // 检查 Tonal.js 是否可用
+  if (!isTonalAvailable()) {
+    console.warn('[ChordTraining] Tonal.js 未加载，和弦识别功能不可用');
+    return false;
+  }
   if (audioContext && analyser && window.ChordDetector) {
     chordDetector = new window.ChordDetector(audioContext, analyser);
     transitionDetector = new TransitionDetector();
+    console.log('[ChordTraining] 和弦检测器初始化成功');
     return true;
   }
+  console.warn('[ChordTraining] 无法初始化和弦检测器：audioContext 或 analyser 缺失');
   return false;
 }
 
@@ -348,21 +369,17 @@ export function updateChordProgressionDisplay() {
 }
 
 function updateProgressionDetail(index) {
-  const progressionChordsEl = document.getElementById('progressionChords');
-  const progressionDescEl = document.getElementById('progressionDesc');
-  const progressionDetailEl = document.getElementById('progressionDetail');
-  
-  if (!progressionChordsEl || !progressionDescEl) return;
+  if (!cachedProgressionDetail.progressionChords || !cachedProgressionDetail.progressionDesc) return;
   
   const progression = window.ChordLibrary.COMMON_PROGRESSIONS[index];
   if (progression) {
-    progressionChordsEl.textContent = progression.chords.join(' → ');
-    progressionDescEl.textContent = progression.desc;
-    if (progressionDetailEl) progressionDetailEl.style.display = 'block';
+    cachedProgressionDetail.progressionChords.textContent = progression.chords.join(' → ');
+    cachedProgressionDetail.progressionDesc.textContent = progression.desc;
+    if (cachedProgressionDetail.progressionDetail) cachedProgressionDetail.progressionDetail.style.display = 'block';
   } else {
-    progressionChordsEl.textContent = '点击选择和弦或选择预设进行';
-    progressionDescEl.textContent = '';
-    if (progressionDetailEl) progressionDetailEl.style.display = 'none';
+    cachedProgressionDetail.progressionChords.textContent = '点击选择和弦或选择预设进行';
+    cachedProgressionDetail.progressionDesc.textContent = '';
+    if (cachedProgressionDetail.progressionDetail) cachedProgressionDetail.progressionDetail.style.display = 'none';
   }
 }
 

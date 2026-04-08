@@ -3,6 +3,10 @@ const path = require('path');
 
 let mainWindow;
 
+/**
+ * 创建主窗口
+ * @returns {BrowserWindow} 创建的窗口实例
+ */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,

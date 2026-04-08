@@ -1,13 +1,39 @@
 // 吉他扫弦练习助手 - 评分计算模块
 
+// 导入常量
+import {
+  STABILITY_MIN_HISTORY,
+  MIN_MEASURE_STRUMS,
+  TONE_MIN_IDEAL,
+  TONE_MAX_IDEAL,
+  CV_EXCELLENT,
+  CV_GOOD,
+  CV_FAIR,
+  SCORE_WEIGHT_RHYTHM,
+  SCORE_WEIGHT_TONE,
+  SCORE_WEIGHT_DYNAMICS,
+  SCORE_WEIGHT_TRANSITION,
+  AMPLITUDE_WEAK,
+  AMPLITUDE_GOOD,
+  TRANSITION_TARGET_MS,
+  TRANSITION_MAX_MS,
+  REFERENCE_BPM,
+  TRANSITION_WEIGHT_TIME,
+  TRANSITION_WEIGHT_ACCURACY,
+  AMPLITUDE_MEDIUM
+} from './constants.js';
+
+// 默认小节时长（毫秒）
+const DEFAULT_MEASURE_DURATION = 4000;
+const DEFAULT_BEATS = 4;
+
 /**
  * 计算稳定性评分（基于历史数据）
  * @param {Array} history - 历史评分数组
  * @returns {number} 稳定性评分 (0-100)
  */
 export function calculateStabilityScore(history) {
-  const MIN_HISTORY = 4;  // 至少 4 个小节才能计算（近 4 个小节）
-  if (history.length < MIN_HISTORY) return 0;
+  if (history.length < STABILITY_MIN_HISTORY) return 0;
   
   // 1. 计算平均分
   const avg = history.reduce((a, b) => a + b, 0) / history.length;
@@ -25,14 +51,14 @@ export function calculateStabilityScore(history) {
   
   // 4. 根据 CV 评分（CV 越小越稳定）
   let score;
-  if (cv < 0.10) {
-    score = 90 + (0.10 - cv) * 100;  // 90-100 分（非常稳定）
-  } else if (cv < 0.20) {
-    score = 70 + (0.20 - cv) * 200;  // 70-90 分（较稳定）
-  } else if (cv < 0.30) {
-    score = 50 + (0.30 - cv) * 200;  // 50-70 分（波动大）
+  if (cv < CV_EXCELLENT) {
+    score = 90 + (CV_EXCELLENT - cv) * 100;  // 90-100 分（非常稳定）
+  } else if (cv < CV_GOOD) {
+    score = 70 + (CV_GOOD - cv) * 200;  // 70-90 分（较稳定）
+  } else if (cv < CV_FAIR) {
+    score = 50 + (CV_FAIR - cv) * 200;  // 50-70 分（波动大）
   } else {
-    score = Math.max(0, 50 - (cv - 0.30) * 100);  // 0-50 分（很不稳定）
+    score = Math.max(0, 50 - (cv - CV_FAIR) * 100);  // 0-50 分（很不稳定）
   }
   
   return Math.round(score);
@@ -45,10 +71,10 @@ export function calculateStabilityScore(history) {
  * @returns {number} 小节时长（毫秒）
  */
 export function getMeasureDuration(currentBPM, pattern) {
-  if (!pattern) return 4000;  // 默认 4 秒
+  if (!pattern) return DEFAULT_MEASURE_DURATION;
   
   // 计算节奏型的总拍数
-  const totalBeats = pattern.beats || 4;
+  const totalBeats = pattern.beats || DEFAULT_BEATS;
   
   // 计算一拍时长（毫秒）
   const beatDuration = (60 / currentBPM) * 1000;
@@ -104,19 +130,16 @@ export function calculateTransitionScore(currentMeasureStrums, transitionDetecto
   if (stats.transitionCount === 0) return 0;
   
   // 1. 转换时间评分（基于平均转换时间与目标时间的偏差）
-  // 目标转换时间：300ms（优秀）- 800ms（及格）
-  const targetTime = 300; // 理想转换时间 (ms)
-  const maxTime = 800;    // 最大可接受转换时间 (ms)
   const avgTime = stats.avgTransitionTime;
   
   let timeScore;
-  if (avgTime <= targetTime) {
+  if (avgTime <= TRANSITION_TARGET_MS) {
     timeScore = 100;
-  } else if (avgTime >= maxTime) {
+  } else if (avgTime >= TRANSITION_MAX_MS) {
     timeScore = 0;
   } else {
     // 线性衰减
-    timeScore = 100 * (1 - (avgTime - targetTime) / (maxTime - targetTime));
+    timeScore = 100 * (1 - (avgTime - TRANSITION_TARGET_MS) / (TRANSITION_MAX_MS - TRANSITION_TARGET_MS));
   }
   
   // 2. 转换准确率评分（基于正确转换的比例）
@@ -124,8 +147,8 @@ export function calculateTransitionScore(currentMeasureStrums, transitionDetecto
   // 如果需要准确率，需要在 TransitionDetector 中添加准确/错误计数
   const accuracyScore = 100; // 暂时假设所有转换都是正确的
   
-  // 3. 综合评分（时间 70% + 准确率 30%）
-  const score = Math.round(timeScore * 0.7 + accuracyScore * 0.3);
+  // 3. 综合评分（时间权重 + 准确率权重）
+  const score = Math.round(timeScore * TRANSITION_WEIGHT_TIME + accuracyScore * TRANSITION_WEIGHT_ACCURACY);
   
   if (DEBUG) {
     console.log('[DEBUG 转换评分] 转换次数:', stats.transitionCount, '平均时间:', Math.round(avgTime) + 'ms', '时间分:', Math.round(timeScore), '准确率分:', accuracyScore, '总分:', score);
@@ -198,12 +221,12 @@ export function checkMeasureUpdate(config) {
     const dynamicsScore = calculateDynamicsScore(currentMeasureStrums, pattern);
     const transitionScore = calculateTransitionScore(currentMeasureStrums, transitionDetector, currentBPM, DEBUG);
 
-    // 计算总分（新权重：节奏 40% + 音色 25% + 强弱 15% + 转换 20%）
+    // 计算总分（各维度加权）
     const totalScore = Math.round(
-      rhythmScore * 0.4 +
-      toneScore * 0.25 +
-      dynamicsScore * 0.15 +
-      transitionScore * 0.2
+      rhythmScore * SCORE_WEIGHT_RHYTHM +
+      toneScore * SCORE_WEIGHT_TONE +
+      dynamicsScore * SCORE_WEIGHT_DYNAMICS +
+      transitionScore * SCORE_WEIGHT_TRANSITION
     );
 
     // 保存评分
@@ -346,14 +369,14 @@ export function calculateRhythmScore(strums, pattern, currentBPM, DEBUG = false)
   
   // 5. 根据平均 CV 评分
   let score;
-  if (avgCV < 0.10) {
-    score = 90 + (0.10 - avgCV) * 100;  // 90-100 分
-  } else if (avgCV < 0.20) {
-    score = 70 + (0.20 - avgCV) * 200;  // 70-90 分
-  } else if (avgCV < 0.30) {
-    score = 60 + (0.30 - avgCV) * 100;  // 60-70 分
+  if (avgCV < CV_EXCELLENT) {
+    score = 90 + (CV_EXCELLENT - avgCV) * 100;  // 90-100 分
+  } else if (avgCV < CV_GOOD) {
+    score = 70 + (CV_GOOD - avgCV) * 200;  // 70-90 分
+  } else if (avgCV < CV_FAIR) {
+    score = 60 + (CV_FAIR - avgCV) * 100;  // 60-70 分
   } else {
-    score = Math.max(0, 60 - (avgCV - 0.30) * 100);  // 0-60 分
+    score = Math.max(0, 60 - (avgCV - CV_FAIR) * 100);  // 0-60 分
   }
   
   if (DEBUG) {
@@ -382,20 +405,17 @@ export function calculateToneScore(strums, DEBUG = false) {
     const tone = strum.tone;
     
     // 使用范围评分而非单点评分
-    // 理想范围：60-200 (更宽容)
-    const idealMin = 60;
-    const idealMax = 200;
-    const idealCenter = (idealMin + idealMax) / 2;
-    const range = (idealMax - idealMin) / 2;
+    const idealCenter = (TONE_MIN_IDEAL + TONE_MAX_IDEAL) / 2;
+    const range = (TONE_MAX_IDEAL - TONE_MIN_IDEAL) / 2;
     
     let score;
-    if (tone >= idealMin && tone <= idealMax) {
+    if (tone >= TONE_MIN_IDEAL && tone <= TONE_MAX_IDEAL) {
       // 在理想范围内，根据距离中心的远近评分
       const distanceFromCenter = Math.abs(tone - idealCenter);
       score = 100 - (distanceFromCenter / range) * 40; // 范围内最低 60 分
     } else {
       // 在理想范围外，线性衰减
-      const distanceOutside = tone < idealMin ? idealMin - tone : tone - idealMax;
+      const distanceOutside = tone < TONE_MIN_IDEAL ? TONE_MIN_IDEAL - tone : tone - TONE_MAX_IDEAL;
       score = Math.max(0, 60 - (distanceOutside / 5) * 60);
     }
     scores.push(score);
@@ -485,9 +505,9 @@ function calculateUniformDynamics(amplitudes) {
   // 同时检查绝对力度 (不能太轻)
   const avgAmplitude = avgAmp;
   let dynamicsBonus = 0;
-  if (avgAmplitude > 0.2) {
+  if (avgAmplitude > AMPLITUDE_GOOD) {
     dynamicsBonus = 10; // 力度充足的奖励
-  } else if (avgAmplitude < 0.1) {
+  } else if (avgAmplitude < AMPLITUDE_WEAK) {
     dynamicsBonus = -15; // 力度不足的惩罚
   }
   

@@ -7,6 +7,31 @@
 import { getAudioContext } from './audio-core.js';
 import { getCurrentBPM } from './audio-metronome.js';
 
+// 导入常量
+import {
+  MAX_HISTORY,
+  FLUX_BUFFER_SIZE,
+  FLUX_COOLDOWN_FRAMES,
+  FLUX_MIN_BUFFER,
+  DEFAULT_SENSITIVITY,
+  DEFAULT_STRUM_THRESHOLD,
+  MIN_STRUM_THRESHOLD,
+  MAX_STRUM_THRESHOLD,
+  BASE_MIN_STRUM_INTERVAL,
+  DETECTED_STRUMS_MAX,
+  TONE_MIN_IDEAL,
+  TONE_MAX_IDEAL,
+  TONE_HIGH,
+  TONE_VERY_HIGH,
+  AMPLITUDE_WEAK,
+  AMPLITUDE_MEDIUM,
+  AMPLITUDE_GOOD,
+  REFERENCE_BPM,
+  FFT_SIZE,
+  SPECTRUM_MIN_FREQ,
+  SPECTRUM_MAX_FREQ
+} from './constants.js';
+
 // ========== 状态变量 ==========
 
 /** @type {number} 当前小节开始时间戳 */
@@ -24,9 +49,6 @@ let lastScoredMeasureEnd = 0;
 /** @type {Object} 评分历史记录 */
 let measureHistory = { rhythm: [], tone: [], dynamics: [] };
 
-/** @constant {number} 最大历史记录数 */
-const MAX_HISTORY = 10;
-
 /** @type {Array} 检测到的扫弦历史 */
 let detectedStrums = [];
 
@@ -42,14 +64,13 @@ let strumHistory = [];
 // Spectral Flux
 let previousSpectrum = null;
 let fluxBuffer = [];
-let fluxBufferSize = 43;
+let fluxBufferSize = FLUX_BUFFER_SIZE;
 let fluxThreshold = 0;
 let fluxPeakCooldown = 0;
-const FLUX_COOLDOWN_FRAMES = 3;
 
 // 灵敏度
-let sensitivityLevel = 50;
-let strumThreshold = 0.05;
+let sensitivityLevel = DEFAULT_SENSITIVITY;
+let strumThreshold = DEFAULT_STRUM_THRESHOLD;
 
 let lastStrumEventTime = 0;
 
@@ -63,72 +84,133 @@ let cachedSampleRate = null;
  * @description 灵敏度 1-100，阈值 0.01-0.30
  */
 export function updateThreshold() {
-  strumThreshold = 0.30 - (sensitivityLevel - 1) * (0.29 / 99);
-  strumThreshold = Math.max(0.01, Math.min(0.30, strumThreshold));
+  strumThreshold = MAX_STRUM_THRESHOLD - (sensitivityLevel - 1) * ((MAX_STRUM_THRESHOLD - MIN_STRUM_THRESHOLD) / (MAX_SENSITIVITY - MIN_SENSITIVITY));
+  strumThreshold = Math.max(MIN_STRUM_THRESHOLD, Math.min(MAX_STRUM_THRESHOLD, strumThreshold));
   const thresholdDisplay = document.getElementById('thresholdDisplay');
   if (thresholdDisplay) {
     thresholdDisplay.textContent = strumThreshold.toFixed(2);
   }
 }
 
+// ========== 灵敏度管理 ==========
+
+/**
+ * 设置灵敏度等级
+ * @param {number} level - 灵敏度等级 (1-100)
+ */
 export function setSensitivityLevel(level) {
   sensitivityLevel = level;
   updateThreshold();
 }
 
+/**
+ * 获取当前灵敏度等级
+ * @returns {number} 灵敏度等级
+ */
 export function getSensitivityLevel() {
   return sensitivityLevel;
 }
 
+/**
+ * 设置扫弦阈值
+ * @param {number} threshold - 扫弦阈值
+ */
 export function setStrumThreshold(threshold) {
   strumThreshold = threshold;
 }
 
+/**
+ * 获取当前扫弦阈值
+ * @returns {number} 扫弦阈值
+ */
 export function getStrumThreshold() {
   return strumThreshold;
 }
 
 // ========== 状态管理 ==========
+/**
+ * 获取已检测的扫弦历史
+ * @returns {Array} 扫弦历史数组
+ */
 export function getDetectedStrums() {
   return detectedStrums;
 }
 
+/**
+ * 获取当前小节的扫弦数据
+ * @returns {Array} 当前小节扫弦数组
+ */
 export function getCurrentMeasureStrums() {
   return currentMeasureStrums;
 }
 
+/**
+ * 获取评分历史记录
+ * @returns {Object} 评分历史 {rhythm, tone, dynamics}
+ */
 export function getMeasureHistory() {
   return measureHistory;
 }
 
+/**
+ * 获取上次小节评分
+ * @returns {Object} 上次评分 {rhythm, tone, dynamics, total}
+ */
 export function getLastMeasureScores() {
   return lastMeasureScores;
 }
 
+/**
+ * 设置上次小节评分
+ * @param {Object} scores - 评分对象
+ */
 export function setLastMeasureScores(scores) {
   lastMeasureScores = scores;
 }
 
+/**
+ * 获取上次评分小节结束时间
+ * @returns {number} 时间戳
+ */
 export function getLastScoredMeasureEnd() {
   return lastScoredMeasureEnd;
 }
 
+/**
+ * 设置上次评分小节结束时间
+ * @param {number} time - 时间戳
+ */
 export function setLastScoredMeasureEnd(time) {
   lastScoredMeasureEnd = time;
 }
 
+/**
+ * 设置当前小节开始时间
+ * @param {number} time - 时间戳
+ */
 export function setCurrentMeasureStartTime(time) {
   currentMeasureStartTime = time;
 }
 
+/**
+ * 获取当前小节开始时间
+ * @returns {number} 时间戳
+ */
 export function getCurrentMeasureStartTime() {
   return currentMeasureStartTime;
 }
 
+/**
+ * 设置当前小节扫弦数据
+ * @param {Array} strums - 扫弦数组
+ */
 export function setCurrentMeasureStrums(strums) {
   currentMeasureStrums = strums;
 }
 
+/**
+ * 重置频谱通量状态
+ */
 export function resetFluxState() {
   previousSpectrum = null;
   fluxBuffer = [];
@@ -139,7 +221,6 @@ export function resetFluxState() {
 // ========== Spectral Flux 计算 ==========
 /**
  * 计算频谱通量（Spectral Flux）
- * @description 检测音频频谱变化，用于识别扫弦 onset
  * @param {Uint8Array} currentSpectrum - 当前帧频谱
  * @param {Uint8Array} previousSpectrum - 上一帧频谱
  * @returns {number} 频谱通量值（归一化到 80-1000Hz 范围）
@@ -156,7 +237,7 @@ export function computeSpectralFlux(currentSpectrum, previousSpectrum) {
   }
   
   let flux = 0;
-  const binFrequency = cachedSampleRate / 2048;
+  const binFrequency = cachedSampleRate / FFT_SIZE;
   const startBin = Math.max(0, Math.floor(80 / binFrequency));
   const endBin = Math.min(currentSpectrum.length, Math.ceil(1000 / binFrequency));
   
@@ -184,13 +265,19 @@ function computeAdaptiveThreshold() {
   return Math.max(0.1, mean + sensitivityFactor * stdDev);
 }
 
+/**
+ * 检测频谱通量峰值
+ * @param {number} currentFlux - 当前频谱通量
+ * @param {number} threshold - 检测阈值
+ * @returns {boolean} 是否检测到峰值
+ */
 export function detectFluxPeak(currentFlux, threshold) {
   if (fluxPeakCooldown > 0) {
     fluxPeakCooldown--;
     return false;
   }
   
-  if (fluxBuffer.length < 3) return false;
+  if (fluxBuffer.length < FLUX_MIN_BUFFER) return false;
   
   const prevFlux = fluxBuffer[fluxBuffer.length - 2];
   const prevPrevFlux = fluxBuffer[fluxBuffer.length - 3];
@@ -208,6 +295,13 @@ export function detectFluxPeak(currentFlux, threshold) {
 }
 
 // ========== Onset 检测 ==========
+/**
+ * 使用频谱通量检测 onset
+ * @param {Uint8Array} freqData - 频域数据
+ * @param {Uint8Array} timeData - 时域数据
+ * @param {number} rms - 均方根振幅
+ * @returns {Object} 检测结果 {onset, confidence, flux, threshold}
+ */
 export function detectOnsetWithFlux(freqData, timeData, rms) {
   const now = Date.now();
   const currentFlux = computeSpectralFlux(freqData, previousSpectrum);
@@ -228,8 +322,7 @@ export function detectOnsetWithFlux(freqData, timeData, rms) {
   const rmsThreshold = strumThreshold * 1.5;
   const rmsOnset = rms > rmsThreshold;
   
-  const baseMinInterval = 200;
-  const minStrumInterval = Math.round(baseMinInterval * (120 / getCurrentBPM()));
+  const minStrumInterval = Math.round(BASE_MIN_STRUM_INTERVAL * (REFERENCE_BPM / getCurrentBPM()));
   const timeSinceLastStrum = now - lastStrumTime;
   
   let onsetDetected = false;
@@ -288,7 +381,7 @@ export function detectStrum(freqData, timeData, rms) {
     currentMeasureStrums.push(strum);
     lastStrumTime = now;
     
-    if (detectedStrums.length > 20) {
+    if (detectedStrums.length > DETECTED_STRUMS_MAX) {
       detectedStrums.shift();
     }
   }
@@ -301,16 +394,16 @@ export function calculateToneScore(strum) {
   if (!strum) return 0;
   
   const tone = strum.tone;
-  if (tone > 200) {
-    return Math.max(0, 100 - (tone - 200) * 0.5);
+  if (tone > TONE_VERY_HIGH) {
+    return Math.max(0, 100 - (tone - TONE_VERY_HIGH) * 0.5);
   }
-  if (tone > 150) {
-    return 85 + (200 - tone) * 0.3;
+  if (tone > TONE_HIGH) {
+    return 85 + (TONE_VERY_HIGH - tone) * 0.3;
   }
-  if (tone > 60) {
-    return 90 + (150 - tone) * 0.1;
+  if (tone > TONE_MIN_IDEAL) {
+    return 90 + (TONE_HIGH - tone) * 0.1;
   }
-  return Math.max(0, 90 - (60 - tone) * 0.5);
+  return Math.max(0, 90 - (TONE_MIN_IDEAL - tone) * 0.5);
 }
 
 // ========== 反馈提供 ==========
@@ -334,19 +427,19 @@ export function provideFeedback(strum, currentRhythm, getActiveRhythmFn) {
     }
   }
   
-  if (strum.tone > 200) {
+  if (strum.tone > TONE_VERY_HIGH) {
     feedback += '🎵 音色略刺耳';
-  } else if (strum.tone > 150) {
+  } else if (strum.tone > TONE_HIGH) {
     feedback += '🎵 音色明亮';
-  } else if (strum.tone > 60) {
+  } else if (strum.tone > TONE_MIN_IDEAL) {
     feedback += '🎵 音色正常';
   } else {
     feedback += '🎵 音色偏闷';
   }
   
-  if (strum.amplitude > 0.25) {
+  if (strum.amplitude > AMPLITUDE_GOOD) {
     feedback += ' 💪 力度很好';
-  } else if (strum.amplitude > 0.15) {
+  } else if (strum.amplitude > AMPLITUDE_MEDIUM) {
     feedback += ' 💪 力度适中';
   } else {
     feedback += ' 💪 力度偏弱';

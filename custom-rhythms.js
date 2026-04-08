@@ -37,12 +37,22 @@ let btnAddRhythm = null;
 let rhythmSelector = null;
 
 // ========== 辅助函数 ==========
+/**
+ * HTML 转义函数
+ * @param {string} text - 待转义文本
+ * @returns {string} 转义后的文本
+ */
 function escapeHtml(text) {
   const _escapeHtmlMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const _escapeHtmlRegex = /[&<>"']/g;
   return String(text).replace(_escapeHtmlRegex, m => _escapeHtmlMap[m]);
 }
 
+/**
+ * 根据音符数组生成箭头模式字符串
+ * @param {Array} notes - 音符数组
+ * @returns {string} 箭头模式字符串
+ */
 export function generateArrowPattern(notes) {
   if (!notes || notes.length === 0) return '';
   const arrows = notes.map(n => ({ arrow: n.direction === 'D' ? '↓' : '↑', duration: n.duration }));
@@ -60,6 +70,11 @@ export function generateArrowPattern(notes) {
 }
 
 // ========== 获取激活的节奏型 ==========
+/**
+ * 获取指定索引的节奏型
+ * @param {number} index - 节奏型索引
+ * @returns {Object|null} 节奏型对象
+ */
 export function getActiveRhythm(index) {
   if (index >= 0 && index < RHYTHM_PATTERNS.length) {
     return RHYTHM_PATTERNS[index];
@@ -92,27 +107,53 @@ export function getActiveRhythm(index) {
   return null;
 }
 
+/**
+ * 获取预置节奏型列表
+ * @returns {Array} 预置节奏型数组
+ */
 export function getRhythmPatterns() {
   return RHYTHM_PATTERNS;
 }
 
+/**
+ * 获取音符时值映射
+ * @returns {Object} 音符时值映射
+ */
 export function getNoteDurations() {
   return NOTE_DURATIONS;
 }
 
+/**
+ * 获取预设模板列表
+ * @returns {Object} 预设模板对象
+ */
 export function getPresetTemplates() {
   return PRESET_TEMPLATES;
 }
 
+/**
+ * 获取自定义节奏型列表
+ * @returns {Array} 自定义节奏型数组
+ */
 export function getCustomRhythms() {
   return customRhythms;
 }
 
+/**
+ * 设置自定义节奏型列表
+ * @param {Array} rhythms - 节奏型数组
+ */
 export function setCustomRhythms(rhythms) {
   customRhythms = rhythms;
 }
 
 // ========== 初始化 ==========
+/**
+ * 初始化自定义节奏型模块
+ * @param {Object} options - 配置选项
+ * @param {HTMLElement} options.btnAddRhythm - 添加按钮
+ * @param {HTMLElement} options.rhythmSelector - 节奏型选择器
+ */
 export function initCustomRhythms(options = {}) {
   btnAddRhythm = options.btnAddRhythm || null;
   rhythmSelector = options.rhythmSelector || null;
@@ -134,6 +175,9 @@ function saveCustomRhythms() {
 }
 
 // ========== 渲染自定义节奏型列表 ==========
+/**
+ * 渲染自定义节奏型列表到 DOM
+ */
 export function renderCustomRhythmsList() {
   const container = document.getElementById('customRhythmsList');
   if (!container) return;
@@ -175,6 +219,11 @@ export function renderCustomRhythmsList() {
 }
 
 // ========== 试听自定义节奏型 ==========
+/**
+ * 从列表播放自定义节奏型
+ * @param {number} index - 节奏型索引
+ * @param {HTMLElement} btn - 播放按钮
+ */
 export function playCustomRhythmFromList(index, btn) {
   if (index < 0 || index >= customRhythms.length) return;
   const rhythm = customRhythms[index];

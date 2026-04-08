@@ -1,6 +1,20 @@
 // 吉他扫弦练习助手 - 音频核心模块
 // 功能：AudioContext 管理、麦克风输入、基础状态管理
 
+// 导入常量
+import {
+  ANALYZE_INTERVAL,
+  RECORDER_BUFFER_SIZE,
+  SPECTRUM_HISTORY_SIZE,
+  DEFAULT_CANVAS_WIDTH,
+  DEFAULT_CANVAS_HEIGHT,
+  FFT_SIZE,
+  ANALYSER_SMOOTHING,
+  MIC_GAIN,
+  SPECTRUM_DRAW_INTERVAL,
+  DEBUG
+} from './constants.js';
+
 // ========== 全局状态（音频相关） ==========
 let audioContext = null;
 let analyser = null;
@@ -9,18 +23,15 @@ let isListening = false;
 
 // 性能优化
 let lastAnalyzeTime = 0;
-const ANALYZE_INTERVAL = 33;
 
 // DOM 元素引用
 let volumeMeterFill = null;
 let recorderCanvas = null;
 let recorderCtx = null;
 let recorderWaveformData = [];
-const RECORDER_BUFFER_SIZE = 300;
 let spectrumCanvas = null;
 let spectrumCtx = null;
 let spectrumHistory = [];
-const SPECTRUM_HISTORY_SIZE = 60;
 
 // 音频分析缓存（避免每帧分配）
 let freqDataCache = null;
@@ -31,10 +42,11 @@ let getActiveRhythmCallback = null;
 let updateScoreRingCallback = null;
 let detectStrumCallback = null;
 
-// 调试模式
-const DEBUG = false;
-
 // ========== 音频处理核心 ==========
+/**
+ * 启动音频监听（麦克风输入）
+ * @returns {Promise<boolean>} 是否成功启动
+ */
 export async function startListening() {
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -55,12 +67,12 @@ export async function startListening() {
     
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.5;
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = ANALYSER_SMOOTHING;
     
     microphone = audioContext.createMediaStreamSource(stream);
     const micGain = audioContext.createGain();
-    micGain.gain.value = 15.0;
+    micGain.gain.value = MIC_GAIN;
     microphone.connect(micGain);
     micGain.connect(analyser);
     
@@ -73,6 +85,9 @@ export async function startListening() {
   }
 }
 
+/**
+ * 停止音频监听
+ */
 export function stopListening() {
   isListening = false;
   
@@ -87,11 +102,23 @@ export function stopListening() {
   }
 }
 
+/**
+ * 获取当前监听状态
+ * @returns {boolean} 是否正在监听
+ */
 export function isListeningState() {
   return isListening;
 }
 
 // ========== 音频分析主循环 ==========
+/**
+ * 音频分析主循环
+ * @param {Function} updateScoresCallback - 更新评分回调
+ * @param {Function} drawRecorderWaveformCallback - 绘制波形回调
+ * @param {Function} drawSpectrumWaveformCallback - 绘制频谱回调
+ * @param {Function} detectStrumCallback - 扫弦检测回调
+ * @param {Function} tunerCallback - 调音器回调
+ */
 export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback, tunerCallback) {
   if (!isListening) return;
   
@@ -148,13 +175,24 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
   }
   
   if (drawSpectrumWaveformCallback) {
-    drawSpectrumWaveformCallback(spectrumCanvas, spectrumCtx, freqDataCache, spectrumHistory, SPECTRUM_HISTORY_SIZE, 67, audioContext, DEBUG);
+    drawSpectrumWaveformCallback(spectrumCanvas, spectrumCtx, freqDataCache, spectrumHistory, SPECTRUM_HISTORY_SIZE, SPECTRUM_DRAW_INTERVAL, audioContext, DEBUG);
   }
   
   requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback));
 }
 
 // ========== 初始化 ==========
+/**
+ * 初始化音频引擎
+ * @param {Object} options - 配置选项
+ * @param {HTMLElement} options.volumeMeterFill - 音量指示条元素
+ * @param {HTMLCanvasElement} options.recorderCanvas - 录音波形 Canvas
+ * @param {CanvasRenderingContext2D} options.recorderCtx - 录音波形 Context
+ * @param {HTMLCanvasElement} options.spectrumCanvas - 频谱 Canvas
+ * @param {CanvasRenderingContext2D} options.spectrumCtx - 频谱 Context
+ * @param {Function} options.getActiveRhythm - 获取当前节奏型函数
+ * @returns {void}
+ */
 export function initAudioEngine(options = {}) {
   volumeMeterFill = options.volumeMeterFill || null;
   recorderCanvas = options.recorderCanvas || null;
@@ -165,24 +203,32 @@ export function initAudioEngine(options = {}) {
   
   if (recorderCanvas) {
     setTimeout(() => {
-      recorderCanvas.width = recorderCanvas.offsetWidth || 600;
-      recorderCanvas.height = recorderCanvas.offsetHeight || 120;
+      recorderCanvas.width = recorderCanvas.offsetWidth || DEFAULT_CANVAS_WIDTH;
+      recorderCanvas.height = recorderCanvas.offsetHeight || DEFAULT_CANVAS_HEIGHT;
     }, 100);
   }
   
   if (spectrumCanvas) {
     setTimeout(() => {
-      spectrumCanvas.width = spectrumCanvas.offsetWidth || 600;
-      spectrumCanvas.height = spectrumCanvas.offsetHeight || 120;
+      spectrumCanvas.width = spectrumCanvas.offsetWidth || DEFAULT_CANVAS_WIDTH;
+      spectrumCanvas.height = spectrumCanvas.offsetHeight || DEFAULT_CANVAS_HEIGHT;
     }, 100);
   }
 }
 
 // ========== 导出音频上下文（用于和弦检测） ==========
+/**
+ * 获取 AudioContext 实例
+ * @returns {AudioContext|null} AudioContext 实例
+ */
 export function getAudioContext() {
   return audioContext;
 }
 
+/**
+ * 获取 AnalyserNode 实例
+ * @returns {AnalyserNode|null} AnalyserNode 实例
+ */
 export function getAnalyser() {
   return analyser;
 }
