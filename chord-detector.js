@@ -10,6 +10,9 @@
  * FFT 分析 → 峰值检测 → 提取音符 → tonaljs 识别和弦 → chord-library 获取指法
  */
 
+import { ChordLibrary } from './chord-library.js';
+ */
+
 // 导入常量
 import { DEBUG } from './constants.js';
 
@@ -236,7 +239,7 @@ class ChordDetector {
       
       if (chordName && chordName.length > 0) {
         // 验证是否是基础和弦
-        const basicChordNames = window.ChordLibrary.getBasicChordNames();
+        const basicChordNames = ChordLibrary.getBasicChordNames();
         
         // 检查是否匹配基础和弦
         for (let j = 0; j < basicChordNames.length; j++) {
@@ -263,7 +266,7 @@ class ChordDetector {
    * @returns {number} 匹配度 (0-1)
    */
   verifyWithStringEnergies(stringEnergies, chordName) {
-    const chordData = window.ChordLibrary.getChordData(chordName);
+    const chordData = ChordLibrary.getChordData(chordName);
     if (!chordData) return 0;
     
     const fingering = chordData.fingering || [];
@@ -326,8 +329,8 @@ class ChordDetector {
     const verifyScore = this.verifyWithStringEnergies(stringEnergies, chordName);
     
     // 7. 获取和弦数据
-    const chordData = window.ChordLibrary.getChordData(chordName);
-    const notes = window.ChordLibrary.getChordNotes(chordName);
+    const chordData = ChordLibrary.getChordData(chordName);
+    const notes = ChordLibrary.getChordNotes(chordName);
     
     // 8. 计算置信度
     const confidence = Math.min(1, 
@@ -369,10 +372,10 @@ class ChordDetector {
     let bestMatch = null;
     let bestScore = 0;
     
-    const basicChords = window.ChordLibrary.BASIC_CHORDS;
+    const basicChords = ChordLibrary.BASIC_CHORDS;
     for (let i = 0; i < basicChords.length; i++) {
       const chord = basicChords[i];
-      const chordData = window.ChordLibrary.getChordData(chord.name);
+      const chordData = ChordLibrary.getChordData(chord.name);
       if (!chordData) continue;
       
       const fingering = chordData.fingering || [];
@@ -517,6 +520,5 @@ class TransitionDetector {
   }
 }
 
-// 导出到全局（浏览器环境）
-window.ChordDetector = ChordDetector;
-window.TransitionDetector = TransitionDetector;
+// ES6 模块导出
+export { ChordDetector, TransitionDetector };

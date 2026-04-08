@@ -3,6 +3,7 @@
 
 import { playMetronomeSound, getCurrentBPM } from './audio-metronome.js';
 import { DEBUG } from './constants.js';
+import { AppState } from './state-manager.js';
 
 // ========== 吉他音源（用于试听演示） ==========
 let guitarSoundfont = null;
@@ -11,11 +12,8 @@ let soundfontLoaded = false;
 let sharedAudioContext = null;
 
 // 演示播放相关
-let _isPlayingDemo = false;
 let demoTimeout = null;
-let demoLoopCount = 0;
 let currentDemoRhythmIndex = -1;
-let playingCustomBtn = null;
 let currentPlayingDemoBtn = null;
 
 // ========== 调试模式（从 constants.js 导入） ==========
@@ -27,7 +25,7 @@ let currentPlayingDemoBtn = null;
  * @returns {boolean} 是否正在播放
  */
 export function getIsPlayingDemo() {
-  return _isPlayingDemo;
+  return AppState.getIsPlayingDemo();
 }
 
 /**
@@ -35,7 +33,7 @@ export function getIsPlayingDemo() {
  * @param {boolean} val - 是否正在播放
  */
 export function setIsPlayingDemo(val) {
-  _isPlayingDemo = val;
+  AppState.setIsPlayingDemo(val);
 }
 
 /**
@@ -48,10 +46,8 @@ export function stopDemo() {
     clearTimeout(window.customRhythmCleanup);
     window.customRhythmCleanup = null;
   }
-  demoLoopCount = 0;
   currentDemoRhythmIndex = -1;
   currentPlayingDemoBtn = null;
-  window.currentPlayingDemoBtn = null;
   
   const allDemoBtns = document.querySelectorAll('.btn-demo');
   allDemoBtns.forEach(btn => {
@@ -66,8 +62,6 @@ export function stopDemo() {
       btn.textContent = '🔊 试听';
     }
   });
-  
-  playingCustomBtn = null;
 }
 
 // ========== 吉他音源加载 ==========
@@ -99,9 +93,9 @@ export async function loadGuitarSoundfont() {
     
     soundfontLoaded = true;
     
-    // 暴露到全局
-    window.guitarSoundfont = guitarSoundfont;
-    window.guitarAudioContext = sharedAudioContext;
+    // 存储到状态管理
+    AppState.setGuitarSoundfont(guitarSoundfont);
+    AppState.setGuitarAudioContext(sharedAudioContext);
     
     console.log('[AudioDemo] ✓ 钢弦吉他音源加载完成');
   } catch (error) {
@@ -256,7 +250,7 @@ export async function playDemo(rhythmIndex, btn, getActiveRhythmFn) {
   if (!btn || !getActiveRhythmFn) return;
   
   // 如果正在播放其他演示，先停止
-  if (_isPlayingDemo) {
+  if (AppState.getIsPlayingDemo()) {
     stopDemo();
   }
   
@@ -266,7 +260,6 @@ export async function playDemo(rhythmIndex, btn, getActiveRhythmFn) {
   setIsPlayingDemo(true);
   currentDemoRhythmIndex = rhythmIndex;
   currentPlayingDemoBtn = btn;
-  window.currentPlayingDemoBtn = btn;
   
   // 更新按钮状态
   if (btn.classList) btn.classList.add('playing');
@@ -275,7 +268,7 @@ export async function playDemo(rhythmIndex, btn, getActiveRhythmFn) {
   let noteIndex = 0;
   
   async function playNextNote() {
-    if (!_isPlayingDemo) return;
+    if (!AppState.getIsPlayingDemo()) return;
     
     const direction = rhythm.demo[noteIndex % rhythm.demo.length];
     try {

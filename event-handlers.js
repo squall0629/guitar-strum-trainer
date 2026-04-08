@@ -10,6 +10,9 @@ import {
   MIC_TEST_VOLUME_SCALE
 } from './constants.js';
 
+import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo, playCustomRhythmFromList as playCustomRhythmFromListDemo } from './audio-demo.js';
+import { getActiveRhythm } from './custom-rhythms.js';
+
 // ========== 全局引用 ==========
 let btnStart = null;
 let btnStop = null;
@@ -239,33 +242,27 @@ function setupDemoButtons() {
     if (btn.dataset.rhythm !== undefined) {
       const rhythmIndex = parseInt(btn.dataset.rhythm);
       
-      // 如果点击的是正在播放的同一个按钮，只停止不播放
-      if (window.getIsPlayingDemo() && window.currentPlayingDemoBtn === btn) {
-        if (window.stopDemo) window.stopDemo();
+      if (getIsPlayingDemo() && currentPlayingDemoBtn === btn) {
+        stopDemo();
         return;
       }
       
-      // 否则先停止当前播放，再播放新的
-      if (window.stopDemo) window.stopDemo();
-      if (window.playDemo) {
-        window.playDemo(rhythmIndex, btn);
-      }
+      stopDemo();
+      playDemo(rhythmIndex, btn, getActiveRhythm);
       return;
     }
     
     if (btn.dataset.customIndex !== undefined) {
       const customIndex = parseInt(btn.dataset.customIndex);
       
-      // 如果点击的是正在播放的同一个按钮，只停止不播放
-      if (window.getIsPlayingDemo() && window.currentPlayingDemoBtn === btn) {
-        if (window.stopDemo) window.stopDemo();
+      if (getIsPlayingDemo() && currentPlayingDemoBtn === btn) {
+        stopDemo();
         return;
       }
       
-      // 否则先停止当前播放，再播放新的
-      if (window.stopDemo) window.stopDemo();
-      if (window.playCustomRhythmFromList) {
-        window.playCustomRhythmFromList(customIndex, btn);
+      stopDemo();
+      if (playCustomRhythmFromListDemo) {
+        playCustomRhythmFromListDemo(customIndex, btn);
       }
       return;
     }
@@ -273,6 +270,8 @@ function setupDemoButtons() {
   
   demoButtonsSetup = true;
 }
+
+let currentPlayingDemoBtn = null;
 
 // ========== 灵敏度设置 ==========
 function setupSensitivity() {
@@ -298,11 +297,7 @@ export function setSensitivityValue(level) {
 // ========== 添加节奏型卡片 ==========
 function setupAddRhythmCard() {
   if (!btnAddRhythm) return;
-  btnAddRhythm.addEventListener('click', () => {
-    if (window.openNewRhythmEditor) {
-      window.openNewRhythmEditor();
-    }
-  });
+  btnAddRhythm.addEventListener('click', openNewRhythmEditor);
 }
 
 // ========== 麦克风测试 ==========

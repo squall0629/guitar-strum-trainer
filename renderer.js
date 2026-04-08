@@ -16,6 +16,9 @@ import {
   DEBUG
 } from './constants.js';
 
+import EventBus, { Events } from './event-bus.js';
+import { AppState } from './state-manager.js';
+
 import { saveUserSettings, loadUserSettings, saveHistory, loadHistoryFromStorage, exportUserSettings, importUserSettings } from './storage.js';
 import { calculateStabilityScore, getMeasureDuration, checkMeasureUpdate, updateScores, calculateRhythmScore, calculateToneScore, calculateDynamicsScore, calculateTransitionScore, updateStabilityScores } from './scoring.js';
 import { drawRecorderWaveform, drawSpectrumWaveform, updateScoreRing, drawChordDiagram, drawChordDiagramFallbackSVG, updateChordRecognition as updateChordRecognitionUI, updateTransitionTime as updateTransitionTimeUI } from './ui-renderer.js';
@@ -70,15 +73,6 @@ import {
 // ========== 调音器状态 ==========
 let tunerAnimationFrame = null;
 let isTunerListening = false;
-let tunerAutoStartPending = false; // 不再自动启动，改为按钮触发
-
-// ========== 全局状态 ==========
-let currentRhythm = 0;
-let currentBPM = DEFAULT_BPM;
-let metronomeEnabled = false;
-let sensitivityLevel = DEFAULT_SENSITIVITY;
-let practiceMode = 'tuner';  // 默认调音器模式
-let currentMode = 'tuner';   // tuner | rhythm | comprehensive
 
 // 历史统计
 let strumHistory = [];
@@ -216,7 +210,7 @@ function showPracticeReport() {
   if (cachedDOM.reportDuration) cachedDOM.reportDuration.textContent = duration + 's';
   if (cachedDOM.reportTotalScore) cachedDOM.reportTotalScore.textContent = totalScore;
   
-  if (practiceMode === 'comprehensive') {
+  if (AppState.getPracticeMode()) {
     if (cachedDOM.reportTransitions) cachedDOM.reportTransitions.textContent = transitionCount;
     if (cachedDOM.reportAvgTime) cachedDOM.reportAvgTime.textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
     if (cachedDOM.reportAccuracy) cachedDOM.reportAccuracy.textContent = accuracy > 0 ? accuracy + '%' : '--';
@@ -272,9 +266,9 @@ function checkMeasureUpdateWrapper() {
     currentMeasureStartTime: getCurrentMeasureStartTime(),
     currentMeasureStrums: getCurrentMeasureStrums(),
     lastScoredMeasureEnd: getLastScoredMeasureEnd(),
-    currentBPM: currentBPM,
+    AppState.getBPM(): AppState.getBPM(),
     getActiveRhythm: getActiveRhythm,
-    currentRhythm: currentRhythm,
+    currentRhythm: AppState.getCurrentRhythm(),
     calculateRhythmScore: calculateRhythmScore,
     calculateToneScore: calculateToneScore,
     calculateDynamicsScore: calculateDynamicsScore,
@@ -333,7 +327,7 @@ async function startTunerListening() {
     isTunerListening = true;
     
     initChordbookTuner((pitchResult) => {
-      if (!isTunerListening || currentMode !== 'tuner') return;
+      if (!isTunerListening || AppState.getCurrentMode() !== 'tuner') return;
       
       const result = identifyString(pitchResult.frequency, { 
         rms: pitchResult.clarity, 
@@ -392,20 +386,20 @@ async function startListening() {
     setCurrentMeasureStartTime(Date.now());
     resetPracticeStats();
     initChordDetector(getAudioContext(), getAnalyser());
-    setChordRecognitionEnabled(practiceMode === 'comprehensive');
+    setChordRecognitionEnabled(AppState.getPracticeMode());
     resetChordTraining();
     
     updateListeningState(true);
     updateStatus('listening');
     
-    const activeRhythm = getActiveRhythm(currentRhythm);
+    const activeRhythm = getActiveRhythm(AppState.getCurrentRhythm());
     if (cachedDOM.feedbackMessage) {
-      cachedDOM.feedbackMessage.textContent = metronomeEnabled
-        ? `🎯 开始练习：${activeRhythm.name} (节拍器：${currentBPM} BPM)`
+      cachedDOM.feedbackMessage.textContent = AppState.getMetronomeEnabled()
+        ? `🎯 开始练习：${activeRhythm.name} (节拍器：${AppState.getBPM()} BPM)`
         : `🎯 开始练习：${activeRhythm.name}`;
     }
 
-    if (metronomeEnabled) startMetronome(getActiveRhythm, currentRhythm);
+    if (AppState.getMetronomeEnabled()) startMetronome(getActiveRhythm, AppState.getCurrentRhythm());
     
     const recorderCanvas = cachedDOM.recorderWaveform;
     const recorderCtx = recorderCanvas?.getContext('2d');
@@ -429,7 +423,7 @@ async function startListening() {
 }
 
 function stopListening() {
-  if (currentMode === 'tuner') return;
+  if (AppState.getCurrentMode() === 'tuner') return;
   
   if (autoSaveIntervalId) {
     clearInterval(autoSaveIntervalId);
@@ -437,7 +431,7 @@ function stopListening() {
   }
   setChordRecognitionEnabled(false);
   stopMetronome();
-  if (getIsPlayingDemo()) stopDemo();
+  if (AppState.getIsPlayingDemo()) stopDemo();
   
   audioStopListening();
   updateListeningState(false);
@@ -452,10 +446,10 @@ function stopListening() {
       cachedDOM.rhythmScore,
       cachedDOM.toneScore,
       cachedDOM.dynamicsScore,
-      currentRhythm,
-      currentBPM,
+      AppState.getCurrentRhythm(),
+      AppState.getBPM(),
       'preset',
-      practiceMode,
+      AppState.getPracticeMode(),
       getPracticeChordStats().total,
       getPracticeChordStats().correct,
       getPracticeTransitionTimes(),
@@ -468,13 +462,13 @@ function stopListening() {
   }
   
   if (cachedDOM.feedbackMessage) {
-    cachedDOM.feedbackMessage.textContent = metronomeEnabled
-      ? `练习结束 (节拍器：${currentBPM} BPM)`
+    cachedDOM.feedbackMessage.textContent = AppState.getMetronomeEnabled()
+      ? `练习结束 (节拍器：${AppState.getBPM()} BPM)`
       : '练习结束，点击"开始练习"继续';
   }
   
   autoSaveIntervalId = setInterval(() => {
-    saveUserSettings(currentBPM, metronomeEnabled, sensitivityLevel, currentRhythm, exportCustomRhythms(), DEBUG);
+    saveUserSettings(AppState.getBPM(), AppState.getMetronomeEnabled(), AppState.getSensitivityLevel(), AppState.getCurrentRhythm(), exportCustomRhythms(), DEBUG);
   }, AUTO_SAVE_INTERVAL);
 }
 
@@ -484,9 +478,9 @@ function renderHistory() {
   
   cachedDOM.historyList.innerHTML = strumHistory.map(item => {
     const modeLabel = item.mode === 'preset' ? '📖' : item.mode === 'custom' ? '✏️' : item.mode === 'free' ? '🎸' : '';
-    const practiceModeLabel = item.practiceMode === 'comprehensive' ? '🎸综合' : '🥁节奏';
-    const accuracyInfo = item.practiceMode === 'comprehensive' && item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
-    const transTimeInfo = item.practiceMode === 'comprehensive' && item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
+    const practiceModeLabel = item.AppState.getPracticeMode() ? '🎸综合' : '🥁节奏';
+    const accuracyInfo = item.AppState.getPracticeMode() && item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
+    const transTimeInfo = item.AppState.getPracticeMode() && item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
     return `<div class="history-item"><span class="time">${item.time} - ${item.rhythm} ${modeLabel} ${practiceModeLabel}</span><span class="score">${item.score}分 (${item.strums}次扫弦${accuracyInfo}${transTimeInfo})</span></div>`;
   }).join('');
 }
@@ -649,24 +643,24 @@ function init() {
     btnMicTest,
     volumeMeterFill: cachedDOM.volumeMeterFill,
     onRhythmSelect: (index) => {
-      currentRhythm = index;
+      AppState.setCurrentRhythm(index);
       const pattern = getActiveRhythm(index);
       if (cachedDOM.feedbackMessage && pattern) cachedDOM.feedbackMessage.textContent = `已选择：${pattern.name} - ${pattern.description}`;
     },
     onMetronomeToggle: (enabled) => {
-      metronomeEnabled = enabled;
+      AppState.setMetronomeEnabled(enabled);
       setMetronomeEnabled(enabled);
-      if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = enabled ? `节拍器已开启 - ${currentBPM} BPM` : '节拍器已关闭';
+      if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = enabled ? `节拍器已开启 - ${AppState.getBPM()} BPM` : '节拍器已关闭';
       if (enabled && isListeningState()) startMetronome(getActiveRhythm, currentRhythm);
       else stopMetronome();
     },
     onBPMChange: (bpm) => {
-      currentBPM = bpm;
+      AppState.getBPM() = bpm;
       setCurrentBPM(bpm);
       if (metronomeEnabled && isListeningState()) { stopMetronome(); startMetronome(getActiveRhythm, currentRhythm); }
     },
     onSensitivityChange: (level) => {
-      sensitivityLevel = level;
+      AppState.setSensitivityLevel(level);
       setSensitivityLevel(level);
       if (cachedDOM.feedbackMessage && !isListeningState()) cachedDOM.feedbackMessage.textContent = `灵敏度：${level} - 开始练习后生效`;
     },
@@ -707,8 +701,8 @@ function init() {
       const practiceModeDesc = document.getElementById('practiceModeDescription');
       
       if (btn.id === 'modeTuner') {
-        currentMode = 'tuner';
-        practiceMode = 'tuner';
+        AppState.setCurrentMode('tuner');
+        AppState.setPracticeMode('tuner');
         // 显示调音器面板
         tunerPanel.style.display = 'block';
         // 隐藏其他面板
@@ -751,8 +745,8 @@ function init() {
           }
         });
       } else if (btn.id === 'practiceModeRhythm') {
-        currentMode = 'rhythm';
-        practiceMode = 'rhythm';
+        AppState.setCurrentMode('rhythm');
+        AppState.setPracticeMode('rhythm');
         // 显示练习面板
         tunerPanel.style.display = 'none';
         chordModePanel.style.display = 'none';
@@ -764,8 +758,8 @@ function init() {
         stopTunerListening();
         setPracticeMode('rhythm');
       } else if (btn.id === 'practiceModeComprehensive') {
-        currentMode = 'comprehensive';
-        practiceMode = 'comprehensive';
+        AppState.setCurrentMode('comprehensive');
+        AppState.setPracticeMode('comprehensive');
         // 显示和弦训练面板
         tunerPanel.style.display = 'none';
         chordModePanel.style.display = 'block';
@@ -846,13 +840,13 @@ function init() {
   // 加载并恢复用户设置
   const savedSettings = loadUserSettings(getRhythmPatterns(), DEBUG);
   if (savedSettings.bpm !== null) {
-    currentBPM = savedSettings.bpm;
+    AppState.getBPM() = savedSettings.bpm;
     setCurrentBPM(savedSettings.bpm);
     if (bpmSlider) bpmSlider.value = savedSettings.bpm;
     if (bpmValue) bpmValue.textContent = savedSettings.bpm;
   }
   if (savedSettings.metronomeEnabled !== null) {
-    metronomeEnabled = savedSettings.metronomeEnabled;
+    AppState.setMetronomeEnabled(savedSettings.metronomeEnabled);
     setMetronomeEnabled(savedSettings.metronomeEnabled);
     if (metronomeToggle) metronomeToggle.checked = savedSettings.metronomeEnabled;
   }
@@ -987,24 +981,3 @@ window.addEventListener('pagehide', () => {
   cleanupUserInteractionListeners();
   cleanupAllTimers();
 });
-
-// ========== 导出到全局 ==========
-window.playDemo = (rhythmIndex, btn) => playDemo(rhythmIndex, btn, getActiveRhythm);
-window.playCustomRhythmFromList = playCustomRhythmFromList;
-window.stopDemo = stopDemo;
-window.getIsPlayingDemo = getIsPlayingDemo;
-
-// 挂载灵敏度函数到 window（供 audio-core.js 使用）
-window.getSensitivityLevel = getSensitivityLevel;
-window.setSensitivityLevel = setSensitivityLevel;
-
-window.guitarTrainer = {
-  chordDetector: getChordDetector,
-  transitionDetector: getTransitionDetector,
-  getProgression: getCurrentProgression,
-  setTrainingMode: setChordTrainingMode,
-  exportUserSettings,
-  importUserSettings,
-  getIsPlayingDemo,
-  stopDemo
-};

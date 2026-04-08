@@ -15,6 +15,8 @@ import {
   DEBUG
 } from './constants.js';
 
+import { AppState } from './state-manager.js';
+
 // ========== 全局状态（音频相关） ==========
 let audioContext = null;
 let analyser = null;
@@ -165,7 +167,7 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
   }
   
   if (volumeMeterFill) {
-    const sensitivityLevel = window.getSensitivityLevel ? window.getSensitivityLevel() : 50;
+    const sensitivityLevel = AppState.getSensitivityLevel();
     const sensitivityGain = 1 + (sensitivityLevel / 100);
     volumeMeterFill.style.width = Math.min(100, rms * sensitivityGain * 100) + '%';
   }

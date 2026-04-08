@@ -1,9 +1,11 @@
 // 吉他扫弦练习助手 - 和弦训练模块
 // 功能：和弦训练逻辑、和弦转换检测、和弦图绘制
 
-// ========== 导入 ==========
 import { drawChordDiagram as drawChordDiagramSVG, drawChordDiagramFallbackSVG as drawChordDiagramFallbackSVGUI } from './ui-renderer.js';
-import { isTonalAvailable } from './chord-detector.js';
+import { isTonalAvailable, ChordDetector as ChordDetectorClass } from './chord-detector.js';
+import { AppState } from './state-manager.js';
+import { ChordLibrary, COMMON_PROGRESSIONS } from './chord-library.js';
+import EventBus, { Events } from './event-bus.js';
 
 // ========== 全局状态 ==========
 let chordDetector = null;
@@ -103,7 +105,7 @@ export class TransitionDetector {
       this.detectedChord = chord;
       this.changeDetected = true;
       
-      const progression = window.guitarTrainer?.getProgression?.();
+      const progression = getCurrentProgression();
       if (progression && progression.length > 0) {
         const currentIndex = progression.indexOf(this.expectedChord);
         const nextIndex = (currentIndex + 1) % progression.length;
@@ -163,8 +165,8 @@ export function initChordDetector(audioContext, analyser) {
     console.warn('[ChordTraining] Tonal.js 未加载，和弦识别功能不可用');
     return false;
   }
-  if (audioContext && analyser && window.ChordDetector) {
-    chordDetector = new window.ChordDetector(audioContext, analyser);
+  if (audioContext && analyser && ChordDetectorClass) {
+    chordDetector = new ChordDetectorClass(audioContext, analyser);
     transitionDetector = new TransitionDetector();
     console.log('[ChordTraining] 和弦检测器初始化成功');
     return true;
@@ -266,13 +268,14 @@ function setupChordTraining() {
   if (progressionSelect) {
     progressionSelect.addEventListener('change', () => {
       const index = parseInt(progressionSelect.value);
-      if (window.ChordLibrary.COMMON_PROGRESSIONS[index]) {
-        currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[index].chords;
+      if (COMMON_PROGRESSIONS[index]) {
+        currentProgression = COMMON_PROGRESSIONS[index].chords;
         updateChordProgressionDisplay();
         updateProgressionDetail(index);
+        EventBus.emit(Events.PROGRESSION_UPDATE, { progression: currentProgression, index });
       }
     });
-    currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
+    currentProgression = COMMON_PROGRESSIONS[0]?.chords || [];
     updateProgressionDetail(0);
   }
   
@@ -282,14 +285,6 @@ function setupChordTraining() {
   
   if (btnSaveProgression) btnSaveProgression.addEventListener('click', saveCustomProgression);
   if (btnClearProgression) btnClearProgression.addEventListener('click', () => { currentProgression = []; currentChordIndex = 0; renderSelectedChords(); updateChordProgressionDisplay(); });
-  
-  window.removeChordFromProgression = function(index) {
-    if (currentProgression && index >= 0 && index < currentProgression.length) {
-      currentProgression.splice(index, 1);
-      renderSelectedChords();
-      updateChordProgressionDisplay();
-    }
-  };
 }
 
 export function getTrainingMode() {
@@ -306,8 +301,8 @@ export function setTrainingMode(mode) {
   if (mode === 'free') {
     currentProgression = [];
     updateChordProgressionDisplay();
-  } else if (mode === 'preset' && window.ChordLibrary.COMMON_PROGRESSIONS[0]) {
-    currentProgression = window.ChordLibrary.COMMON_PROGRESSIONS[0].chords;
+  } else if (mode === 'preset' && COMMON_PROGRESSIONS[0]) {
+    currentProgression = COMMON_PROGRESSIONS[0].chords;
     updateChordProgressionDisplay();
   }
 }
@@ -319,6 +314,14 @@ function addChordToProgression(chordName) {
   updateChordProgressionDisplay();
 }
 
+export function removeChordFromProgression(index) {
+  if (currentProgression && index >= 0 && index < currentProgression.length) {
+    currentProgression.splice(index, 1);
+    renderSelectedChords();
+    updateChordProgressionDisplay();
+  }
+}
+
 function renderSelectedChords() {
   if (!selectedChordsDisplay) return;
   if (currentProgression.length === 0) {
@@ -326,11 +329,18 @@ function renderSelectedChords() {
     return;
   }
   selectedChordsDisplay.innerHTML = currentProgression.map((chord, index) => `
-    <span style="background: rgba(0,217,255,0.2); padding: 5px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px;">
+    <span class="chord-item" data-chord-index="${index}" style="background: rgba(0,217,255,0.2); padding: 5px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px;">
       ${chord}
-      <button onclick="window.removeChordFromProgression(${index})" style="background: none; border: none; color: #ff4757; cursor: pointer; font-size: 1.2em;">×</button>
+      <button class="btn-remove-chord" data-index="${index}" style="background: none; border: none; color: #ff4757; cursor: pointer; font-size: 1.2em;">×</button>
     </span>
   `).join('');
+  
+  selectedChordsDisplay.querySelectorAll('.btn-remove-chord').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(btn.dataset.index);
+      removeChordFromProgression(index);
+    });
+  });
 }
 
 function saveCustomProgression() {
@@ -374,7 +384,7 @@ export function updateChordProgressionDisplay() {
 function updateProgressionDetail(index) {
   if (!cachedProgressionDetail.progressionChords || !cachedProgressionDetail.progressionDesc) return;
   
-  const progression = window.ChordLibrary.COMMON_PROGRESSIONS[index];
+  const progression = COMMON_PROGRESSIONS[index];
   if (progression) {
     cachedProgressionDetail.progressionChords.textContent = progression.chords.join(' → ');
     cachedProgressionDetail.progressionDesc.textContent = progression.desc;

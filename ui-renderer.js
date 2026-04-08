@@ -8,6 +8,9 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// 导入和弦库
+import { ChordLibrary } from './chord-library.js';
+
 // 导入常量
 import {
   RECORDER_DRAW_INTERVAL,
@@ -258,7 +261,7 @@ export function drawChordDiagram(container, chordName) {
   
   try {
     // 使用 chordictionary 生成 SVG
-    const svgString = window.ChordLibrary.getChordSVG(chordName, width, height);
+    const svgString = ChordLibrary.getChordSVG(chordName, width, height);
     
     // 安全地插入 SVG（清理潜在危险内容）
     container.innerHTML = '';
@@ -292,7 +295,7 @@ export function drawChordDiagramFallbackSVG(container, chordName) {
   const width = Math.floor(rect.width * dpr);
   const height = Math.floor(rect.height * dpr);
   
-  const chordData = window.ChordLibrary.getChordData(chordName);
+  const chordData = ChordLibrary.getChordData(chordName);
   
   if (!chordData) {
     container.innerHTML = '';

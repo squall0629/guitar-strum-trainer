@@ -12,11 +12,12 @@ import {
   DEBUG
 } from './constants.js';
 
+import { AppState } from './state-manager.js';
+
 // 调试模式（使用 constants.js 中的 DEBUG）
 
 let audioContextForMetronome = null;
 let metronomeEnabled = false;
-let currentBPM = DEFAULT_BPM;
 let metronomeInterval = null;
 let metronomeBeat = 0;
 
@@ -61,6 +62,7 @@ export function startMetronome(getActiveRhythmFn, currentDemoRhythmIndex = -1) {
     clearInterval(metronomeInterval);
   }
   
+  const currentBPM = AppState.getBPM();
   const beatInterval = (60 / currentBPM) * 1000;
   metronomeBeat = 0;
   
@@ -118,7 +120,7 @@ export function isMetronomeEnabled() {
  * @param {number} bpm - BPM 值
  */
 export function setCurrentBPM(bpm) {
-  currentBPM = bpm;
+  AppState.setBPM(bpm);
 }
 
 /**
@@ -126,5 +128,5 @@ export function setCurrentBPM(bpm) {
  * @returns {number} BPM 值
  */
 export function getCurrentBPM() {
-  return currentBPM;
+  return AppState.getBPM();
 }

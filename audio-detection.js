@@ -6,6 +6,7 @@
 
 import { getAudioContext } from './audio-core.js';
 import { getCurrentBPM } from './audio-metronome.js';
+import { AppState } from './state-manager.js';
 
 // 导入常量
 import {
@@ -101,6 +102,7 @@ export function updateThreshold() {
 export function setSensitivityLevel(level) {
   sensitivityLevel = level;
   updateThreshold();
+  AppState.setSensitivityLevel(level);
 }
 
 /**
@@ -108,7 +110,7 @@ export function setSensitivityLevel(level) {
  * @returns {number} 灵敏度等级
  */
 export function getSensitivityLevel() {
-  return sensitivityLevel;
+  return AppState.getSensitivityLevel();
 }
 
 /**

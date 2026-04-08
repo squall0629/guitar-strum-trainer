@@ -503,8 +503,12 @@
   <!-- Constants Module (must be loaded before other modules that import it) -->
   <script type="module" src="constants.js"></script>
   
+  <!-- Event Bus & State Manager (core architecture modules) -->
+  <script type="module" src="event-bus.js"></script>
+  <script type="module" src="state-manager.js"></script>
+  
   <!-- Chord Library -->
-  <script src="chord-library.js"></script>
+  <script type="module" src="chord-library.js"></script>
   
   <!-- Chord Detector -->
   <script type="module" src="chord-detector.js"></script>

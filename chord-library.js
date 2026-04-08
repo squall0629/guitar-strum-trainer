@@ -252,18 +252,18 @@ var getProgressionNames = function() {
   return COMMON_PROGRESSIONS.map(function(p) { return p.name; });
 };
 
-// 导出到全局
-window.ChordLibrary = {
-  BASIC_CHORDS: BASIC_CHORDS,
-  COMMON_PROGRESSIONS: COMMON_PROGRESSIONS,
+// ES6 模块导出
+export const ChordLibrary = {
+  BASIC_CHORDS,
+  COMMON_PROGRESSIONS,
   findChord: getChordData,
-  getChordData: getChordData,
-  getChordSVG: getChordSVG,
-  getChordNotes: getChordNotes,
-  isValidChord: isValidChord,
-  getBasicChordNames: getBasicChordNames,
-  getChordDifficulty: getChordDifficulty,
-  calculateTransitionDifficulty: calculateTransitionDifficulty,
-  getProgression: getProgression,
-  getProgressionNames: getProgressionNames
+  getChordData,
+  getChordSVG,
+  getChordNotes,
+  isValidChord,
+  getBasicChordNames,
+  getChordDifficulty,
+  calculateTransitionDifficulty,
+  getProgression,
+  getProgressionNames
 };

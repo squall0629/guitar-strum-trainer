@@ -1,8 +1,9 @@
 // 吉他扫弦练习助手 - 自定义节奏型管理模块
 // 功能：自定义节奏型的渲染、保存、删除、编辑
 
-// ========== 导入 ==========
 import { playDemo, getIsPlayingDemo, stopDemo } from './audio-demo.js';
+import { AppState } from './state-manager.js';
+import EventBus, { Events } from './event-bus.js';
 
 // ========== 全局状态 ==========
 const RHYTHM_PATTERNS = [
@@ -190,28 +191,49 @@ export function renderCustomRhythmsList() {
   container.innerHTML = customRhythms.map((rhythm, index) => {
     const pattern = rhythm.notes ? generateArrowPattern(rhythm.notes) : '';
     return `
-      <div style="padding: 15px; background: rgba(184, 102, 255, 0.08); border: 1px solid rgba(184, 102, 255, 0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="cursor: pointer; flex: 1;" onclick="window.selectCustomRhythm(${index})">
+      <div class="rhythm-item" data-rhythm-index="${index}" style="padding: 15px; background: rgba(184, 102, 255, 0.08); border: 1px solid rgba(184, 102, 255, 0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <div class="rhythm-item-content" style="cursor: pointer; flex: 1;">
           <div style="font-weight: bold; color: #b866ff; margin-bottom: 5px;">${escapeHtml(rhythm.name)}</div>
           <div style="color: #888; font-size: 1.1em; font-family: monospace; letter-spacing: 2px;">${pattern}</div>
         </div>
         <div style="display: flex; gap: 10px;">
-          <button onclick="window.editCustomRhythm(${index}); event.stopPropagation();" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
+          <button class="btn-edit-rhythm" data-edit-index="${index}" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
           <button class="btn-custom-play" data-custom-index="${index}" style="padding: 8px 16px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer;">🔊 试听</button>
-          <button onclick="window.deleteCustomRhythm(${index}); event.stopPropagation();" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑 删除</button>
+          <button class="btn-delete-rhythm" data-delete-index="${index}" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑 删除</button>
         </div>
       </div>
     `;
   }).join('');
+  
+  container.querySelectorAll('.rhythm-item-content').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const index = parseInt(el.closest('.rhythm-item').dataset.rhythmIndex);
+      selectCustomRhythm(index);
+    });
+  });
+  
+  container.querySelectorAll('.btn-edit-rhythm').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.dataset.editIndex);
+      editCustomRhythm(index);
+    });
+  });
+  
+  container.querySelectorAll('.btn-delete-rhythm').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.dataset.deleteIndex);
+      deleteCustomRhythm(index);
+    });
+  });
   
   container.querySelectorAll('.btn-custom-play').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
       const customIndex = parseInt(btn.dataset.customIndex);
-      if (window.playCustomRhythmFromList) {
-        window.playCustomRhythmFromList(customIndex, btn);
-      }
+      playCustomRhythmFromList(customIndex, btn);
     });
   });
   
@@ -228,7 +250,7 @@ export function playCustomRhythmFromList(index, btn) {
   if (index < 0 || index >= customRhythms.length) return;
   const rhythm = customRhythms[index];
   if (!rhythm.notes || rhythm.notes.length === 0) return;
-  if (getIsPlayingDemo()) { stopDemo(); return; }
+  if (AppState.getIsPlayingDemo()) { stopDemo(); return; }
   
   const rhythmIndex = RHYTHM_PATTERNS.length + index;
   if (btn && btn.classList) btn.classList.add('playing');
@@ -236,7 +258,7 @@ export function playCustomRhythmFromList(index, btn) {
   
   playDemo(rhythmIndex, btn, getActiveRhythm);
   
-  window.customRhythmCleanup = setTimeout(() => { if (getIsPlayingDemo()) stopDemo(); }, 10000);
+  window.customRhythmCleanup = setTimeout(() => { if (AppState.getIsPlayingDemo()) stopDemo(); }, 10000);
 }
 
 function syncCustomRhythmsToSelector() {
@@ -255,7 +277,7 @@ function syncCustomRhythmsToSelector() {
   });
 }
 
-function selectCustomRhythm(index) {
+export function selectCustomRhythm(index) {
   if (index < 0 || index >= customRhythms.length) return;
   const rhythm = customRhythms[index];
   if (!rhythm.notes || rhythm.notes.length === 0) return;
@@ -269,9 +291,9 @@ function selectCustomRhythm(index) {
   const tempDemo = rhythm.notes.map(note => note.direction);
   const feedbackMessage = document.getElementById('feedbackMessage');
   if (feedbackMessage) feedbackMessage.textContent = `已选择：${rhythm.name} - ${tempDemo.join(' ')}`;
+  
+  EventBus.emit(Events.RHYTHM_SELECT, { index, rhythm });
 }
-
-window.selectCustomRhythm = selectCustomRhythm;
 
 // ========== 设置自定义节奏型按钮 ==========
 function setupCustomRhythmButtons() {
@@ -285,36 +307,33 @@ function setupCustomRhythmButtons() {
   
   if (btnNew) btnNew.addEventListener('click', openNewRhythmEditor);
   if (btnExport) btnExport.addEventListener('click', () => {
-    const exportUserSettings = window.guitarTrainer?.exportUserSettings;
-    if (exportUserSettings) exportUserSettings(70, false, 50, customRhythms, false);
+    exportUserSettings(70, false, 50, customRhythms, false);
   });
   if (btnImport) btnImport.addEventListener('click', () => importInput.click());
   if (importInput) importInput.addEventListener('change', (e) => {
-    const importUserSettings = window.guitarTrainer?.importUserSettings;
-    if (importUserSettings) {
-      importUserSettings(e, customRhythms, {
-        saveCustomRhythms,
-        updateUI: (bpm, metronome, sensitivity) => {
-          if (bpm) {
-            const slider = document.getElementById('bpmSlider');
-            const val = document.getElementById('bpmValue');
-            if (slider) slider.value = bpm;
-            if (val) val.textContent = bpm;
-          }
-          if (metronome !== null) {
-            const toggle = document.getElementById('metronomeToggle');
-            if (toggle) toggle.checked = metronome;
-          }
-          if (sensitivity) {
-            const slider = document.getElementById('sensitivitySlider');
-            const val = document.getElementById('sensitivityValue');
-            if (slider) slider.value = sensitivity;
-            if (val) val.textContent = sensitivity;
-            if (window.updateThreshold) window.updateThreshold();
-          }
-        },
-        renderCustomRhythmsList
-      }, false);
+    importUserSettings(e, customRhythms, {
+      saveCustomRhythms,
+      updateUI: (bpm, metronome, sensitivity) => {
+        if (bpm) {
+          const slider = document.getElementById('bpmSlider');
+          const val = document.getElementById('bpmValue');
+          if (slider) slider.value = bpm;
+          if (val) val.textContent = bpm;
+        }
+        if (metronome !== null) {
+          const toggle = document.getElementById('metronomeToggle');
+          if (toggle) toggle.checked = metronome;
+        }
+        if (sensitivity) {
+          const slider = document.getElementById('sensitivitySlider');
+          const val = document.getElementById('sensitivityValue');
+          if (slider) slider.value = sensitivity;
+          if (val) val.textContent = sensitivity;
+          updateThreshold();
+        }
+      },
+      renderCustomRhythmsList
+    }, false);
     }
   });
   if (btnSave) btnSave.addEventListener('click', saveRhythmEditor);
@@ -327,39 +346,6 @@ function setupCustomRhythmButtons() {
 }
 
 // ========== 节奏型编辑器 ==========
-function openNewRhythmEditor() {
-  editingRhythmIndex = -1;
-  currentNoteSequence = [];
-  const nameInput = document.getElementById('rhythmNameInput');
-  if (nameInput) nameInput.value = '';
-  const modal = document.getElementById('rhythmEditorModal');
-  if (modal) modal.style.display = 'block';
-  renderNoteSequenceEditor();
-}
-
-function editCustomRhythm(index) {
-  if (index < 0 || index >= customRhythms.length) return;
-  editingRhythmIndex = index;
-  const rhythm = customRhythms[index];
-  const nameInput = document.getElementById('rhythmNameInput');
-  if (nameInput) nameInput.value = rhythm.name;
-  currentNoteSequence = JSON.parse(JSON.stringify(rhythm.notes || []));
-  const modal = document.getElementById('rhythmEditorModal');
-  if (modal) modal.style.display = 'block';
-  renderNoteSequenceEditor();
-}
-
-window.editCustomRhythm = editCustomRhythm;
-
-function deleteCustomRhythm(index) {
-  if (index < 0 || index >= customRhythms.length) return;
-  if (!confirm('确定要删除这个节奏型吗？')) return;
-  customRhythms.splice(index, 1);
-  saveCustomRhythms();
-  renderCustomRhythmsList();
-}
-
-window.deleteCustomRhythm = deleteCustomRhythm;
 
 function renderNoteSequenceEditor() {
   const container = document.getElementById('noteSequenceEditor');
@@ -369,36 +355,59 @@ function renderNoteSequenceEditor() {
     return;
   }
   container.innerHTML = currentNoteSequence.map((note, index) => `
-    <div style="display: flex; gap: 5px; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+    <div class="note-item" data-note-index="${index}" style="display: flex; gap: 5px; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px;">
       <span style="color: #888; font-size: 0.8em;">#${index + 1}</span>
-      <select onchange="window.updateNote(${index}, 'duration', this.value)" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
+      <select class="note-duration-select" data-note-index="${index}" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
         ${Object.entries(NOTE_DURATIONS).map(([key, val]) => `<option value="${key}" ${note.duration === key ? 'selected' : ''}>${val.name}</option>`).join('')}
       </select>
-      <select onchange="window.updateNote(${index}, 'direction', this.value)" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
+      <select class="note-direction-select" data-note-index="${index}" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
         <option value="D" ${note.direction === 'D' ? 'selected' : ''}>下扫 (D)</option>
         <option value="U" ${note.direction === 'U' ? 'selected' : ''}>上扫 (U)</option>
       </select>
-      <input type="range" min="0.1" max="1.0" step="0.1" value="${note.velocity || 0.5}" onchange="window.updateNote(${index}, 'velocity', parseFloat(this.value))" style="width: 80px;">
-      <span style="color: #00d9ff; min-width: 30px;">${Math.round((note.velocity || 0.5) * 100)}%</span>
-      <button onclick="window.removeNote(${index})" style="padding: 5px 10px; background: #ff4757; color: white; border: none; border-radius: 4px; cursor: pointer;">✕</button>
+      <input type="range" class="note-velocity-input" data-note-index="${index}" min="0.1" max="1.0" step="0.1" value="${note.velocity || 0.5}" style="width: 80px;">
+      <span class="note-velocity-display" style="color: #00d9ff; min-width: 30px;">${Math.round((note.velocity || 0.5) * 100)}%</span>
+      <button class="btn-remove-note" data-note-index="${index}" style="padding: 5px 10px; background: #ff4757; color: white; border: none; border-radius: 4px; cursor: pointer;">✕</button>
     </div>
   `).join('');
+  
+  container.querySelectorAll('.note-duration-select').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const index = parseInt(sel.dataset.noteIndex);
+      updateNote(index, 'duration', e.target.value);
+    });
+  });
+  
+  container.querySelectorAll('.note-direction-select').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const index = parseInt(sel.dataset.noteIndex);
+      updateNote(index, 'direction', e.target.value);
+    });
+  });
+  
+  container.querySelectorAll('.note-velocity-input').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const index = parseInt(input.dataset.noteIndex);
+      updateNote(index, 'velocity', parseFloat(e.target.value));
+    });
+  });
+  
+  container.querySelectorAll('.note-velocity-input').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const display = input.closest('.note-item').querySelector('.note-velocity-display');
+      if (display) display.textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
+    });
+  });
+  
+  container.querySelectorAll('.btn-remove-note').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const index = parseInt(btn.dataset.noteIndex);
+      removeNote(index);
+    });
+  });
 }
 
 function addNoteToSequence() {
   currentNoteSequence.push({ duration: '8th', direction: 'D', velocity: 0.8 });
-  renderNoteSequenceEditor();
-}
-
-function updateNote(index, field, value) {
-  if (index < 0 || index >= currentNoteSequence.length) return;
-  currentNoteSequence[index][field] = value;
-  renderNoteSequenceEditor();
-}
-
-function removeNote(index) {
-  if (index < 0 || index >= currentNoteSequence.length) return;
-  currentNoteSequence.splice(index, 1);
   renderNoteSequenceEditor();
 }
 
@@ -424,6 +433,7 @@ function saveRhythmEditor() {
   saveCustomRhythms();
   closeRhythmEditor();
   renderCustomRhythmsList();
+  EventBus.emit(Events.SCORE_UPDATE, { customRhythms });
 }
 
 function closeRhythmEditor() {
@@ -433,11 +443,52 @@ function closeRhythmEditor() {
   currentNoteSequence = [];
 }
 
-window.updateNote = updateNote;
-window.removeNote = removeNote;
-window.openNewRhythmEditor = openNewRhythmEditor;
+// ========== 导出函数 ==========
+export function openNewRhythmEditor() {
+  editingRhythmIndex = -1;
+  currentNoteSequence = [];
+  const nameInput = document.getElementById('rhythmNameInput');
+  if (nameInput) nameInput.value = '';
+  const modal = document.getElementById('rhythmEditorModal');
+  if (modal) modal.style.display = 'block';
+  renderNoteSequenceEditor();
+  EventBus.emit(Events.MODE_CHANGE, { mode: 'rhythm-editor', isNew: true });
+}
 
-// ========== 导出 ==========
+export function editCustomRhythm(index) {
+  if (index < 0 || index >= customRhythms.length) return;
+  editingRhythmIndex = index;
+  const rhythm = customRhythms[index];
+  const nameInput = document.getElementById('rhythmNameInput');
+  if (nameInput) nameInput.value = rhythm.name;
+  currentNoteSequence = JSON.parse(JSON.stringify(rhythm.notes || []));
+  const modal = document.getElementById('rhythmEditorModal');
+  if (modal) modal.style.display = 'block';
+  renderNoteSequenceEditor();
+  EventBus.emit(Events.MODE_CHANGE, { mode: 'rhythm-editor', isNew: false, index });
+}
+
+export function deleteCustomRhythm(index) {
+  if (index < 0 || index >= customRhythms.length) return;
+  if (!confirm('确定要删除这个节奏型吗？')) return;
+  customRhythms.splice(index, 1);
+  saveCustomRhythms();
+  renderCustomRhythmsList();
+  EventBus.emit(Events.SCORE_UPDATE, { customRhythms });
+}
+
+export function updateNote(index, field, value) {
+  if (index < 0 || index >= currentNoteSequence.length) return;
+  currentNoteSequence[index][field] = value;
+  renderNoteSequenceEditor();
+}
+
+export function removeNote(index) {
+  if (index < 0 || index >= currentNoteSequence.length) return;
+  currentNoteSequence.splice(index, 1);
+  renderNoteSequenceEditor();
+}
+
 export function exportCustomRhythms() {
   return JSON.parse(JSON.stringify(customRhythms));
 }
