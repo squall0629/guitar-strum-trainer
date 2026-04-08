@@ -731,7 +731,25 @@ function init() {
         }
         // 启动调音器监听（用户点击后主动触发，符合浏览器安全策略）
         startTunerListening();
-        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '请点击下方琴弦按钮播放标准音';
+        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '检测中...';
+        // 初始化琴弦按钮点击事件（确保每次进入调音器模式都能点击）
+        initTunerUI(async (stringIndex) => {
+          try {
+            let audioCtx = getAudioContext();
+            if (!audioCtx) {
+              await initAudioEngine();
+              audioCtx = getAudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+              await audioCtx.resume();
+            }
+            if (audioCtx) {
+              await playReferenceTone(audioCtx, stringIndex, 2);
+            }
+          } catch (err) {
+            console.error('[Renderer] 播放标准音失败:', err);
+          }
+        });
       } else if (btn.id === 'practiceModeRhythm') {
         currentMode = 'rhythm';
         practiceMode = 'rhythm';
