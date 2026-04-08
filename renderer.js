@@ -731,7 +731,7 @@ function init() {
         }
         // 启动调音器监听（用户点击后主动触发，符合浏览器安全策略）
         startTunerListening();
-        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '检测中...';
+        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '请点击下方琴弦按钮播放标准音';
       } else if (btn.id === 'practiceModeRhythm') {
         currentMode = 'rhythm';
         practiceMode = 'rhythm';
