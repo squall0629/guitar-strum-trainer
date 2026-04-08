@@ -7,7 +7,8 @@ export const MIN_BPM = 40;
 export const MAX_BPM = 200;
 
 // ========== 时间间隔（毫秒） ==========
-export const ANALYZE_INTERVAL = 33;           // 音频分析间隔 (~30fps)
+export const ANALYZE_INTERVAL = 50;           // 音频分析间隔 (~20fps，降低 CPU 占用)
+export const UI_UPDATE_INTERVAL = 100;        // UI 更新间隔 (~10fps，分离音频分析和 UI 渲染)
 export const RECORDER_DRAW_INTERVAL = 100;    // 波形绘制间隔 (10fps)
 export const SPECTRUM_DRAW_INTERVAL = 67;      // 频谱绘制间隔 (15fps)
 export const METRONOME_DOT_TIMEOUT = 150;      // 节拍器光点显示时长

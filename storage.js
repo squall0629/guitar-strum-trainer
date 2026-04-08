@@ -1,6 +1,20 @@
 // 吉他扫弦练习助手 - 用户设置与历史存储模块
 
 /**
+ * XSS 防护：清理字符串中的危险字符
+ * @param {string} str - 待清理的字符串
+ * @returns {string} 清理后的字符串
+ */
+function sanitizeString(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * 保存用户设置到 localStorage
  * @param {number} currentBPM - 当前 BPM
  * @param {boolean} metronomeEnabled - 节拍器是否启用
@@ -240,9 +254,19 @@ export function importUserSettings(event, customRhythmsRef, callbacks, DEBUG = f
           if (typeof rhythm.name !== 'string' || rhythm.name.length === 0) {
             throw new Error(`customRhythms[${i}].name 必须是有效字符串`);
           }
+          // XSS 防护：清理 name 中的危险字符
+          rhythm.name = sanitizeString(rhythm.name);
+          // 名称长度限制
+          if (rhythm.name.length > 50) {
+            throw new Error(`customRhythms[${i}].name 不能超过 50 字符`);
+          }
+          // 验证 notes 数组不能为空
           if (rhythm.notes !== undefined) {
             if (!Array.isArray(rhythm.notes)) {
               throw new Error(`customRhythms[${i}].notes 必须是数组`);
+            }
+            if (rhythm.notes.length === 0) {
+              throw new Error(`customRhythms[${i}].notes 不能为空数组`);
             }
             for (let j = 0; j < rhythm.notes.length; j++) {
               const note = rhythm.notes[j];
@@ -255,6 +279,15 @@ export function importUserSettings(event, customRhythmsRef, callbacks, DEBUG = f
               if (!['8th', '16th'].includes(note.duration)) {
                 throw new Error(`customRhythms[${i}].notes[${j}].duration 必须是 '8th' 或 '16th'`);
               }
+            }
+          }
+          // 验证 pattern 数组（如果存在）
+          if (rhythm.pattern !== undefined) {
+            if (!Array.isArray(rhythm.pattern)) {
+              throw new Error(`customRhythms[${i}].pattern 必须是数组`);
+            }
+            if (rhythm.pattern.length === 0) {
+              throw new Error(`customRhythms[${i}].pattern 不能为空数组`);
             }
           }
         }

@@ -135,6 +135,26 @@ const cachedDOM = {
   statusText: null
 };
 
+/**
+ * 安全获取缓存的 DOM 元素，支持 null 检查和动态重新获取
+ * @param {string} id - 元素 ID
+ * @param {string} selector - CSS 选择器（可选）
+ * @returns {HTMLElement|null}
+ */
+function getCachedElement(id, selector = null) {
+  const element = cachedDOM[id];
+  // 如果缓存中存在且仍在 DOM 中，直接返回
+  if (element && document.contains(element)) {
+    return element;
+  }
+  // 否则重新获取并缓存
+  const newElement = selector ? document.querySelector(selector) : document.getElementById(id);
+  if (newElement) {
+    cachedDOM[id] = newElement;
+  }
+  return newElement;
+}
+
 function cacheDOMElements() {
   cachedDOM.rhythmScore = document.getElementById('rhythmScore');
   cachedDOM.toneScore = document.getElementById('toneScore');
@@ -329,11 +349,27 @@ async function startTunerListening() {
     initChordbookTuner((pitchResult) => {
       if (!isTunerListening || AppState.getCurrentMode() !== 'tuner') return;
       
-      const result = identifyString(pitchResult.frequency, { 
-        rms: pitchResult.clarity, 
-        confidence: pitchResult.clarity 
-      });
-      updateTunerDisplay(result, cachedDOM.tunerStringName, cachedDOM.tunerCents, cachedDOM.tunerFrequency, cachedDOM.tunerNeedle);
+      try {
+        if (!pitchResult?.frequency) {
+          throw new Error('无效的音高检测结果');
+        }
+        const result = identifyString(pitchResult.frequency, { 
+          rms: pitchResult.clarity, 
+          confidence: pitchResult.clarity 
+        });
+        updateTunerDisplay(result, cachedDOM.tunerStringName, cachedDOM.tunerCents, cachedDOM.tunerFrequency, cachedDOM.tunerNeedle);
+      } catch (err) {
+        console.error('[Tuner] 音高识别失败:', err);
+        if (cachedDOM.tunerStringName) {
+          cachedDOM.tunerStringName.textContent = '⚠️ 识别错误';
+        }
+        if (cachedDOM.tunerCents) {
+          cachedDOM.tunerCents.textContent = '--';
+        }
+        if (cachedDOM.tunerFrequency) {
+          cachedDOM.tunerFrequency.textContent = '-- Hz';
+        }
+      }
     });
     
     startChordbookTuner();

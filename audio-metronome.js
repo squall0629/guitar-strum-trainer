@@ -20,6 +20,12 @@ let audioContextForMetronome = null;
 let metronomeEnabled = false;
 let metronomeInterval = null;
 let metronomeBeat = 0;
+let metronomeDotTimeout = null;  // 追踪节拍器指示灯定时器
+
+// 导出所有定时器 ID 以便统一清理
+export function getMetronomeTimers() {
+  return { metronomeInterval, metronomeDotTimeout };
+}
 
 // ========== 节拍器声音生成 ==========
 /**
@@ -85,8 +91,16 @@ function triggerMetronomeDot(isAccent) {
   const metronomeDot = document.getElementById('metronomeDot');
   if (!metronomeDot) return;
   
+  // 清理之前的定时器，防止泄漏
+  if (metronomeDotTimeout) {
+    clearTimeout(metronomeDotTimeout);
+  }
+  
   metronomeDot.classList.add('accent');
-  setTimeout(() => metronomeDot.classList.remove('accent'), METRONOME_DOT_TIMEOUT);
+  metronomeDotTimeout = setTimeout(() => {
+    metronomeDot.classList.remove('accent');
+    metronomeDotTimeout = null;
+  }, METRONOME_DOT_TIMEOUT);
 }
 
 /**
@@ -96,6 +110,26 @@ export function stopMetronome() {
   if (metronomeInterval) {
     clearInterval(metronomeInterval);
     metronomeInterval = null;
+  }
+  // 清理指示灯定时器
+  if (metronomeDotTimeout) {
+    clearTimeout(metronomeDotTimeout);
+    metronomeDotTimeout = null;
+  }
+}
+
+/**
+ * 统一清理所有节拍器定时器（用于应用卸载时）
+ */
+export function cleanupAllMetronomeTimers() {
+  stopMetronome();
+  if (audioContextForMetronome && audioContextForMetronome.state !== 'closed') {
+    try {
+      audioContextForMetronome.close();
+    } catch (e) {
+      console.warn('[Metronome] AudioContext 清理失败:', e);
+    }
+    audioContextForMetronome = null;
   }
 }
 

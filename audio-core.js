@@ -4,6 +4,7 @@
 // 导入常量
 import {
   ANALYZE_INTERVAL,
+  UI_UPDATE_INTERVAL,
   RECORDER_BUFFER_SIZE,
   SPECTRUM_HISTORY_SIZE,
   DEFAULT_CANVAS_WIDTH,
@@ -25,6 +26,7 @@ let isListening = false;
 
 // 性能优化
 let lastAnalyzeTime = 0;
+let lastUIUpdateTime = 0;  // 分离 UI 更新频率
 
 // DOM 元素引用
 let volumeMeterFill = null;
@@ -161,23 +163,29 @@ export function analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback,
     tunerCallback(timeDataCache, audioContext.sampleRate);
   }
   
-  // 调用小节评分更新（每帧检查）
-  if (updateScoresCallback) {
-    updateScoresCallback();
-  }
-  
-  if (volumeMeterFill) {
-    const sensitivityLevel = AppState.getSensitivityLevel();
-    const sensitivityGain = 1 + (sensitivityLevel / 100);
-    volumeMeterFill.style.width = Math.min(100, rms * sensitivityGain * 100) + '%';
-  }
-  
-  if (drawRecorderWaveformCallback) {
-    drawRecorderWaveformCallback(recorderCanvas, recorderCtx, recorderWaveformData, timeDataCache, rms, RECORDER_BUFFER_SIZE, 100, DEBUG);
-  }
-  
-  if (drawSpectrumWaveformCallback) {
-    drawSpectrumWaveformCallback(spectrumCanvas, spectrumCtx, freqDataCache, spectrumHistory, SPECTRUM_HISTORY_SIZE, SPECTRUM_DRAW_INTERVAL, audioContext, DEBUG);
+  // 分离音频分析和 UI 更新：UI 更新频率更低 (10fps vs 20fps)
+  const uiDelta = now - lastUIUpdateTime;
+  if (uiDelta >= UI_UPDATE_INTERVAL) {
+    lastUIUpdateTime = now;
+    
+    // 调用小节评分更新
+    if (updateScoresCallback) {
+      updateScoresCallback();
+    }
+    
+    if (volumeMeterFill) {
+      const sensitivityLevel = AppState.getSensitivityLevel();
+      const sensitivityGain = 1 + (sensitivityLevel / 100);
+      volumeMeterFill.style.width = Math.min(100, rms * sensitivityGain * 100) + '%';
+    }
+    
+    if (drawRecorderWaveformCallback) {
+      drawRecorderWaveformCallback(recorderCanvas, recorderCtx, recorderWaveformData, timeDataCache, rms, RECORDER_BUFFER_SIZE, 100, DEBUG);
+    }
+    
+    if (drawSpectrumWaveformCallback) {
+      drawSpectrumWaveformCallback(spectrumCanvas, spectrumCtx, freqDataCache, spectrumHistory, SPECTRUM_HISTORY_SIZE, SPECTRUM_DRAW_INTERVAL, audioContext, DEBUG);
+    }
   }
   
   requestAnimationFrame(() => analyzeAudio(updateScoresCallback, drawRecorderWaveformCallback, drawSpectrumWaveformCallback, detectStrumCallback));
