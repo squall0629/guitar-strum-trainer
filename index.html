@@ -17,7 +17,7 @@
     <div class="panel" style="margin-bottom: 20px;">
       <h2>🎮 模式选择</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <button class="mode-btn active" id="modeTuner" data-mode="tuner" aria-pressed="true">
+        <button class="mode-btn" id="modeTuner" data-mode="tuner" aria-pressed="false">
           🎛️ 调音器
         </button>
         <button class="mode-btn" id="practiceModeRhythm" data-practice-mode="rhythm" aria-pressed="false">
@@ -35,14 +35,6 @@
     <!-- 调音器面板 -->
     <div class="panel" id="tunerPanel" style="margin-bottom: 20px;">
       <h2>🎛️ 吉他调音器</h2>
-      
-      <!-- 麦克风启动按钮 -->
-      <div style="text-align: center; margin-bottom: 20px;">
-        <button id="btnStartTuner" style="padding: 12px 30px; background: linear-gradient(135deg, #2ed573, #17a555); color: white; border: none; border-radius: 10px; font-size: 1.1em; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3); transition: all 0.3s;">
-          🎤 启动调音器
-        </button>
-        <div id="tunerStatusText" style="margin-top: 10px; color: #888; font-size: 0.9em;">点击按钮开始麦克风监听</div>
-      </div>
       
       <div class="tuner-container">
         <!-- 弦名显示 -->
@@ -112,7 +104,7 @@
     <div class="panel chord-training-panel" id="chordModePanel" style="margin-bottom: 20px; display: none;">
       <h2>🎯 训练模式</h2>
       <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <button class="mode-btn active" id="modePreset" data-mode="preset" aria-pressed="true">
+        <button class="mode-btn" id="modePreset" data-mode="preset" aria-pressed="false">
           📖 预设进行
         </button>
         <button class="mode-btn" id="modeCustom" data-mode="custom" aria-pressed="false">

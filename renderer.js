@@ -680,16 +680,12 @@ function init() {
   const modeComprehensive = document.getElementById('practiceModeComprehensive');
   const modeBtns = [modeTuner, modeRhythm, modeComprehensive];
   
-  // 确保初始化时只有调音器按钮为 active
+  // 初始化时所有按钮都不高亮，等待用户点击
   modeBtns.forEach(btn => {
     if (!btn) return;
     btn.classList.remove('active');
     btn.setAttribute('aria-pressed', 'false');
   });
-  if (modeTuner) {
-    modeTuner.classList.add('active');
-    modeTuner.setAttribute('aria-pressed', 'true');
-  }
   
   modeBtns.forEach(btn => {
     if (!btn) return;
@@ -728,9 +724,12 @@ function init() {
         if (!window.guitarSoundfont) {
           loadGuitarSoundfont();
         }
-        // 调音器独立启动监听
+        // 停止练习模式监听，调音器显示就绪状态
         stopListening();
-        startTunerListening();
+        if (isTunerListening) {
+          stopTunerListening();
+        }
+        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '就绪';
       } else if (btn.id === 'practiceModeRhythm') {
         currentMode = 'rhythm';
         practiceMode = 'rhythm';
@@ -761,10 +760,7 @@ function init() {
     });
   });
   
-  // 初始化调音器 UI
-  const btnStartTuner = document.getElementById('btnStartTuner');
-  const tunerStatusText = document.getElementById('tunerStatusText');
-  
+  // 初始化调音器 UI（参考音播放）
   initTunerUI(async (stringIndex) => {
     try {
       let audioCtx = getAudioContext();
@@ -784,26 +780,6 @@ function init() {
       console.error('[Renderer] 播放标准音失败:', err);
     }
   });
-  
-  // 调音器启动按钮事件
-  if (btnStartTuner) {
-    btnStartTuner.addEventListener('click', async () => {
-      if (isTunerListening) {
-        // 已启动，变为停止按钮
-        stopTunerListening();
-        btnStartTuner.innerHTML = '🎤 启动调音器';
-        btnStartTuner.style.background = 'linear-gradient(135deg, #2ed573, #17a555)';
-        if (tunerStatusText) tunerStatusText.textContent = '点击按钮开始麦克风监听';
-        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '已停止';
-      } else {
-        // 未启动，启动监听
-        btnStartTuner.innerHTML = '⏹️ 停止监听';
-        btnStartTuner.style.background = 'linear-gradient(135deg, #ff4757, #c0392b)';
-        if (tunerStatusText) tunerStatusText.textContent = '正在监听麦克风...';
-        await startTunerListening();
-      }
-    });
-  }
   
   // 初始化和弦训练
   initChordTraining({
@@ -886,9 +862,8 @@ function init() {
   if (scorePanel) scorePanel.style.display = 'none';
   
   // 页面加载时显示调音器为就绪状态
-  console.log('[Renderer] 调音器就绪，等待用户点击启动按钮...');
+  console.log('[Renderer] 调音器就绪，等待用户选择模式...');
   if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '就绪';
-  if (tunerStatusText) tunerStatusText.textContent = '点击按钮开始麦克风监听';
   
   // 立即更新状态为 ready
   updateStatus('ready');
