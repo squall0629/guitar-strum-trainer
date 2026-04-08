@@ -724,12 +724,14 @@ function init() {
         if (!window.guitarSoundfont) {
           loadGuitarSoundfont();
         }
-        // 停止练习模式监听，调音器显示就绪状态
+        // 停止练习模式监听
         stopListening();
         if (isTunerListening) {
           stopTunerListening();
         }
-        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '就绪';
+        // 启动调音器监听（用户点击后主动触发，符合浏览器安全策略）
+        startTunerListening();
+        if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '检测中...';
       } else if (btn.id === 'practiceModeRhythm') {
         currentMode = 'rhythm';
         practiceMode = 'rhythm';
