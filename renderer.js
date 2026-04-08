@@ -670,11 +670,28 @@ function init() {
   const modeComprehensive = document.getElementById('practiceModeComprehensive');
   const modeBtns = [modeTuner, modeRhythm, modeComprehensive];
   
+  // 确保初始化时只有调音器按钮为 active
+  modeBtns.forEach(btn => {
+    if (!btn) return;
+    btn.classList.remove('active');
+    btn.setAttribute('aria-pressed', 'false');
+  });
+  if (modeTuner) {
+    modeTuner.classList.add('active');
+    modeTuner.setAttribute('aria-pressed', 'true');
+  }
+  
   modeBtns.forEach(btn => {
     if (!btn) return;
     btn.addEventListener('click', () => {
-      modeBtns.forEach(b => b && b.classList.remove('active'));
+      modeBtns.forEach(b => {
+        if (b) {
+          b.classList.remove('active');
+          b.setAttribute('aria-pressed', 'false');
+        }
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       
       const tunerPanel = document.getElementById('tunerPanel');
       const chordModePanel = document.getElementById('chordModePanel');
@@ -835,16 +852,13 @@ function init() {
   if (practicePanel) practicePanel.style.display = 'none';
   if (scorePanel) scorePanel.style.display = 'none';
   
-  // 初始化模式按钮状态（确保只有调音器按钮为 active）
-  if (modeTuner) modeTuner.classList.add('active');
-  if (modeRhythm) modeRhythm.classList.remove('active');
-  if (modeComprehensive) modeComprehensive.classList.remove('active');
-  
-  // 自动启动调音器监听
+  // 自动启动调音器监听（延迟确保 DOM 完全加载）
   initTunerTimeoutId = setTimeout(() => {
+    console.log('[Renderer] 自动启动调音器监听...');
     startTunerListening();
   }, INIT_TUNER_DELAY);
   
+  // 立即更新状态为 ready
   updateStatus('ready');
   
   setupPracticeReport();

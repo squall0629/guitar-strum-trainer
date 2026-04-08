@@ -17,7 +17,7 @@ let chordRecognitionEnabled = false;
 let lastRecognizedChord = null;
 let chordChangeTimeout = null;
 
-let practiceMode = 'rhythm';
+let practiceMode = 'tuner';  // 默认调音器模式，与 renderer.js 保持一致
 let practiceStartTime = 0;
 let practiceChordCorrect = 0;
 let practiceChordTotal = 0;
@@ -204,8 +204,11 @@ export function setPracticeMode(mode) {
 }
 
 function updatePracticeModeUI() {
-  if (practiceModeRhythm) practiceModeRhythm.classList.toggle('active', practiceMode === 'rhythm');
-  if (practiceModeComprehensive) practiceModeComprehensive.classList.toggle('active', practiceMode === 'comprehensive');
+  // 调音器模式下，不激活任何练习模式按钮
+  const isRhythmMode = practiceMode === 'rhythm';
+  const isComprehensiveMode = practiceMode === 'comprehensive';
+  if (practiceModeRhythm) practiceModeRhythm.classList.toggle('active', isRhythmMode);
+  if (practiceModeComprehensive) practiceModeComprehensive.classList.toggle('active', isComprehensiveMode);
   if (practiceModeDescription) {
     practiceModeDescription.textContent = practiceMode === 'rhythm' ? '💡 纯节奏模式：专注节奏稳定度，任意和弦均可练习' : '💡 综合模式：需要正确和弦转换，同时评估节奏与和弦准确度';
   }
