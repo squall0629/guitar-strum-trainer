@@ -4,7 +4,7 @@
 import { drawChordDiagram as drawChordDiagramSVG, drawChordDiagramFallbackSVG as drawChordDiagramFallbackSVGUI } from './ui-renderer.js';
 import { isTonalAvailable, ChordDetector as ChordDetectorClass } from './chord-detector.js';
 import { AppState } from './state-manager.js';
-import { ChordLibrary, COMMON_PROGRESSIONS } from './chord-library.js';
+import { ChordLibrary } from './chord-library.js';
 import EventBus, { Events } from './event-bus.js';
 
 // ========== 全局状态 ==========
@@ -277,14 +277,14 @@ function setupChordTraining() {
   if (progressionSelect) {
     progressionSelect.addEventListener('change', () => {
       const index = parseInt(progressionSelect.value);
-      if (COMMON_PROGRESSIONS[index]) {
-        currentProgression = COMMON_PROGRESSIONS[index].chords;
+      if (ChordLibrary.COMMON_PROGRESSIONS[index]) {
+        currentProgression = ChordLibrary.COMMON_PROGRESSIONS[index].chords;
         updateChordProgressionDisplay();
         updateProgressionDetail(index);
         EventBus.emit(Events.PROGRESSION_UPDATE, { progression: currentProgression, index });
       }
     });
-    currentProgression = COMMON_PROGRESSIONS[0]?.chords || [];
+    currentProgression = ChordLibrary.COMMON_PROGRESSIONS[0]?.chords || [];
     updateProgressionDetail(0);
   }
   
@@ -323,8 +323,8 @@ export function setTrainingMode(mode) {
   if (mode === 'free') {
     currentProgression = [];
     updateChordProgressionDisplay();
-  } else if (mode === 'preset' && COMMON_PROGRESSIONS[0]) {
-    currentProgression = COMMON_PROGRESSIONS[0].chords;
+  } else if (mode === 'preset' && ChordLibrary.COMMON_PROGRESSIONS[0]) {
+    currentProgression = ChordLibrary.COMMON_PROGRESSIONS[0].chords;
     updateChordProgressionDisplay();
   }
 }
@@ -399,7 +399,7 @@ export function updateChordProgressionDisplay() {
 function updateProgressionDetail(index) {
   if (!cachedProgressionDetail.progressionChords || !cachedProgressionDetail.progressionDesc) return;
   
-  const progression = COMMON_PROGRESSIONS[index];
+  const progression = ChordLibrary.COMMON_PROGRESSIONS[index];
   if (progression) {
     cachedProgressionDetail.progressionChords.textContent = progression.chords.join(' → ');
     cachedProgressionDetail.progressionDesc.textContent = progression.desc;

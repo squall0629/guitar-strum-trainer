@@ -10,7 +10,8 @@ import {
   MIC_TEST_VOLUME_SCALE
 } from './constants.js';
 
-import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo, playCustomRhythmFromList as playCustomRhythmFromListDemo } from './audio-demo.js';
+import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo } from './audio-demo.js';
+import { playCustomRhythmFromList as playCustomRhythmFromListDemo } from './custom-rhythms.js';
 import { getActiveRhythm } from './custom-rhythms.js';
 
 // ========== 全局引用 ==========
