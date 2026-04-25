@@ -11,7 +11,7 @@ import {
 } from './constants.js';
 
 import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo } from './audio-demo.js';
-import { playCustomRhythmFromList as playCustomRhythmFromListDemo } from './custom-rhythms.js';
+import { playCustomRhythmFromList as playCustomRhythmFromListDemo, openNewRhythmEditor } from './custom-rhythms.js';
 import { getActiveRhythm } from './custom-rhythms.js';
 
 // ========== 全局引用 ==========
