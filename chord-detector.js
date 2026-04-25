@@ -11,7 +11,6 @@
  */
 
 import { ChordLibrary } from './chord-library.js';
- */
 
 // 导入常量
 import { DEBUG } from './constants.js';

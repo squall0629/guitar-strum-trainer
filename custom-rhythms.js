@@ -307,7 +307,6 @@ function setupCustomRhythmButtons() {
       },
       renderCustomRhythmsList
     }, false);
-    }
   });
   if (btnSave) btnSave.addEventListener('click', saveRhythmEditor);
   if (btnCancel) btnCancel.addEventListener('click', closeRhythmEditor);
