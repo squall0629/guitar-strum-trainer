@@ -109,100 +109,95 @@ export function drawSpectrumWaveform(spectrumCanvas, spectrumCtx, freqData, spec
     return;
   }
   spectrumCanvas._lastSpectrumDrawTime = now;
-  
-  // 检测 canvas 尺寸变化，重建离屏缓冲
-  if (spectrumCanvas.width !== spectrumCanvas._lastSpectrumCanvasWidth || 
-      spectrumCanvas.height !== spectrumCanvas._lastSpectrumCanvasHeight) {
-    spectrumCanvas._spectrumOffscreenCanvas = null;
-    spectrumCanvas._spectrumOffscreenCtx = null;
-    spectrumCanvas._spectrumBackgroundDirty = true;
-    spectrumCanvas._lastSpectrumCanvasWidth = spectrumCanvas.width;
-    spectrumCanvas._lastSpectrumCanvasHeight = spectrumCanvas.height;
-  }
-  
-  // 创建离屏 Canvas（只创建一次）
-  if (!spectrumCanvas._spectrumOffscreenCanvas) {
-    spectrumCanvas._spectrumOffscreenCanvas = document.createElement('canvas');
-    spectrumCanvas._spectrumOffscreenCanvas.width = spectrumCanvas.width;
-    spectrumCanvas._spectrumOffscreenCanvas.height = spectrumCanvas.height;
-    spectrumCanvas._spectrumOffscreenCtx = spectrumCanvas._spectrumOffscreenCanvas.getContext('2d');
-    spectrumCanvas._spectrumBackgroundDirty = true;
-  }
-  
-  // 添加当前频谱到历史缓冲区（使用预分配环形缓冲区，避免每帧 GC）
-  if (!spectrumCanvas._spectrumRingBuffer) {
-    spectrumCanvas._spectrumRingBuffer = [];
-    for (let i = 0; i < SPECTRUM_HISTORY_SIZE; i++) {
-      spectrumCanvas._spectrumRingBuffer.push(new Uint8Array(freqData.length));
-    }
-    spectrumCanvas._spectrumRingHead = 0;
-    spectrumCanvas._spectrumRingCount = 0;
-  }
-  const head = spectrumCanvas._spectrumRingHead;
-  spectrumCanvas._spectrumRingBuffer[head].set(freqData);
-  spectrumCanvas._spectrumRingHead = (head + 1) % SPECTRUM_HISTORY_SIZE;
-  spectrumCanvas._spectrumRingCount = Math.min(spectrumCanvas._spectrumRingCount + 1, SPECTRUM_HISTORY_SIZE);
-  
-  // 重建 spectrumHistory 为当前环形缓冲区的视图
-  spectrumHistory.length = 0;
-  for (let i = 0; i < spectrumCanvas._spectrumRingCount; i++) {
-    const idx = (head - spectrumCanvas._spectrumRingCount + i + SPECTRUM_HISTORY_SIZE) % SPECTRUM_HISTORY_SIZE;
-    spectrumHistory.push(spectrumCanvas._spectrumRingBuffer[idx]);
-  }
-  if (spectrumHistory.length > SPECTRUM_HISTORY_SIZE) {
-    spectrumHistory.shift();
-  }
-  
-  const historyLength = spectrumHistory.length;
-  const cellWidth = spectrumCanvas.width / SPECTRUM_HISTORY_SIZE;
-  
-  // 性能优化：只处理 80Hz-1000Hz 关键频段（吉他核心频段）
+
   const sampleRate = audioContext ? audioContext.sampleRate : 44100;
   const binFrequency = sampleRate / FFT_SIZE;
   const startBin = Math.max(0, Math.floor(80 / binFrequency));
   const endBin = Math.min(Math.floor(freqData.length / 4), Math.ceil(1000 / binFrequency));
   const freqBins = endBin - startBin;
-  
+
   if (freqBins <= 0) return;
-  
-  const cellHeight = spectrumCanvas.height / freqBins;
-  
-  // 绘制热力图到离屏 Canvas
-  for (let t = 0; t < historyLength; t++) {
-    const spectrum = spectrumHistory[t];
-    const x = t * cellWidth;
-    
-    for (let f = startBin; f < endBin; f++) {
-      const value = spectrum[f];
-      const freqIndex = f - startBin;
-      const y = spectrumCanvas.height - (freqIndex + 1) * cellHeight;
-      
-      // 彩虹色映射（根据能量强度）
-      const normalizedValue = value / 255;
-      const hue = (1 - normalizedValue) * 240;
-      const saturation = 80 + normalizedValue * 20;
-      const lightness = 40 + normalizedValue * 30;
-      const alpha = 0.3 + normalizedValue * 0.7;
-      
-      spectrumCanvas._spectrumOffscreenCtx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
-      spectrumCanvas._spectrumOffscreenCtx.fillRect(x, y, cellWidth + 1, cellHeight + 1);
-    }
+
+  if (spectrumCanvas.width !== spectrumCanvas._lastSpectrumCanvasWidth ||
+      spectrumCanvas.height !== spectrumCanvas._lastSpectrumCanvasHeight) {
+    spectrumCanvas._spectrumOffscreenCanvas = null;
+    spectrumCanvas._spectrumOffscreenCtx = null;
+    spectrumCanvas._lastSpectrumCanvasWidth = spectrumCanvas.width;
+    spectrumCanvas._lastSpectrumCanvasHeight = spectrumCanvas.height;
+    spectrumCanvas._spectrumNeedsFullRedraw = true;
   }
-  
-  // 将离屏 Canvas 内容绘制到主 Canvas
+
+  if (!spectrumCanvas._spectrumOffscreenCanvas) {
+    spectrumCanvas._spectrumOffscreenCanvas = document.createElement('canvas');
+    spectrumCanvas._spectrumOffscreenCanvas.width = spectrumCanvas.width;
+    spectrumCanvas._spectrumOffscreenCanvas.height = spectrumCanvas.height;
+    spectrumCanvas._spectrumOffscreenCtx = spectrumCanvas._spectrumOffscreenCanvas.getContext('2d');
+    spectrumCanvas._spectrumNeedsFullRedraw = true;
+  }
+
+  spectrumHistory.push(new Uint8Array(freqData));
+  if (spectrumHistory.length > SPECTRUM_HISTORY_SIZE) {
+    spectrumHistory.shift();
+  }
+
+  const cellWidth = spectrumCanvas.width / SPECTRUM_HISTORY_SIZE;
+  const cellHeight = spectrumCanvas.height / freqBins;
+  const offscreenCtx = spectrumCanvas._spectrumOffscreenCtx;
+
+  if (spectrumCanvas._spectrumNeedsFullRedraw) {
+    offscreenCtx.clearRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
+    spectrumHistory.forEach((spectrum, index) => {
+      const x = index * cellWidth;
+      drawSpectrumColumn(offscreenCtx, spectrumCanvas.height, spectrum, x, cellWidth, cellHeight, startBin, endBin);
+    });
+    spectrumCanvas._spectrumNeedsFullRedraw = false;
+  } else {
+    offscreenCtx.save();
+    offscreenCtx.setTransform(1, 0, 0, 1, 0, 0);
+    offscreenCtx.globalCompositeOperation = 'copy';
+    offscreenCtx.drawImage(spectrumCanvas._spectrumOffscreenCanvas, -cellWidth, 0);
+    offscreenCtx.restore();
+    offscreenCtx.clearRect(spectrumCanvas.width - cellWidth - 1, 0, cellWidth + 2, spectrumCanvas.height);
+    drawSpectrumColumn(
+      offscreenCtx,
+      spectrumCanvas.height,
+      freqData,
+      spectrumCanvas.width - cellWidth,
+      cellWidth,
+      cellHeight,
+      startBin,
+      endBin
+    );
+  }
+
   spectrumCtx.clearRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
   spectrumCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   spectrumCtx.fillRect(0, 0, spectrumCanvas.width, spectrumCanvas.height);
   spectrumCtx.drawImage(spectrumCanvas._spectrumOffscreenCanvas, 0, 0);
-  
-  // 绘制频率刻度标签（只在背景脏时重绘）
-  if (spectrumCanvas._spectrumBackgroundDirty) {
-    spectrumCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    spectrumCtx.font = '10px Arial';
-    spectrumCtx.fillText('1kHz', 5, 12);
-    spectrumCtx.fillText('80Hz', 5, spectrumCanvas.height - 5);
-    spectrumCanvas._spectrumBackgroundDirty = false;
+  drawSpectrumLabels(spectrumCtx, spectrumCanvas.height);
+}
+
+function drawSpectrumColumn(ctx, canvasHeight, spectrum, x, cellWidth, cellHeight, startBin, endBin) {
+  for (let f = startBin; f < endBin; f++) {
+    const value = spectrum[f];
+    const freqIndex = f - startBin;
+    const y = canvasHeight - (freqIndex + 1) * cellHeight;
+    const normalizedValue = value / 255;
+    const hue = (1 - normalizedValue) * 240;
+    const saturation = 80 + normalizedValue * 20;
+    const lightness = 40 + normalizedValue * 30;
+    const alpha = 0.3 + normalizedValue * 0.7;
+
+    ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
+    ctx.fillRect(x, y, cellWidth + 1, cellHeight + 1);
   }
+}
+
+function drawSpectrumLabels(ctx, canvasHeight) {
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.font = '10px Arial';
+  ctx.fillText('1kHz', 5, 12);
+  ctx.fillText('80Hz', 5, canvasHeight - 5);
 }
 
 /**

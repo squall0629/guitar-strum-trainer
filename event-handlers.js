@@ -387,11 +387,26 @@ function setupChartToggle() {
 // ========== 状态更新 ==========
 /**
  * 更新状态显示
- * @param {string} status - 状态 ('ready', 'listening', 'error')
+ * @param {string} status - 状态 ('ready', 'listening', 'warning', 'busy', 'error')
+ * @param {string} customText - 自定义状态文本
  */
-export function updateStatus(status) {
+export function updateStatus(status, customText = '') {
   if (statusIndicatorEl) statusIndicatorEl.className = 'status-indicator ' + status;
-  if (statusTextEl) statusTextEl.textContent = status === 'ready' ? '准备就绪' : status === 'listening' ? '正在监听...' : '发生错误';
+  if (statusTextEl) {
+    if (customText) {
+      statusTextEl.textContent = customText;
+      return;
+    }
+    statusTextEl.textContent = status === 'ready'
+      ? '准备就绪'
+      : status === 'listening'
+        ? '正在监听...'
+        : status === 'warning'
+          ? '请调整输入环境'
+          : status === 'busy'
+            ? '处理中...'
+            : '发生错误';
+  }
 }
 
 // ========== 导出演示相关 ==========

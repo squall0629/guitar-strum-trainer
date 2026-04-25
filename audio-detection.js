@@ -15,6 +15,8 @@ import {
   FLUX_COOLDOWN_FRAMES,
   FLUX_MIN_BUFFER,
   DEFAULT_SENSITIVITY,
+  MIN_SENSITIVITY,
+  MAX_SENSITIVITY,
   DEFAULT_STRUM_THRESHOLD,
   MIN_STRUM_THRESHOLD,
   MAX_STRUM_THRESHOLD,
@@ -77,6 +79,18 @@ let lastStrumEventTime = 0;
 
 // 采样率缓存（避免每帧调用 getAudioContext）
 let cachedSampleRate = null;
+let micDiagnosticStatus = {
+  level: 'normal',
+  message: '',
+  noiseLevel: 0,
+  clipping: false,
+  suggestedSensitivity: { min: 35, max: 70 }
+};
+let micDiagnosticLastUpdate = 0;
+
+const MIC_DIAGNOSTIC_INTERVAL_MS = 250;
+const MIC_NOISE_WARNING_RMS = 0.05;
+const MIC_CLIPPING_PEAK = 0.98;
 
 // ========== 灵敏度管理 ==========
 
@@ -218,6 +232,36 @@ export function resetFluxState() {
   fluxBuffer = [];
   fluxThreshold = 0;
   fluxPeakCooldown = 0;
+  cachedSampleRate = null;
+}
+
+/**
+ * 重置当前练习 session 的检测状态
+ */
+export function resetDetectionSession() {
+  currentMeasureStartTime = 0;
+  currentMeasureStrums = [];
+  lastMeasureScores = { rhythm: 0, tone: 0, dynamics: 0, total: 0 };
+  lastScoredMeasureEnd = 0;
+  measureHistory = { rhythm: [], tone: [], dynamics: [] };
+  detectedStrums = [];
+  lastStrumTime = 0;
+  expectedStrumIndex = 0;
+  strumHistory = [];
+  lastStrumEventTime = 0;
+  resetFluxState();
+  micDiagnosticStatus = {
+    level: 'normal',
+    message: '',
+    noiseLevel: 0,
+    clipping: false,
+    suggestedSensitivity: { min: 35, max: 70 }
+  };
+  micDiagnosticLastUpdate = 0;
+}
+
+export function getMicDiagnosticStatus() {
+  return micDiagnosticStatus;
 }
 
 // ========== Spectral Flux 计算 ==========
@@ -366,6 +410,7 @@ export function detectStrum(freqData, timeData, rms) {
   highFreqEnergy /= (freqData.length - highFreqStart);
   
   const onsetResult = detectOnsetWithFlux(freqData, timeData, rms);
+  updateMicDiagnosticStatus(freqData, timeData, rms, onsetResult, now);
   
   if (onsetResult.onset) {
     const strum = {
@@ -389,6 +434,55 @@ export function detectStrum(freqData, timeData, rms) {
   }
   
   return onsetResult;
+}
+
+function updateMicDiagnosticStatus(freqData, timeData, rms, onsetResult, now) {
+  if (now - micDiagnosticLastUpdate < MIC_DIAGNOSTIC_INTERVAL_MS) return;
+  micDiagnosticLastUpdate = now;
+
+  let peakAmplitude = 0;
+  for (let i = 0; i < timeData.length; i++) {
+    const normalized = Math.abs((timeData[i] - 128) / 128);
+    if (normalized > peakAmplitude) {
+      peakAmplitude = normalized;
+    }
+  }
+
+  const clipping = peakAmplitude >= MIC_CLIPPING_PEAK;
+  const noisyEnvironment = rms >= MIC_NOISE_WARNING_RMS && !onsetResult?.onset;
+  let suggestedSensitivity = { min: 35, max: 70 };
+  let message = '';
+  let level = 'normal';
+
+  if (rms < 0.015) {
+    suggestedSensitivity = { min: 60, max: 85 };
+    message = '输入偏弱，建议灵敏度 60-85';
+    level = 'low-input';
+  } else if (rms > 0.12) {
+    suggestedSensitivity = { min: 25, max: 50 };
+    message = '输入偏强，建议灵敏度 25-50';
+    level = 'strong-input';
+  }
+
+  if (noisyEnvironment) {
+    suggestedSensitivity = { min: 20, max: 45 };
+    message = '环境噪音较高，建议降低灵敏度并靠近琴体';
+    level = 'noise';
+  }
+
+  if (clipping) {
+    suggestedSensitivity = { min: 15, max: 35 };
+    message = '检测到输入过载，请远离麦克风或降低输入增益';
+    level = 'clipping';
+  }
+
+  micDiagnosticStatus = {
+    level,
+    message,
+    noiseLevel: rms,
+    clipping,
+    suggestedSensitivity
+  };
 }
 
 // ========== 音色评分 ==========

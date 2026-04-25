@@ -27,7 +27,7 @@ import { updateTunerDisplay, initTunerUI, resetTunerUI } from './tuner-ui.js';
 import { initAudioEngine, startListening as audioStartListening, stopListening as audioStopListening, isListeningState, analyzeAudio, getAudioContext, getAnalyser } from './audio-core.js';
 import { setCurrentBPM, getCurrentBPM, setMetronomeEnabled, isMetronomeEnabled, startMetronome, stopMetronome, playMetronomeSound } from './audio-metronome.js';
 import { getIsPlayingDemo, setIsPlayingDemo, stopDemo, playDemo, loadGuitarSoundfont } from './audio-demo.js';
-import { detectStrum, provideFeedback, calculateToneScore as audioCalculateToneScore, resetFluxState, getDetectedStrums, getCurrentMeasureStrums, getMeasureHistory, getLastMeasureScores, setLastMeasureScores, getLastScoredMeasureEnd, setLastScoredMeasureEnd, setCurrentMeasureStartTime, getCurrentMeasureStartTime, setCurrentMeasureStrums, setSensitivityLevel, getSensitivityLevel, updateThreshold } from './audio-detection.js';
+import { detectStrum, provideFeedback, calculateToneScore as audioCalculateToneScore, getDetectedStrums, getCurrentMeasureStrums, getMeasureHistory, getLastMeasureScores, setLastMeasureScores, getLastScoredMeasureEnd, setLastScoredMeasureEnd, setCurrentMeasureStartTime, getCurrentMeasureStartTime, setCurrentMeasureStrums, setSensitivityLevel, getSensitivityLevel, updateThreshold, resetDetectionSession, getMicDiagnosticStatus } from './audio-detection.js';
 import {
   initChordTraining,
   initChordDetector,
@@ -83,6 +83,10 @@ let autoSaveIntervalId = null;
 
 // 初始调音器启动定时器
 let initTunerTimeoutId = null;
+let micStatusLastMessage = '';
+let micStatusLastUpdate = 0;
+
+const MIC_STATUS_UI_INTERVAL = 500;
 
 // ========== 缓存 DOM 元素 ==========
 const cachedDOM = {
@@ -226,11 +230,12 @@ function showPracticeReport() {
   const bestTransition = practiceTransitionTimes.length > 0 ? Math.round(Math.min(...practiceTransitionTimes)) : null;
   const worstTransition = practiceTransitionTimes.length > 0 ? Math.round(Math.max(...practiceTransitionTimes)) : null;
   const totalScore = parseInt(cachedDOM.totalScore?.textContent) || 0;
+  const isComprehensiveMode = AppState.getPracticeMode() === 'comprehensive';
   
   if (cachedDOM.reportDuration) cachedDOM.reportDuration.textContent = duration + 's';
   if (cachedDOM.reportTotalScore) cachedDOM.reportTotalScore.textContent = totalScore;
   
-  if (AppState.getPracticeMode()) {
+  if (isComprehensiveMode) {
     if (cachedDOM.reportTransitions) cachedDOM.reportTransitions.textContent = transitionCount;
     if (cachedDOM.reportAvgTime) cachedDOM.reportAvgTime.textContent = avgTransitionTime > 0 ? avgTransitionTime + 'ms' : '--';
     if (cachedDOM.reportAccuracy) cachedDOM.reportAccuracy.textContent = accuracy > 0 ? accuracy + '%' : '--';
@@ -286,7 +291,7 @@ function checkMeasureUpdateWrapper() {
     currentMeasureStartTime: getCurrentMeasureStartTime(),
     currentMeasureStrums: getCurrentMeasureStrums(),
     lastScoredMeasureEnd: getLastScoredMeasureEnd(),
-    AppState.getBPM(): AppState.getBPM(),
+    currentBPM: AppState.getBPM(),
     getActiveRhythm: getActiveRhythm,
     currentRhythm: AppState.getCurrentRhythm(),
     calculateRhythmScore: calculateRhythmScore,
@@ -320,27 +325,71 @@ function checkMeasureUpdateWrapper() {
   }
 }
 
+function setFeedbackMessage(message) {
+  if (cachedDOM.feedbackMessage) {
+    cachedDOM.feedbackMessage.textContent = message;
+  }
+}
+
+function setLoadingOverlayState(visible, title = '正在请求麦克风权限...', subtitle = '请在浏览器弹窗中点击"允许"') {
+  if (!cachedDOM.loadingOverlay) return;
+
+  cachedDOM.loadingOverlay.style.display = visible ? 'flex' : 'none';
+  const loadingTexts = cachedDOM.loadingOverlay.querySelectorAll('div');
+  if (loadingTexts[2]) loadingTexts[2].textContent = title;
+  if (loadingTexts[3]) loadingTexts[3].textContent = subtitle;
+}
+
+function updateMicStatusUI(force = false) {
+  const now = Date.now();
+  if (!force && now - micStatusLastUpdate < MIC_STATUS_UI_INTERVAL) return;
+  micStatusLastUpdate = now;
+
+  if (!isListeningState()) return;
+
+  const micStatus = getMicDiagnosticStatus();
+  if (micStatus.level === 'noise' || micStatus.level === 'clipping') {
+    updateStatus('warning', micStatus.message);
+    if (micStatus.message && micStatus.message !== micStatusLastMessage) {
+      setFeedbackMessage(`⚠️ ${micStatus.message}`);
+      micStatusLastMessage = micStatus.message;
+    }
+    return;
+  }
+
+  if (micStatus.level === 'low-input' || micStatus.level === 'strong-input') {
+    updateStatus('listening', micStatus.message);
+    return;
+  }
+
+  micStatusLastMessage = '';
+  updateStatus('listening');
+}
+
 // ========== 调音器独立监听 ==========
 async function startTunerListening() {
   if (isTunerListening) {
     console.log('[Renderer] 调音器已在监听中');
-    return;
+    return true;
   }
   
   console.log('[Renderer] startTunerListening 开始...');
   
   try {
-    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'flex';
+    setLoadingOverlayState(true, '正在请求麦克风...', '请在浏览器弹窗中点击"允许"');
+    setFeedbackMessage('正在请求麦克风...');
+    updateStatus('busy', '正在请求麦克风...');
     
     const success = await audioStartListening();
     console.log('[Renderer] audioStartListening 返回:', success);
     
-    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    setLoadingOverlayState(false);
     
     if (!success) {
       console.warn('[Renderer] 麦克风访问失败，audioStartListening 返回 false');
       if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '❌ 无法访问麦克风';
-      return;
+      updateStatus('error');
+      return false;
     }
     
     console.log('[Renderer] ✓ 麦克风访问成功，启动调音器...');
@@ -374,10 +423,15 @@ async function startTunerListening() {
     
     startChordbookTuner();
     console.log('[Renderer] ✓ 调音器启动成功');
+    updateStatus('ready', '调音器已就绪');
+    setFeedbackMessage('调音器已就绪');
+    return true;
   } catch (err) {
-    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    setLoadingOverlayState(false);
     console.error('[Renderer] startTunerListening 异常:', err);
     if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '❌ 麦克风访问失败';
+    updateStatus('error');
+    return false;
   }
 }
 
@@ -397,36 +451,74 @@ function stopTunerListening() {
   audioStopListening();
 }
 
+function startAutoSave() {
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+  }
+  autoSaveIntervalId = setInterval(() => {
+    saveUserSettings(AppState.getBPM(), AppState.getMetronomeEnabled(), AppState.getSensitivityLevel(), AppState.getCurrentRhythm(), exportCustomRhythms(), DEBUG);
+  }, AUTO_SAVE_INTERVAL);
+}
+
+function stopAutoSave() {
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+    autoSaveIntervalId = null;
+  }
+}
+
+function saveSettingsNow() {
+  saveUserSettings(AppState.getBPM(), AppState.getMetronomeEnabled(), AppState.getSensitivityLevel(), AppState.getCurrentRhythm(), exportCustomRhythms(), DEBUG);
+}
+
+function startPracticeSessionState() {
+  const sessionStartTime = Date.now();
+  resetDetectionSession();
+  resetPracticeStats();
+  setPracticeStartTime(sessionStartTime);
+  setCurrentMeasureStartTime(sessionStartTime);
+}
+
+function stopPracticeSession() {
+  stopAutoSave();
+  saveSettingsNow();
+  setChordRecognitionEnabled(false);
+  stopMetronome();
+  if (getIsPlayingDemo()) stopDemo();
+  audioStopListening();
+  resetDetectionSession();
+  updateListeningState(false);
+  micStatusLastMessage = '';
+  if (AppState.getCurrentMode() !== 'tuner') {
+    updateStatus('ready');
+  }
+}
+
 // ========== 开始/停止监听（练习模式） ==========
 async function startListening() {
   try {
-    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'flex';
-    
-    if (autoSaveIntervalId) {
-      clearInterval(autoSaveIntervalId);
-      autoSaveIntervalId = null;
-    }
-    
+    setLoadingOverlayState(true, '正在请求麦克风...', '请在浏览器弹窗中点击"允许"');
+    setFeedbackMessage('正在请求麦克风...');
+    updateStatus('busy', '正在请求麦克风...');
+
     const success = await audioStartListening();
     
-    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    setLoadingOverlayState(false);
     
     if (!success) {
       updateStatus('error');
-      if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = '❌ 无法访问麦克风';
+      setFeedbackMessage('❌ 无法访问麦克风');
       return;
     }
 
-    resetFluxState();
-    setPracticeStartTime(Date.now());
-    setCurrentMeasureStartTime(Date.now());
-    resetPracticeStats();
+    startPracticeSessionState();
     initChordDetector(getAudioContext(), getAnalyser());
-    setChordRecognitionEnabled(AppState.getPracticeMode());
+    setChordRecognitionEnabled(AppState.getPracticeMode() === 'comprehensive');
     resetChordTraining();
     
     updateListeningState(true);
     updateStatus('listening');
+    startAutoSave();
     
     const activeRhythm = getActiveRhythm(AppState.getCurrentRhythm());
     if (cachedDOM.feedbackMessage) {
@@ -448,32 +540,24 @@ async function startListening() {
         drawRecorderWaveform(canvas, ctx, data, timeData, rms, bufferSize, drawInterval, debug),
       (canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug) =>
         drawSpectrumWaveform(canvas, ctx, freqData, history, historySize, drawInterval, audioCtx, debug),
-      (freqData, timeData, rms) => detectStrum(freqData, timeData, rms)
+      (freqData, timeData, rms) => {
+        const detectionResult = detectStrum(freqData, timeData, rms);
+        updateMicStatusUI();
+        return detectionResult;
+      }
     );
   } catch (err) {
-    if (cachedDOM.loadingOverlay) cachedDOM.loadingOverlay.style.display = 'none';
+    setLoadingOverlayState(false);
     updateStatus('error');
-    if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = '❌ 启动失败: ' + err.message;
+    setFeedbackMessage('❌ 启动失败: ' + err.message);
     console.error('[Renderer] startListening 失败:', err);
   }
 }
 
 function stopListening() {
-  if (AppState.getCurrentMode() === 'tuner') return;
-  
-  if (autoSaveIntervalId) {
-    clearInterval(autoSaveIntervalId);
-    autoSaveIntervalId = null;
-  }
-  setChordRecognitionEnabled(false);
-  stopMetronome();
-  if (AppState.getIsPlayingDemo()) stopDemo();
-  
-  audioStopListening();
-  updateListeningState(false);
-  updateStatus('ready');
-  
   const detectedStrums = getDetectedStrums();
+  stopPracticeSession();
+  
   if (detectedStrums.length > 0) {
     saveHistory(
       strumHistory,
@@ -502,10 +586,6 @@ function stopListening() {
       ? `练习结束 (节拍器：${AppState.getBPM()} BPM)`
       : '练习结束，点击"开始练习"继续';
   }
-  
-  autoSaveIntervalId = setInterval(() => {
-    saveUserSettings(AppState.getBPM(), AppState.getMetronomeEnabled(), AppState.getSensitivityLevel(), AppState.getCurrentRhythm(), exportCustomRhythms(), DEBUG);
-  }, AUTO_SAVE_INTERVAL);
 }
 
 // ========== 渲染历史统计 ==========
@@ -514,9 +594,10 @@ function renderHistory() {
   
   cachedDOM.historyList.innerHTML = strumHistory.map(item => {
     const modeLabel = item.mode === 'preset' ? '📖' : item.mode === 'custom' ? '✏️' : item.mode === 'free' ? '🎸' : '';
-    const practiceModeLabel = item.AppState.getPracticeMode() ? '🎸综合' : '🥁节奏';
-    const accuracyInfo = item.AppState.getPracticeMode() && item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
-    const transTimeInfo = item.AppState.getPracticeMode() && item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
+    const isComprehensiveMode = item.practiceMode === 'comprehensive';
+    const practiceModeLabel = isComprehensiveMode ? '🎸综合' : '🥁节奏';
+    const accuracyInfo = isComprehensiveMode && item.chordAccuracy ? ` | 准确率${item.chordAccuracy}%` : '';
+    const transTimeInfo = isComprehensiveMode && item.avgTransitionTime ? ` | 转换${item.avgTransitionTime}ms` : '';
     return `<div class="history-item"><span class="time">${item.time} - ${item.rhythm} ${modeLabel} ${practiceModeLabel}</span><span class="score">${item.score}分 (${item.strums}次扫弦${accuracyInfo}${transTimeInfo})</span></div>`;
   }).join('');
 }
@@ -687,13 +768,13 @@ function init() {
       AppState.setMetronomeEnabled(enabled);
       setMetronomeEnabled(enabled);
       if (cachedDOM.feedbackMessage) cachedDOM.feedbackMessage.textContent = enabled ? `节拍器已开启 - ${AppState.getBPM()} BPM` : '节拍器已关闭';
-      if (enabled && isListeningState()) startMetronome(getActiveRhythm, currentRhythm);
+      if (enabled && isListeningState()) startMetronome(getActiveRhythm, AppState.getCurrentRhythm());
       else stopMetronome();
     },
     onBPMChange: (bpm) => {
-      AppState.getBPM() = bpm;
+      AppState.setBPM(bpm);
       setCurrentBPM(bpm);
-      if (metronomeEnabled && isListeningState()) { stopMetronome(); startMetronome(getActiveRhythm, currentRhythm); }
+      if (AppState.getMetronomeEnabled() && isListeningState()) { stopMetronome(); startMetronome(getActiveRhythm, AppState.getCurrentRhythm()); }
     },
     onSensitivityChange: (level) => {
       AppState.setSensitivityLevel(level);
@@ -719,7 +800,7 @@ function init() {
   
   modeBtns.forEach(btn => {
     if (!btn) return;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       modeBtns.forEach(b => {
         if (b) {
           b.classList.remove('active');
@@ -737,6 +818,8 @@ function init() {
       const practiceModeDesc = document.getElementById('practiceModeDescription');
       
       if (btn.id === 'modeTuner') {
+        setFeedbackMessage('正在停止练习...');
+        updateStatus('busy', '正在停止练习...');
         AppState.setCurrentMode('tuner');
         AppState.setPracticeMode('tuner');
         // 显示调音器面板
@@ -755,13 +838,16 @@ function init() {
           loadGuitarSoundfont();
         }
         // 停止练习模式监听
-        stopListening();
+        stopPracticeSession();
         if (isTunerListening) {
           stopTunerListening();
         }
         // 启动调音器监听（用户点击后主动触发，符合浏览器安全策略）
-        startTunerListening();
         if (cachedDOM.tunerStringName) cachedDOM.tunerStringName.textContent = '检测中...';
+        const tunerReady = await startTunerListening();
+        if (tunerReady) {
+          setFeedbackMessage('调音器已就绪');
+        }
         // 初始化琴弦按钮点击事件（确保每次进入调音器模式都能点击）
         initTunerUI(async (stringIndex) => {
           try {
@@ -783,6 +869,7 @@ function init() {
       } else if (btn.id === 'practiceModeRhythm') {
         AppState.setCurrentMode('rhythm');
         AppState.setPracticeMode('rhythm');
+        setFeedbackMessage('已切换到纯节奏训练');
         // 显示练习面板
         tunerPanel.style.display = 'none';
         chordModePanel.style.display = 'none';
@@ -796,6 +883,7 @@ function init() {
       } else if (btn.id === 'practiceModeComprehensive') {
         AppState.setCurrentMode('comprehensive');
         AppState.setPracticeMode('comprehensive');
+        setFeedbackMessage('已切换到和弦 + 节奏综合训练');
         // 显示和弦训练面板
         tunerPanel.style.display = 'none';
         chordModePanel.style.display = 'block';
@@ -876,25 +964,23 @@ function init() {
   // 加载并恢复用户设置
   const savedSettings = loadUserSettings(getRhythmPatterns(), DEBUG);
   if (savedSettings.bpm !== null) {
-    AppState.getBPM() = savedSettings.bpm;
+    AppState.setBPM(savedSettings.bpm);
     setCurrentBPM(savedSettings.bpm);
-    if (bpmSlider) bpmSlider.value = savedSettings.bpm;
-    if (bpmValue) bpmValue.textContent = savedSettings.bpm;
+    setBPMValue(savedSettings.bpm);
   }
   if (savedSettings.metronomeEnabled !== null) {
     AppState.setMetronomeEnabled(savedSettings.metronomeEnabled);
     setMetronomeEnabled(savedSettings.metronomeEnabled);
-    if (metronomeToggle) metronomeToggle.checked = savedSettings.metronomeEnabled;
+    setMetronomeChecked(savedSettings.metronomeEnabled);
   }
   if (savedSettings.sensitivityLevel !== null) {
-    sensitivityLevel = savedSettings.sensitivityLevel;
+    AppState.setSensitivityLevel(savedSettings.sensitivityLevel);
     setSensitivityLevel(savedSettings.sensitivityLevel);
-    if (sensitivitySlider) sensitivitySlider.value = savedSettings.sensitivityLevel;
-    if (sensitivityValueEl) sensitivityValueEl.textContent = savedSettings.sensitivityLevel;
+    setSensitivityValue(savedSettings.sensitivityLevel);
   }
   if (savedSettings.currentRhythm !== null) {
-    currentRhythm = savedSettings.currentRhythm;
-    if (rhythmSelector) rhythmSelector.value = savedSettings.currentRhythm;
+    AppState.setCurrentRhythm(savedSettings.currentRhythm);
+    setCurrentRhythm(savedSettings.currentRhythm);
   }
   
   // 初始化面板显示状态（默认调音器模式）

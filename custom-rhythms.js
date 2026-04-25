@@ -32,6 +32,11 @@ const PRESET_TEMPLATES = {
 let customRhythms = [];
 let editingRhythmIndex = -1;
 let currentNoteSequence = [];
+let customRhythmsListContainer = null;
+let noteSequenceEditorContainer = null;
+let customRhythmDelegationReady = false;
+let noteEditorDelegationReady = false;
+let rhythmSelectorDelegationReady = false;
 
 // DOM 元素引用
 let btnAddRhythm = null;
@@ -182,60 +187,29 @@ function saveCustomRhythms() {
 export function renderCustomRhythmsList() {
   const container = document.getElementById('customRhythmsList');
   if (!container) return;
+  customRhythmsListContainer = container;
   
   if (customRhythms.length === 0) {
-    container.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">暂无自定义节奏型，点击"+"创建</div>';
+    container.innerHTML = '<div class="custom-rhythm-empty">暂无自定义节奏型，点击"+"创建</div>';
     return;
   }
   
   container.innerHTML = customRhythms.map((rhythm, index) => {
     const pattern = rhythm.notes ? generateArrowPattern(rhythm.notes) : '';
     return `
-      <div class="rhythm-item" data-rhythm-index="${index}" style="padding: 15px; background: rgba(184, 102, 255, 0.08); border: 1px solid rgba(184, 102, 255, 0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
-        <div class="rhythm-item-content" style="cursor: pointer; flex: 1;">
-          <div style="font-weight: bold; color: #b866ff; margin-bottom: 5px;">${escapeHtml(rhythm.name)}</div>
-          <div style="color: #888; font-size: 1.1em; font-family: monospace; letter-spacing: 2px;">${pattern}</div>
+      <div class="rhythm-item" data-rhythm-index="${index}">
+        <div class="rhythm-item-content" data-action="select-rhythm" role="button" tabindex="0">
+          <div class="rhythm-item-title">${escapeHtml(rhythm.name)}</div>
+          <div class="rhythm-item-pattern">${pattern}</div>
         </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn-edit-rhythm" data-edit-index="${index}" style="padding: 8px 16px; background: #ffa502; color: white; border: none; border-radius: 8px; cursor: pointer;">✏️ 编辑</button>
-          <button class="btn-custom-play" data-custom-index="${index}" style="padding: 8px 16px; background: #2ed573; color: white; border: none; border-radius: 8px; cursor: pointer;">🔊 试听</button>
-          <button class="btn-delete-rhythm" data-delete-index="${index}" style="padding: 8px 16px; background: #ff4757; color: white; border: none; border-radius: 8px; cursor: pointer;">🗑 删除</button>
+        <div class="rhythm-item-actions">
+          <button class="rhythm-action-btn rhythm-action-edit btn-edit-rhythm" data-edit-index="${index}">✏️ 编辑</button>
+          <button class="rhythm-action-btn rhythm-action-play btn-custom-play" data-custom-index="${index}">🔊 试听</button>
+          <button class="rhythm-action-btn rhythm-action-delete btn-delete-rhythm" data-delete-index="${index}">🗑 删除</button>
         </div>
       </div>
     `;
   }).join('');
-  
-  container.querySelectorAll('.rhythm-item-content').forEach(el => {
-    el.addEventListener('click', (e) => {
-      const index = parseInt(el.closest('.rhythm-item').dataset.rhythmIndex);
-      selectCustomRhythm(index);
-    });
-  });
-  
-  container.querySelectorAll('.btn-edit-rhythm').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const index = parseInt(btn.dataset.editIndex);
-      editCustomRhythm(index);
-    });
-  });
-  
-  container.querySelectorAll('.btn-delete-rhythm').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const index = parseInt(btn.dataset.deleteIndex);
-      deleteCustomRhythm(index);
-    });
-  });
-  
-  container.querySelectorAll('.btn-custom-play').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      const customIndex = parseInt(btn.dataset.customIndex);
-      playCustomRhythmFromList(customIndex, btn);
-    });
-  });
   
   syncCustomRhythmsToSelector();
 }
@@ -272,7 +246,6 @@ function syncCustomRhythmsToSelector() {
     option.className = 'rhythm-option custom-rhythm-option';
     option.dataset.customIndex = index;
     option.innerHTML = `<div class="name">${escapeHtml(rhythm.name)}</div><div class="pattern">${arrowPattern}</div><button class="btn-demo" data-custom-index="${index}">🔊 试听演示</button>`;
-    option.addEventListener('click', (e) => { if (e.target.classList.contains('btn-demo')) return; selectCustomRhythm(index); });
     rhythmSelector.appendChild(option);
   });
 }
@@ -339,10 +312,78 @@ function setupCustomRhythmButtons() {
   if (btnSave) btnSave.addEventListener('click', saveRhythmEditor);
   if (btnCancel) btnCancel.addEventListener('click', closeRhythmEditor);
   if (btnAddNote) btnAddNote.addEventListener('click', addNoteToSequence);
+  setupCustomRhythmDelegation();
+  setupNoteEditorDelegation();
+  setupRhythmSelectorDelegation();
   
   document.querySelectorAll('.btnPreset').forEach(btn => {
     btn.addEventListener('click', (e) => loadPresetTemplate(e.target.dataset.preset));
   });
+}
+
+function setupCustomRhythmDelegation() {
+  if (customRhythmDelegationReady) return;
+  customRhythmsListContainer = document.getElementById('customRhythmsList');
+  if (!customRhythmsListContainer) return;
+
+  customRhythmsListContainer.addEventListener('click', (e) => {
+    const item = e.target.closest('.rhythm-item');
+    if (!item) return;
+
+    if (e.target.closest('.btn-edit-rhythm')) {
+      editCustomRhythm(parseInt(e.target.closest('.btn-edit-rhythm').dataset.editIndex));
+      return;
+    }
+
+    if (e.target.closest('.btn-delete-rhythm')) {
+      deleteCustomRhythm(parseInt(e.target.closest('.btn-delete-rhythm').dataset.deleteIndex));
+      return;
+    }
+
+    const playBtn = e.target.closest('.btn-custom-play');
+    if (playBtn) {
+      e.preventDefault();
+      playCustomRhythmFromList(parseInt(playBtn.dataset.customIndex), playBtn);
+      return;
+    }
+
+    if (e.target.closest('.rhythm-item-content')) {
+      selectCustomRhythm(parseInt(item.dataset.rhythmIndex));
+    }
+  });
+
+  customRhythmsListContainer.addEventListener('keydown', (e) => {
+    const content = e.target.closest('.rhythm-item-content');
+    if (!content || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    const item = content.closest('.rhythm-item');
+    if (item) {
+      selectCustomRhythm(parseInt(item.dataset.rhythmIndex));
+    }
+  });
+
+  customRhythmDelegationReady = true;
+}
+
+function setupRhythmSelectorDelegation() {
+  if (rhythmSelectorDelegationReady || !rhythmSelector) return;
+
+  rhythmSelector.addEventListener('click', (e) => {
+    const option = e.target.closest('.custom-rhythm-option');
+    if (!option || e.target.closest('.btn-demo')) return;
+    selectCustomRhythm(parseInt(option.dataset.customIndex));
+  });
+
+  rhythmSelector.addEventListener('keydown', (e) => {
+    const option = e.target.closest('.custom-rhythm-option');
+    if (!option || e.target.closest('.btn-demo')) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      selectCustomRhythm(parseInt(option.dataset.customIndex));
+    }
+  });
+
+  rhythmSelectorDelegationReady = true;
 }
 
 // ========== 节奏型编辑器 ==========
@@ -350,60 +391,61 @@ function setupCustomRhythmButtons() {
 function renderNoteSequenceEditor() {
   const container = document.getElementById('noteSequenceEditor');
   if (!container) return;
+  noteSequenceEditorContainer = container;
   if (currentNoteSequence.length === 0) {
-    container.innerHTML = '<div style="color: #888; width: 100%; text-align: center; padding: 20px;">点击"添加音符"或选择预设模板开始</div>';
+    container.innerHTML = '<div class="note-editor-empty">点击"添加音符"或选择预设模板开始</div>';
     return;
   }
   container.innerHTML = currentNoteSequence.map((note, index) => `
-    <div class="note-item" data-note-index="${index}" style="display: flex; gap: 5px; align-items: center; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-      <span style="color: #888; font-size: 0.8em;">#${index + 1}</span>
-      <select class="note-duration-select" data-note-index="${index}" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
+    <div class="note-item" data-note-index="${index}">
+      <span class="note-index-label">#${index + 1}</span>
+      <select class="note-duration-select" data-note-index="${index}">
         ${Object.entries(NOTE_DURATIONS).map(([key, val]) => `<option value="${key}" ${note.duration === key ? 'selected' : ''}>${val.name}</option>`).join('')}
       </select>
-      <select class="note-direction-select" data-note-index="${index}" style="padding: 5px; background: #1a1a2e; border: 1px solid #00d9ff; border-radius: 4px; color: white;">
+      <select class="note-direction-select" data-note-index="${index}">
         <option value="D" ${note.direction === 'D' ? 'selected' : ''}>下扫 (D)</option>
         <option value="U" ${note.direction === 'U' ? 'selected' : ''}>上扫 (U)</option>
       </select>
-      <input type="range" class="note-velocity-input" data-note-index="${index}" min="0.1" max="1.0" step="0.1" value="${note.velocity || 0.5}" style="width: 80px;">
-      <span class="note-velocity-display" style="color: #00d9ff; min-width: 30px;">${Math.round((note.velocity || 0.5) * 100)}%</span>
-      <button class="btn-remove-note" data-note-index="${index}" style="padding: 5px 10px; background: #ff4757; color: white; border: none; border-radius: 4px; cursor: pointer;">✕</button>
+      <input type="range" class="note-velocity-input" data-note-index="${index}" min="0.1" max="1.0" step="0.1" value="${note.velocity || 0.5}">
+      <span class="note-velocity-display">${Math.round((note.velocity || 0.5) * 100)}%</span>
+      <button class="btn-remove-note" data-note-index="${index}">✕</button>
     </div>
   `).join('');
-  
-  container.querySelectorAll('.note-duration-select').forEach(sel => {
-    sel.addEventListener('change', (e) => {
-      const index = parseInt(sel.dataset.noteIndex);
-      updateNote(index, 'duration', e.target.value);
-    });
+}
+
+function setupNoteEditorDelegation() {
+  if (noteEditorDelegationReady) return;
+  noteSequenceEditorContainer = document.getElementById('noteSequenceEditor');
+  if (!noteSequenceEditorContainer) return;
+
+  noteSequenceEditorContainer.addEventListener('change', (e) => {
+    const target = e.target;
+    const noteIndex = parseInt(target.dataset.noteIndex);
+    if (target.classList.contains('note-duration-select')) {
+      updateNote(noteIndex, 'duration', target.value);
+    } else if (target.classList.contains('note-direction-select')) {
+      updateNote(noteIndex, 'direction', target.value);
+    } else if (target.classList.contains('note-velocity-input')) {
+      updateNote(noteIndex, 'velocity', parseFloat(target.value));
+    }
   });
-  
-  container.querySelectorAll('.note-direction-select').forEach(sel => {
-    sel.addEventListener('change', (e) => {
-      const index = parseInt(sel.dataset.noteIndex);
-      updateNote(index, 'direction', e.target.value);
-    });
+
+  noteSequenceEditorContainer.addEventListener('input', (e) => {
+    const target = e.target;
+    if (!target.classList.contains('note-velocity-input')) return;
+    const display = target.closest('.note-item')?.querySelector('.note-velocity-display');
+    if (display) {
+      display.textContent = Math.round(parseFloat(target.value) * 100) + '%';
+    }
   });
-  
-  container.querySelectorAll('.note-velocity-input').forEach(input => {
-    input.addEventListener('change', (e) => {
-      const index = parseInt(input.dataset.noteIndex);
-      updateNote(index, 'velocity', parseFloat(e.target.value));
-    });
+
+  noteSequenceEditorContainer.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.btn-remove-note');
+    if (!removeBtn) return;
+    removeNote(parseInt(removeBtn.dataset.noteIndex));
   });
-  
-  container.querySelectorAll('.note-velocity-input').forEach(input => {
-    input.addEventListener('input', (e) => {
-      const display = input.closest('.note-item').querySelector('.note-velocity-display');
-      if (display) display.textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
-    });
-  });
-  
-  container.querySelectorAll('.btn-remove-note').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const index = parseInt(btn.dataset.noteIndex);
-      removeNote(index);
-    });
-  });
+
+  noteEditorDelegationReady = true;
 }
 
 function addNoteToSequence() {

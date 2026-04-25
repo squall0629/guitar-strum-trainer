@@ -350,6 +350,139 @@
       color: #ff4757;
       animation: pulse 1s infinite;
     }
+
+    .custom-rhythm-empty,
+    .note-editor-empty,
+    .selected-chords-empty {
+      color: #888;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .selected-chords-empty {
+      font-style: italic;
+    }
+
+    .rhythm-item {
+      padding: 15px;
+      background: rgba(184, 102, 255, 0.08);
+      border: 1px solid rgba(184, 102, 255, 0.25);
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .rhythm-item-content {
+      cursor: pointer;
+      flex: 1;
+      outline: none;
+    }
+
+    .rhythm-item-content:focus-visible {
+      box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.5);
+      border-radius: 8px;
+    }
+
+    .rhythm-item-title {
+      font-weight: bold;
+      color: #b866ff;
+      margin-bottom: 5px;
+    }
+
+    .rhythm-item-pattern {
+      color: #888;
+      font-size: 1.1em;
+      font-family: monospace;
+      letter-spacing: 2px;
+    }
+
+    .rhythm-item-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .rhythm-action-btn {
+      padding: 8px 16px;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95em;
+    }
+
+    .rhythm-action-edit {
+      background: #ffa502;
+    }
+
+    .rhythm-action-play {
+      background: #2ed573;
+    }
+
+    .rhythm-action-delete {
+      background: #ff4757;
+    }
+
+    .note-item {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+    }
+
+    .note-index-label {
+      color: #888;
+      font-size: 0.8em;
+    }
+
+    .note-duration-select,
+    .note-direction-select {
+      padding: 5px;
+      background: #1a1a2e;
+      border: 1px solid #00d9ff;
+      border-radius: 4px;
+      color: white;
+    }
+
+    .note-velocity-input {
+      width: 80px;
+    }
+
+    .note-velocity-display {
+      color: #00d9ff;
+      min-width: 30px;
+    }
+
+    .btn-remove-note {
+      padding: 5px 10px;
+      background: #ff4757;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .selected-chord-item {
+      background: rgba(0, 217, 255, 0.2);
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-remove-chord {
+      background: none;
+      border: none;
+      color: #ff4757;
+      cursor: pointer;
+      font-size: 1.2em;
+      padding: 0;
+    }
     
     .metronome-settings {
       padding: 15px;
@@ -461,6 +594,20 @@
     .status-indicator.listening {
       background: #2ed573;
       animation: pulse 1s infinite;
+    }
+
+    .status-indicator.warning {
+      background: #ffa502;
+      animation: pulse 1s infinite;
+    }
+
+    .status-indicator.busy {
+      background: #00d9ff;
+      animation: pulse 1s infinite;
+    }
+
+    .status-indicator.error {
+      background: #ff4757;
     }
     
     @keyframes pulse {

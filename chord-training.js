@@ -18,6 +18,15 @@ let nextChord = null;
 let chordRecognitionEnabled = false;
 let lastRecognizedChord = null;
 let chordChangeTimeout = null;
+let selectedChordsDelegationReady = false;
+let stableRecognitionCandidate = null;
+let stableRecognitionFrames = 0;
+let stableRecognitionEmittedChord = null;
+let lastConfirmedChord = null;
+let lastConfirmedChordAt = 0;
+
+const CHORD_STABLE_FRAME_COUNT = 6;
+const CHORD_REPEAT_SUPPRESS_MS = 1200;
 
 let practiceMode = 'tuner';  // 默认调音器模式，与 renderer.js 保持一致
 let practiceStartTime = 0;
@@ -282,9 +291,22 @@ function setupChordTraining() {
   document.querySelectorAll('.chord-select-btn').forEach(btn => {
     btn.addEventListener('click', (e) => addChordToProgression(e.target.dataset.chord));
   });
+  setupSelectedChordsDelegation();
   
   if (btnSaveProgression) btnSaveProgression.addEventListener('click', saveCustomProgression);
   if (btnClearProgression) btnClearProgression.addEventListener('click', () => { currentProgression = []; currentChordIndex = 0; renderSelectedChords(); updateChordProgressionDisplay(); });
+}
+
+function setupSelectedChordsDelegation() {
+  if (selectedChordsDelegationReady || !selectedChordsDisplay) return;
+
+  selectedChordsDisplay.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-remove-chord');
+    if (!btn) return;
+    removeChordFromProgression(parseInt(btn.dataset.index));
+  });
+
+  selectedChordsDelegationReady = true;
 }
 
 export function getTrainingMode() {
@@ -325,22 +347,15 @@ export function removeChordFromProgression(index) {
 function renderSelectedChords() {
   if (!selectedChordsDisplay) return;
   if (currentProgression.length === 0) {
-    selectedChordsDisplay.innerHTML = '<span style="color: #666; font-style: italic;">点击选择和弦</span>';
+    selectedChordsDisplay.innerHTML = '<span class="selected-chords-empty">点击选择和弦</span>';
     return;
   }
   selectedChordsDisplay.innerHTML = currentProgression.map((chord, index) => `
-    <span class="chord-item" data-chord-index="${index}" style="background: rgba(0,217,255,0.2); padding: 5px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px;">
+    <span class="selected-chord-item chord-item" data-chord-index="${index}">
       ${chord}
-      <button class="btn-remove-chord" data-index="${index}" style="background: none; border: none; color: #ff4757; cursor: pointer; font-size: 1.2em;">×</button>
+      <button class="btn-remove-chord" data-index="${index}">×</button>
     </span>
   `).join('');
-  
-  selectedChordsDisplay.querySelectorAll('.btn-remove-chord').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const index = parseInt(btn.dataset.index);
-      removeChordFromProgression(index);
-    });
-  });
 }
 
 function saveCustomProgression() {
@@ -398,24 +413,30 @@ function updateProgressionDetail(index) {
 
 // ========== 和弦识别更新 ==========
 export function updateChordRecognition(chordResult) {
-  if (!chordResult || !chordDetector) return;
+  const stableResult = getStableChordResult(chordResult);
+  if (!stableResult || !chordDetector) return;
   
   if (recognizedChordEl) {
-    recognizedChordEl.textContent = chordResult.chord;
-    recognizedChordEl.style.color = chordResult.chord === expectedChord ? '#00ff00' : '#00d9ff';
+    recognizedChordEl.textContent = stableResult.chord;
+    recognizedChordEl.style.color = stableResult.chord === expectedChord ? '#00ff00' : '#00d9ff';
   }
-  if (chordConfidenceEl) chordConfidenceEl.textContent = `(${Math.round(chordResult.confidence * 100)}%)`;
-  if (currentChordDisplayEl) currentChordDisplayEl.textContent = chordResult.chord;
-  if (currentChordCanvas && chordResult.chord) drawChordDiagramSVG(currentChordCanvas, chordResult.chord);
+  if (chordConfidenceEl) chordConfidenceEl.textContent = `(${Math.round(stableResult.confidence * 100)}%)`;
+  if (currentChordDisplayEl) currentChordDisplayEl.textContent = stableResult.chord;
+  if (currentChordCanvas && stableResult.chord) drawChordDiagramSVG(currentChordCanvas, stableResult.chord);
   
   if (expectedChord) {
-    if (chordResult.chord === expectedChord) {
+    if (stableResult.chord === expectedChord) {
       showFeedback('✓ 和弦正确！', 'success');
-      practiceChordCorrect++;
+      if (shouldCountConfirmedChord(stableResult.chord)) {
+        practiceChordCorrect++;
+        practiceChordTotal++;
+      }
     } else {
-      showFeedback(`⚠ 应该是 ${expectedChord}，检测到 ${chordResult.chord}`, 'warning');
+      showFeedback(`⚠ 应该是 ${expectedChord}，检测到 ${stableResult.chord}`, 'warning');
+      if (shouldCountConfirmedChord(stableResult.chord)) {
+        practiceChordTotal++;
+      }
     }
-    practiceChordTotal++;
   }
 }
 
@@ -430,26 +451,64 @@ export function updateTransitionTime() {
 
 // ========== 和弦显示更新（包含反馈） ==========
 export function updateChordDisplay(chordResult) {
-  if (!chordResult || !chordDetector) return;
+  const stableResult = getStableChordResult(chordResult);
+  if (!stableResult || !chordDetector) return;
   
   if (recognizedChordEl) {
-    recognizedChordEl.textContent = chordResult.chord;
-    recognizedChordEl.style.color = chordResult.chord === expectedChord ? '#00ff00' : '#00d9ff';
+    recognizedChordEl.textContent = stableResult.chord;
+    recognizedChordEl.style.color = stableResult.chord === expectedChord ? '#00ff00' : '#00d9ff';
   }
-  if (chordConfidenceEl) chordConfidenceEl.textContent = `(${Math.round(chordResult.confidence * 100)}%)`;
-  if (currentChordDisplayEl) currentChordDisplayEl.textContent = chordResult.chord;
-  if (currentChordCanvas && chordResult.chord) drawChordDiagramSVG(currentChordCanvas, chordResult.chord);
+  if (chordConfidenceEl) chordConfidenceEl.textContent = `(${Math.round(stableResult.confidence * 100)}%)`;
+  if (currentChordDisplayEl) currentChordDisplayEl.textContent = stableResult.chord;
+  if (currentChordCanvas && stableResult.chord) drawChordDiagramSVG(currentChordCanvas, stableResult.chord);
   
   if (expectedChord) {
-    if (chordResult.chord === expectedChord) {
+    if (stableResult.chord === expectedChord) {
       showFeedback('✓ 和弦正确！', 'success');
       if (transitionDetector) {
-        transitionDetector.onChordDetected(chordResult.chord, expectedChord, Date.now());
+        transitionDetector.onChordDetected(stableResult.chord, expectedChord, Date.now());
       }
     } else {
-      showFeedback(`⚠ 应该是 ${expectedChord}，检测到 ${chordResult.chord}`, 'warning');
+      showFeedback(`⚠ 应该是 ${expectedChord}，检测到 ${stableResult.chord}`, 'warning');
     }
   }
+}
+
+function getStableChordResult(chordResult) {
+  if (!chordResult?.chord) return null;
+
+  if (stableRecognitionCandidate === chordResult.chord) {
+    stableRecognitionFrames++;
+  } else {
+    stableRecognitionCandidate = chordResult.chord;
+    stableRecognitionFrames = 1;
+    if (stableRecognitionEmittedChord !== chordResult.chord) {
+      stableRecognitionEmittedChord = null;
+    }
+  }
+
+  if (stableRecognitionFrames < CHORD_STABLE_FRAME_COUNT) {
+    return null;
+  }
+
+  if (stableRecognitionEmittedChord === chordResult.chord) {
+    return null;
+  }
+
+  lastRecognizedChord = chordResult.chord;
+  stableRecognitionEmittedChord = chordResult.chord;
+  return chordResult;
+}
+
+function shouldCountConfirmedChord(chordName) {
+  const now = Date.now();
+  if (lastConfirmedChord === chordName && now - lastConfirmedChordAt < CHORD_REPEAT_SUPPRESS_MS) {
+    return false;
+  }
+
+  lastConfirmedChord = chordName;
+  lastConfirmedChordAt = now;
+  return true;
 }
 
 function showFeedback(message, type = 'info') {
@@ -473,6 +532,11 @@ export function resetChordTraining() {
   expectedChord = null;
   nextChord = null;
   lastRecognizedChord = null;
+  stableRecognitionCandidate = null;
+  stableRecognitionFrames = 0;
+  stableRecognitionEmittedChord = null;
+  lastConfirmedChord = null;
+  lastConfirmedChordAt = 0;
   if (transitionDetector) transitionDetector.reset();
   
   if (recognizedChordEl) recognizedChordEl.textContent = '--';

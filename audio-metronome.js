@@ -21,6 +21,12 @@ let metronomeEnabled = false;
 let metronomeInterval = null;
 let metronomeBeat = 0;
 let metronomeDotTimeout = null;  // 追踪节拍器指示灯定时器
+let metronomeNextBeatTime = 0;
+let metronomeSchedulerActive = false;
+let metronomeVisualTimers = [];
+
+const METRONOME_LOOKAHEAD_MS = 25;
+const METRONOME_SCHEDULE_AHEAD_TIME = 0.1;
 
 // 导出所有定时器 ID 以便统一清理
 export function getMetronomeTimers() {
@@ -33,7 +39,7 @@ export function getMetronomeTimers() {
  * @param {number} frequency - 频率 (Hz)
  * @param {number} duration - 持续时间 (秒)
  */
-export function playMetronomeSound(frequency = METRONOME_NORMAL_FREQ, duration = METRONOME_DURATION) {
+export function playMetronomeSound(frequency = METRONOME_NORMAL_FREQ, duration = METRONOME_DURATION, startTime = null) {
   if (!audioContextForMetronome) {
     audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
@@ -49,12 +55,15 @@ export function playMetronomeSound(frequency = METRONOME_NORMAL_FREQ, duration =
   
   oscillator.frequency.value = frequency;
   oscillator.type = 'sine';
+  const playTime = typeof startTime === 'number'
+    ? Math.max(startTime, audioContextForMetronome.currentTime)
+    : audioContextForMetronome.currentTime;
   
-  gainNode.gain.setValueAtTime(METRONOME_GAIN, audioContextForMetronome.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextForMetronome.currentTime + duration);
+  gainNode.gain.setValueAtTime(METRONOME_GAIN, playTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, playTime + duration);
   
-  oscillator.start(audioContextForMetronome.currentTime);
-  oscillator.stop(audioContextForMetronome.currentTime + duration);
+  oscillator.start(playTime);
+  oscillator.stop(playTime + duration);
 }
 
 // ========== 节拍器控制 ==========
@@ -64,57 +73,96 @@ export function playMetronomeSound(frequency = METRONOME_NORMAL_FREQ, duration =
  * @param {number} currentDemoRhythmIndex - 当前演示节奏型索引
  */
 export function startMetronome(getActiveRhythmFn, currentDemoRhythmIndex = -1) {
-  if (metronomeInterval) {
-    clearInterval(metronomeInterval);
-  }
-  
-  const currentBPM = AppState.getBPM();
-  const beatInterval = (60 / currentBPM) * 1000;
+  stopMetronome();
+  ensureMetronomeContext();
   metronomeBeat = 0;
-  
-  // 首拍重音
-  playMetronomeSound(METRONOME_ACCENT_FREQ, METRONOME_DURATION);
-  triggerMetronomeDot(true);
-  
-  metronomeInterval = setInterval(() => {
-    metronomeBeat++;
-    const activeRhythm = getActiveRhythmFn ? getActiveRhythmFn(currentDemoRhythmIndex) : null;
-    const beats = activeRhythm ? activeRhythm.beats : 4;
-    const isAccent = metronomeBeat % beats === 0; // 每小节第一拍重音
-    
-    playMetronomeSound(isAccent ? METRONOME_ACCENT_FREQ : METRONOME_NORMAL_FREQ, METRONOME_DURATION);
-    triggerMetronomeDot(isAccent);
-  }, beatInterval);
+  metronomeSchedulerActive = true;
+  metronomeNextBeatTime = audioContextForMetronome.currentTime + 0.05;
+
+  const scheduler = () => {
+    if (!metronomeSchedulerActive || !audioContextForMetronome) return;
+
+    while (metronomeNextBeatTime < audioContextForMetronome.currentTime + METRONOME_SCHEDULE_AHEAD_TIME) {
+      const activeRhythm = getActiveRhythmFn ? getActiveRhythmFn(currentDemoRhythmIndex) : null;
+      const beats = activeRhythm ? activeRhythm.beats : 4;
+      const isAccent = metronomeBeat % beats === 0;
+
+      scheduleMetronomeBeat(metronomeNextBeatTime, isAccent);
+      metronomeBeat++;
+      metronomeNextBeatTime += 60 / AppState.getBPM();
+    }
+
+    metronomeInterval = setTimeout(scheduler, METRONOME_LOOKAHEAD_MS);
+  };
+
+  scheduler();
 }
 
-function triggerMetronomeDot(isAccent) {
-  const metronomeDot = document.getElementById('metronomeDot');
-  if (!metronomeDot) return;
-  
-  // 清理之前的定时器，防止泄漏
-  if (metronomeDotTimeout) {
-    clearTimeout(metronomeDotTimeout);
+function ensureMetronomeContext() {
+  if (!audioContextForMetronome) {
+    audioContextForMetronome = new (window.AudioContext || window.webkitAudioContext)();
   }
-  
-  metronomeDot.classList.add('accent');
-  metronomeDotTimeout = setTimeout(() => {
-    metronomeDot.classList.remove('accent');
-    metronomeDotTimeout = null;
-  }, METRONOME_DOT_TIMEOUT);
+  if (audioContextForMetronome.state === 'suspended') {
+    audioContextForMetronome.resume().catch(err => { if (DEBUG) console.warn(err); });
+  }
+}
+
+function scheduleMetronomeBeat(beatTime, isAccent) {
+  playMetronomeSound(
+    isAccent ? METRONOME_ACCENT_FREQ : METRONOME_NORMAL_FREQ,
+    METRONOME_DURATION,
+    beatTime
+  );
+  triggerMetronomeDot(isAccent, beatTime);
+}
+
+function triggerMetronomeDot(isAccent, beatTime = null) {
+  const metronomeDot = document.getElementById('metronomeDot');
+  if (!metronomeDot || !audioContextForMetronome) return;
+
+  const delay = beatTime
+    ? Math.max(0, (beatTime - audioContextForMetronome.currentTime) * 1000)
+    : 0;
+
+  const triggerTimer = setTimeout(() => {
+    metronomeVisualTimers = metronomeVisualTimers.filter(timerId => timerId !== triggerTimer);
+    if (!metronomeSchedulerActive && beatTime !== null) return;
+
+    if (metronomeDotTimeout) {
+      clearTimeout(metronomeDotTimeout);
+    }
+
+    metronomeDot.classList.add('accent');
+    metronomeDotTimeout = setTimeout(() => {
+      metronomeDot.classList.remove('accent');
+      metronomeDotTimeout = null;
+    }, METRONOME_DOT_TIMEOUT);
+  }, delay);
+
+  metronomeVisualTimers.push(triggerTimer);
 }
 
 /**
  * 停止节拍器
  */
 export function stopMetronome() {
+  metronomeSchedulerActive = false;
   if (metronomeInterval) {
-    clearInterval(metronomeInterval);
+    clearTimeout(metronomeInterval);
     metronomeInterval = null;
+  }
+  if (metronomeVisualTimers.length > 0) {
+    metronomeVisualTimers.forEach(timerId => clearTimeout(timerId));
+    metronomeVisualTimers = [];
   }
   // 清理指示灯定时器
   if (metronomeDotTimeout) {
     clearTimeout(metronomeDotTimeout);
     metronomeDotTimeout = null;
+  }
+  const metronomeDot = document.getElementById('metronomeDot');
+  if (metronomeDot) {
+    metronomeDot.classList.remove('accent');
   }
 }
 

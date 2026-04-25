@@ -6,7 +6,6 @@ import { DEBUG } from './constants.js';
 import { AppState } from './state-manager.js';
 
 // ========== 吉他音源（用于试听演示） ==========
-let guitarSoundfont = null;
 let soundfontLoading = false;
 let soundfontLoaded = false;
 let sharedAudioContext = null;
@@ -86,15 +85,16 @@ export async function loadGuitarSoundfont() {
     sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     
     // 加载钢弦吉他音源
-    guitarSoundfont = await window.Soundfont.instrument(sharedAudioContext, 'acoustic_guitar_steel', {
+    window.guitarSoundfont = await window.Soundfont.instrument(sharedAudioContext, 'acoustic_guitar_steel', {
       soundfont: 'FluidR3_GM',
       gain: 1.5
     });
+    window.guitarAudioContext = sharedAudioContext;
     
     soundfontLoaded = true;
     
     // 存储到状态管理
-    AppState.setGuitarSoundfont(guitarSoundfont);
+    AppState.setGuitarSoundfont(window.guitarSoundfont);
     AppState.setGuitarAudioContext(sharedAudioContext);
     
     console.log('[AudioDemo] ✓ 钢弦吉他音源加载完成');
@@ -113,12 +113,12 @@ export async function loadGuitarSoundfont() {
  * @returns {Promise<void>}
  */
 export async function playStrumSound(direction, duration = 0.15, noteVelocities = null) {
-  if (!guitarSoundfont) {
+  if (!window.guitarSoundfont) {
     await playStrumSoundSynth(direction, duration);
     return;
   }
   
-  const ctx = guitarSoundfont.context;
+  const ctx = window.guitarSoundfont.context;
   if (ctx.state === 'suspended') {
     await ctx.resume();
   }
@@ -148,14 +148,14 @@ export async function playStrumSound(direction, duration = 0.15, noteVelocities 
   bassOrder.forEach((note, index) => {
     const delay = index * bassStrumSpeed;
     const randomVelocity = bassVelocity * (0.9 + Math.random() * 0.2);
-    guitarSoundfont.play(note, currentTime + delay, { gain: randomVelocity, duration });
+    window.guitarSoundfont.play(note, currentTime + delay, { gain: randomVelocity, duration });
   });
   
   const trebleDelay = bassNotes.length * bassStrumSpeed + 0.015;
   trebleOrder.forEach((note, index) => {
     const delay = trebleDelay + (index * trebleStrumSpeed);
     const randomVelocity = trebleVelocity * (0.9 + Math.random() * 0.2);
-    guitarSoundfont.play(note, currentTime + delay, { gain: randomVelocity, duration });
+    window.guitarSoundfont.play(note, currentTime + delay, { gain: randomVelocity, duration });
   });
 }
 
