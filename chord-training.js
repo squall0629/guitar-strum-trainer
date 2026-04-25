@@ -19,6 +19,9 @@ let chordRecognitionEnabled = false;
 let lastRecognizedChord = null;
 let chordChangeTimeout = null;
 let selectedChordsDelegationReady = false;
+let customChordSelectorDelegationReady = false;
+let chordTrainingBindingsReady = false;
+let practiceModeBindingsReady = false;
 let stableRecognitionCandidate = null;
 let stableRecognitionFrames = 0;
 let stableRecognitionEmittedChord = null;
@@ -202,9 +205,11 @@ export function isChordRecognitionEnabled() {
 
 // ========== 练习模式 ==========
 function setupPracticeMode() {
+  if (practiceModeBindingsReady) return;
   if (!practiceModeRhythm || !practiceModeComprehensive) return;
   practiceModeRhythm.addEventListener('click', () => setPracticeMode('rhythm'));
   practiceModeComprehensive.addEventListener('click', () => setPracticeMode('comprehensive'));
+  practiceModeBindingsReady = true;
   updatePracticeModeUI();
 }
 
@@ -270,6 +275,8 @@ export function resetPracticeStats() {
 
 // ========== 和弦训练设置 ==========
 function setupChordTraining() {
+  if (chordTrainingBindingsReady) return;
+
   if (modePreset) modePreset.addEventListener('click', () => setTrainingMode('preset'));
   if (modeCustom) modeCustom.addEventListener('click', () => setTrainingMode('custom'));
   if (modeFree) modeFree.addEventListener('click', () => setTrainingMode('free'));
@@ -287,14 +294,25 @@ function setupChordTraining() {
     currentProgression = ChordLibrary.COMMON_PROGRESSIONS[0]?.chords || [];
     updateProgressionDetail(0);
   }
-  
-  document.querySelectorAll('.chord-select-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => addChordToProgression(e.target.dataset.chord));
-  });
+
+  setupCustomChordSelectorDelegation();
   setupSelectedChordsDelegation();
   
   if (btnSaveProgression) btnSaveProgression.addEventListener('click', saveCustomProgression);
   if (btnClearProgression) btnClearProgression.addEventListener('click', () => { currentProgression = []; currentChordIndex = 0; renderSelectedChords(); updateChordProgressionDisplay(); });
+  chordTrainingBindingsReady = true;
+}
+
+function setupCustomChordSelectorDelegation() {
+  if (customChordSelectorDelegationReady || !customChordSelector) return;
+
+  customChordSelector.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chord-select-btn');
+    if (!btn) return;
+    addChordToProgression(btn.dataset.chord);
+  });
+
+  customChordSelectorDelegationReady = true;
 }
 
 function setupSelectedChordsDelegation() {

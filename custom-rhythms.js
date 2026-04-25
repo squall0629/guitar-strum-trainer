@@ -37,6 +37,8 @@ let noteSequenceEditorContainer = null;
 let customRhythmDelegationReady = false;
 let noteEditorDelegationReady = false;
 let rhythmSelectorDelegationReady = false;
+let customRhythmButtonsReady = false;
+let presetTemplateButtonsReady = false;
 
 // DOM 元素引用
 let btnAddRhythm = null;
@@ -167,6 +169,9 @@ export function initCustomRhythms(options = {}) {
   loadCustomRhythms();
   renderCustomRhythmsList();
   setupCustomRhythmButtons();
+  setupCustomRhythmDelegation();
+  setupNoteEditorDelegation();
+  setupRhythmSelectorDelegation();
 }
 
 function loadCustomRhythms() {
@@ -270,6 +275,8 @@ export function selectCustomRhythm(index) {
 
 // ========== 设置自定义节奏型按钮 ==========
 function setupCustomRhythmButtons() {
+  if (customRhythmButtonsReady) return;
+
   const btnNew = document.getElementById('btnNewRhythm');
   const btnExport = document.getElementById('btnExportSettings');
   const btnImport = document.getElementById('btnImportSettings');
@@ -311,13 +318,14 @@ function setupCustomRhythmButtons() {
   if (btnSave) btnSave.addEventListener('click', saveRhythmEditor);
   if (btnCancel) btnCancel.addEventListener('click', closeRhythmEditor);
   if (btnAddNote) btnAddNote.addEventListener('click', addNoteToSequence);
-  setupCustomRhythmDelegation();
-  setupNoteEditorDelegation();
-  setupRhythmSelectorDelegation();
-  
-  document.querySelectorAll('.btnPreset').forEach(btn => {
-    btn.addEventListener('click', (e) => loadPresetTemplate(e.target.dataset.preset));
-  });
+  customRhythmButtonsReady = true;
+
+  if (!presetTemplateButtonsReady) {
+    document.querySelectorAll('.btnPreset').forEach(btn => {
+      btn.addEventListener('click', (e) => loadPresetTemplate(e.currentTarget.dataset.preset));
+    });
+    presetTemplateButtonsReady = true;
+  }
 }
 
 function setupCustomRhythmDelegation() {
@@ -365,6 +373,9 @@ function setupCustomRhythmDelegation() {
 }
 
 function setupRhythmSelectorDelegation() {
+  if (!rhythmSelector) {
+    rhythmSelector = document.getElementById('rhythmSelector');
+  }
   if (rhythmSelectorDelegationReady || !rhythmSelector) return;
 
   rhythmSelector.addEventListener('click', (e) => {
