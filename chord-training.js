@@ -3,6 +3,7 @@
 
 import { drawChordDiagram as drawChordDiagramSVG, drawChordDiagramFallbackSVG as drawChordDiagramFallbackSVGUI } from './ui-renderer.js';
 import { isTonalAvailable, ChordDetector as ChordDetectorClass } from './chord-detector.js';
+import { TransitionDetector } from './utils/transition-detector.js';
 import { AppState } from './state-manager.js';
 import { ChordLibrary } from './chord-library.js';
 import EventBus, { Events } from './event-bus.js';
@@ -17,7 +18,6 @@ let expectedChord = null;
 let nextChord = null;
 let chordRecognitionEnabled = false;
 let lastRecognizedChord = null;
-let chordChangeTimeout = null;
 let selectedChordsDelegationReady = false;
 let customChordSelectorDelegationReady = false;
 let chordTrainingBindingsReady = false;
@@ -75,71 +75,8 @@ function cacheProgressionDetailElements() {
   cachedProgressionDetail.progressionDetail = document.getElementById('progressionDetail');
 }
 
-// ========== TransitionDetector 类 ==========
-export class TransitionDetector {
-  constructor() {
-    this.transitionCount = 0;
-    this.transitionTimes = [];
-    this.lastChangeTime = 0;
-    this.expectedChord = null;
-    this.detectedChord = null;
-    this.changeDetected = false;
-  }
-  
-  reset() {
-    this.transitionCount = 0;
-    this.transitionTimes = [];
-    this.lastChangeTime = 0;
-    this.expectedChord = null;
-    this.detectedChord = null;
-    this.changeDetected = false;
-  }
-  
-  setExpectedChord(chord) {
-    this.expectedChord = chord;
-  }
-  
-  onChordDetected(chord, expectedChord, currentTime) {
-    if (!this.expectedChord) {
-      this.expectedChord = expectedChord;
-      this.detectedChord = chord;
-      this.lastChangeTime = currentTime;
-      return;
-    }
-    
-    if (chord !== this.detectedChord && chord === this.expectedChord) {
-      if (this.lastChangeTime > 0) {
-        const transitionTime = currentTime - this.lastChangeTime;
-        this.transitionTimes.push(transitionTime);
-        this.transitionCount++;
-      }
-      this.lastChangeTime = currentTime;
-      this.detectedChord = chord;
-      this.changeDetected = true;
-      
-      const progression = getCurrentProgression();
-      if (progression && progression.length > 0) {
-        const currentIndex = progression.indexOf(this.expectedChord);
-        const nextIndex = (currentIndex + 1) % progression.length;
-        this.expectedChord = progression[nextIndex];
-      }
-    }
-  }
-  
-  getStats() {
-    if (this.transitionTimes.length === 0) {
-      return { transitionCount: 0, avgTransitionTime: 0, minTransitionTime: 0, maxTransitionTime: 0 };
-    }
-    const sum = this.transitionTimes.reduce((a, b) => a + b, 0);
-    const avg = sum / this.transitionTimes.length;
-    const min = Math.min(...this.transitionTimes);
-    const max = Math.max(...this.transitionTimes);
-    return { transitionCount: this.transitionCount, avgTransitionTime: avg, minTransitionTime: min, maxTransitionTime: max };
-  }
-}
-
-// ========== 初始化 ==========
-export function initChordTraining(options = {}) {
+export { TransitionDetector };
+export { initChordTraining,(options = {}) {
   currentChordDisplay = options.currentChordDisplay || null;
   nextChordDisplay = options.nextChordDisplay || null;
   currentChordCanvas = options.currentChordCanvas || null;
@@ -368,12 +305,21 @@ function renderSelectedChords() {
     selectedChordsDisplay.innerHTML = '<span class="selected-chords-empty">点击选择和弦</span>';
     return;
   }
-  selectedChordsDisplay.innerHTML = currentProgression.map((chord, index) => `
-    <span class="selected-chord-item chord-item" data-chord-index="${index}">
-      ${chord}
-      <button class="btn-remove-chord" data-index="${index}">×</button>
-    </span>
-  `).join('');
+  // Use textContent for chord names to prevent XSS attacks
+  selectedChordsDisplay.textContent = '';
+  currentProgression.forEach((chord, index) => {
+    const span = document.createElement('span');
+    span.className = 'selected-chord-item chord-item';
+    span.dataset.chordIndex = String(index);
+    const text = document.createTextNode(chord + ' ');
+    const btn = document.createElement('button');
+    btn.className = 'btn-remove-chord';
+    btn.dataset.index = String(index);
+    btn.textContent = '×';
+    span.appendChild(text);
+    span.appendChild(btn);
+    selectedChordsDisplay.appendChild(span);
+  });
 }
 
 function saveCustomProgression() {

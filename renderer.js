@@ -653,7 +653,7 @@ function renderStatsChart() {
   }
   
   const points = recentHistory.map((item, index) => ({
-    x: padding.left + (chartWidth / (recentHistory.length - 1 || 1)) * index,
+    x: padding.left + (chartWidth / Math.max(1, recentHistory.length - 1)) * index,
     y: padding.top + chartHeight - (item.score / 100) * chartHeight,
     score: item.score
   }));

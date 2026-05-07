@@ -11,6 +11,7 @@
  */
 
 import { ChordLibrary } from './chord-library.js';
+import { TransitionDetector } from './utils/transition-detector.js';
 
 // 导入常量
 import { DEBUG } from './constants.js';
@@ -132,7 +133,8 @@ class ChordDetector {
    */
   extractStringEnergies(freqData) {
     const sampleRate = this.audioContext.sampleRate;
-    const fftSize = freqData.length * 2;
+    // Use analyser.fftSize directly instead of deriving from freqData.length
+    const fftSize = this.analyser.fftSize;
     const binSize = sampleRate / fftSize;
     
     return this.stringRanges.map(range => {
@@ -166,7 +168,8 @@ class ChordDetector {
    */
   detectPeaks(freqData) {
     const sampleRate = this.audioContext.sampleRate;
-    const fftSize = freqData.length * 2;
+    // Use analyser.fftSize directly instead of deriving from freqData.length
+    const fftSize = this.analyser.fftSize;
     const binSize = sampleRate / fftSize;
     
     const peaks = [];
@@ -399,125 +402,7 @@ class ChordDetector {
   }
 }
 
-/**
- * 和弦转换检测器 - ES6 Class
- */
-class TransitionDetector {
-  constructor() {
-    this.lastChord = null;
-    this.lastStrumTime = 0;
-    this.transitions = [];
-    this.strumCount = 0;
-    this.correctChords = 0;
-  }
-
-  /**
-   * 处理和弦检测结果
-   */
-  onChordDetected(detectedChord, expectedChord, timestamp) {
-    if (expectedChord === undefined) expectedChord = null;
-    
-    this.strumCount++;
-    
-    if (expectedChord && detectedChord === expectedChord) {
-      this.correctChords++;
-    }
-    
-    if (this.lastChord && detectedChord && detectedChord !== this.lastChord) {
-      const transitionTime = timestamp - this.lastStrumTime;
-      
-      this.transitions.push({
-        from: this.lastChord,
-        to: detectedChord,
-        time: transitionTime,
-        timestamp: timestamp,
-        expected: expectedChord
-      });
-    }
-    
-    this.lastChord = detectedChord;
-    this.lastStrumTime = timestamp;
-  }
-
-  /**
-   * 获取平均转换时间
-   */
-  getAverageTransitionTime() {
-    if (!this.transitions || this.transitions.length === 0) return 0;
-    const validTransitions = this.transitions.filter(t => 
-      t && typeof t.time === 'number' && !isNaN(t.time) && isFinite(t.time)
-    );
-    if (validTransitions.length === 0) return 0;
-    const sum = validTransitions.reduce((acc, t) => acc + t.time, 0);
-    return Math.round(sum / validTransitions.length);
-  }
-
-  /**
-   * 获取最慢转换
-   */
-  getSlowestTransition() {
-    if (this.transitions.length === 0) return null;
-    return this.transitions.reduce((max, t) => t.time > max.time ? t : max);
-  }
-
-  /**
-   * 获取最快转换
-   */
-  getFastestTransition() {
-    if (this.transitions.length === 0) return null;
-    return this.transitions.reduce((min, t) => t.time < min.time ? t : min);
-  }
-
-  /**
-   * 计算转换流畅度评分
-   */
-  calculateTransitionScore(targetTime = 500) {
-    if (this.transitions.length === 0) return 100;
-    
-    const avgTime = this.getAverageTransitionTime();
-    const deviation = Math.abs(avgTime - targetTime) / targetTime;
-    
-    const sigma = 0.3;
-    const score = 100 * Math.exp(-(deviation * deviation) / (2 * sigma * sigma));
-    
-    return Math.round(Math.max(0, Math.min(100, score)));
-  }
-
-  /**
-   * 获取准确率
-   */
-  getAccuracy() {
-    if (this.strumCount === 0) return 0;
-    return Math.round((this.correctChords / this.strumCount) * 100);
-  }
-
-  /**
-   * 重置
-   */
-  reset() {
-    this.lastChord = null;
-    this.lastStrumTime = 0;
-    this.transitions = [];
-    this.strumCount = 0;
-    this.correctChords = 0;
-  }
-
-  /**
-   * 获取统计数据
-   */
-  getStats() {
-    return {
-      strumCount: this.strumCount,
-      correctChords: this.correctChords,
-      accuracy: this.getAccuracy(),
-      transitionCount: this.transitions.length,
-      avgTransitionTime: this.getAverageTransitionTime(),
-      fastestTransition: this.getFastestTransition(),
-      slowestTransition: this.getSlowestTransition(),
-      transitions: this.transitions
-    };
-  }
-}
+// TransitionDetector is now imported from utils/transition-detector.js
 
 // ES6 模块导出
 export { ChordDetector, TransitionDetector };
