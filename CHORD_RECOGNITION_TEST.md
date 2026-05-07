@@ -23,7 +23,7 @@ guitar-strum-trainer/
 
 ### 1. 启动应用
 ```bash
-cd /home/squall0629/.openclaw/workspace-se/projects/guitar-strum-trainer
+cd /Users/yang/.openclaw/workspace-se/projects/guitar-strum-trainer
 npm start
 ```
 

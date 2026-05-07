@@ -20,7 +20,7 @@ scoring.js:23 Uncaught SyntaxError: Identifier 'AMPLITUDE_GOOD' has already been
 删除第 23 行的重复导入。
 
 **修复位置：**
-`/home/squall0629/.openclaw/workspace-se/projects/guitar-strum-trainer/scoring.js` 第 16-26 行
+`/Users/yang/.openclaw/workspace-se/projects/guitar-strum-trainer/scoring.js` 第 16-26 行
 
 ---
 
@@ -41,7 +41,7 @@ import 语句被分成了 5 个块，分布在第 5、20-24、31-34、36-56、58
 - 符合 ES6 模块规范
 
 **修复位置：**
-`/home/squall0629/.openclaw/workspace-se/projects/guitar-strum-trainer/renderer.js`
+`/Users/yang/.openclaw/workspace-se/projects/guitar-strum-trainer/renderer.js`
 
 ---
 
@@ -114,7 +114,7 @@ INFO  Accepting connections at http://localhost:3000
 
 ### 1. 本地测试
 ```bash
-cd /home/squall0629/.openclaw/workspace-se/projects/guitar-strum-trainer
+cd /Users/yang/.openclaw/workspace-se/projects/guitar-strum-trainer
 npm start
 ```
 

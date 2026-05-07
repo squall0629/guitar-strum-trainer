@@ -66,7 +66,7 @@ Canvas 渲染 → UI 显示
 
 ### 准备工作
 ```bash
-cd /home/squall0629/.openclaw/workspace-se/projects/guitar-strum-trainer
+cd /Users/yang/.openclaw/workspace-se/projects/guitar-strum-trainer
 npm install
 npm start
 ```
