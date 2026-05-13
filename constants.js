@@ -154,4 +154,4 @@ export const MIC_TEST_VOLUME_SCALE = 128;
 
 // ========== 调试模式 ==========
 export const DEBUG = false;
-export const APP_VERSION = 'v2.1';
+export const APP_VERSION = '2026-05-13';

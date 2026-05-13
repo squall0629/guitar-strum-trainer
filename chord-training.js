@@ -76,7 +76,7 @@ function cacheProgressionDetailElements() {
 }
 
 export { TransitionDetector };
-export { initChordTraining,(options = {}) {
+export function initChordTraining(options = {}) {
   currentChordDisplay = options.currentChordDisplay || null;
   nextChordDisplay = options.nextChordDisplay || null;
   currentChordCanvas = options.currentChordCanvas || null;
